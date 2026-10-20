@@ -1,0 +1,345 @@
+﻿@page "/media/tv/seasons/{SeasonId:int}"
+@using ErsatzTV.Application.MediaCards
+@using ErsatzTV.Application.MediaCollections
+@using ErsatzTV.Application.MediaItems
+@using ErsatzTV.Application.ProgramSchedules
+@using ErsatzTV.Application.Television
+@using ErsatzTV.Extensions
+@implements IDisposable
+@inject IMediator Mediator
+@inject ILogger<TelevisionEpisodeList> Logger
+@inject ISnackbar Snackbar
+@inject IDialogService Dialog
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JsRuntime
+
+<MudContainer MaxWidth="MaxWidth.False" Style="padding: 0" Class="fanart-container">
+    <div class="fanart-tint"></div>
+    @if (!string.IsNullOrWhiteSpace(_season?.FanArt))
+    {
+        if (_season.FanArt.StartsWith("http://") || _season.FanArt.StartsWith("https://"))
+        {
+            <img src="@_season.FanArt" alt="fan art"/>
+        }
+        else
+        {
+            <img src="@($"artwork/fanart/{_season.FanArt}")" alt="fan art"/>
+        }
+    }
+</MudContainer>
+<MudContainer MaxWidth="MaxWidth.Large" Style="margin-top: 100px" Class="z-10">
+    <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Spacing="6">
+        @if (!string.IsNullOrWhiteSpace(_season?.Poster))
+        {
+            <MudImage Src="@GetPosterUrl(_season.Poster)" Elevation="2" Class="rounded-lg z-10" Style="max-height: 325px; margin-left: auto; margin-right: auto"/>
+        }
+        <MudStack Row="false" Style="flex: 1" Class="z-10">
+            <MudStack Row="false">
+                <MudLink Href="@($"media/tv/shows/{_season?.ShowId}")">
+                    <MudHidden Invert="true" Breakpoint="Breakpoint.SmAndDown">
+                        <MudText Typo="Typo.h4" Class="media-item-title">@_season?.Title</MudText>
+                    </MudHidden>
+                    <MudHidden Invert="true" Breakpoint="Breakpoint.MdAndUp">
+                        <MudText Typo="Typo.h2" Class="media-item-title">@_season?.Title</MudText>
+                    </MudHidden>
+                </MudLink>
+                <MudText Typo="Typo.subtitle1" Class="media-item-subtitle mb-6 mud-text-secondary">@_season?.Name</MudText>
+            </MudStack>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="mb-6">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="@AddToCollection">
+                    Add To Collection
+                </MudButton>
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.PlaylistAdd"
+                           OnClick="@AddToPlaylist">
+                    Add To Playlist
+                </MudButton>
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Schedule"
+                           OnClick="@AddToSchedule">
+                    Add To Schedule
+                </MudButton>
+            </MudStack>
+        </MudStack>
+    </MudStack>
+</MudContainer>
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-8">
+    <MudStack Row="false" Spacing="6">
+        @foreach (TelevisionEpisodeCardViewModel episode in _data.Cards)
+        {
+            <MudCard>
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" id="@($"episode-{episode.EpisodeId}")">
+                    @if (!string.IsNullOrWhiteSpace(episode.Poster))
+                    {
+                        <div style="display: flex; flex-direction: column; position: relative">
+                            <MudHidden Invert="true" Breakpoint="Breakpoint.SmAndDown">
+                                <MudImage Src="@GetThumbnailUrl(episode.Poster)" Style="max-height: 220px; max-width: 265px; margin-left: auto; margin-right: auto;"/>
+                            </MudHidden>
+                            <MudHidden Invert="true" Breakpoint="Breakpoint.MdAndUp">
+                                <MudImage Src="@GetThumbnailUrl(episode.Poster)" Style="max-height: 220px; max-width: 392px; margin-left: auto; margin-right: auto;"/>
+                            </MudHidden>
+                            @if (episode.State == MediaItemState.FileNotFound)
+                            {
+                                <div style="position: absolute; right: 10px; top: 8px;">
+                                    <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" Size="Size.Large"/>
+                                </div>
+                            }
+                            else if (episode.State == MediaItemState.Unavailable)
+                            {
+                                <div style="position: absolute; right: 10px; top: 8px;">
+                                    <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Size="Size.Large"/>
+                                </div>
+                            }
+                        </div>
+                    }
+                    <MudCardContent Class="ml-3">
+                        <div style="display: flex; flex-direction: column; height: 100%">
+                            <MudText Typo="Typo.h4" Class="mb-6">@episode.Episode. @episode.Title</MudText>
+                            <MudText Class="d-none d-md-flex" Style="flex-grow: 1">@episode.Plot</MudText>
+                            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown">
+                                <MudMenu Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Label="Add To ...">
+                                    <MudMenuItem OnClick="@(_ => AddEpisodeToCollection(episode))" Icon="@Icons.Material.Filled.Add">
+                                        Add To Collection
+                                    </MudMenuItem>
+                                    <MudMenuItem OnClick="@(_ => AddEpisodeToPlaylist(episode))" Icon="@Icons.Material.Filled.PlaylistAdd">
+                                        Add To Playlist
+                                    </MudMenuItem>
+                                </MudMenu>
+                                <MudButton Variant="Variant.Filled"
+                                           Color="Color.Secondary"
+                                           StartIcon="@Icons.Material.Filled.Info"
+                                           OnClick="@(_ => ShowInfo(episode))">
+                                    Show Media Info
+                                </MudButton>
+                                <MudButton Variant="Variant.Filled"
+                                           Color="Color.Secondary"
+                                           StartIcon="@Icons.Material.Filled.Troubleshoot"
+                                           Href="@($"system/troubleshooting/playback?mediaItem={episode.EpisodeId}")">
+                                    Troubleshoot Playback
+                                </MudButton>
+                            </MudStack>
+                        </div>
+                    </MudCardContent>
+                </MudStack>
+                <div class="pl-3 pt-3">
+                    @if (episode.State == MediaItemState.FileNotFound)
+                    {
+                        <div class="mb-3" style="display: flex; flex-direction: row; flex-wrap: wrap">
+                            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" Class="mr-2"/>
+                            <MudText>File Not Found:&nbsp;</MudText>
+                            <MudText>@episode.Path</MudText>
+                        </div>
+                    }
+                    else if (episode.State == MediaItemState.Unavailable)
+                    {
+                        <div class="mb-3" style="display: flex; flex-direction: row; flex-wrap: wrap">
+                            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Class="mr-2"/>
+                            <MudText>Unavailable:&nbsp;</MudText>
+                            <MudText>@episode.LocalPath</MudText>
+                        </div>
+                    }
+                    <div class="d-none d-md-flex" style="flex-direction: row; flex-wrap: wrap">
+                        <MudText GutterBottom="true">Released: @episode.Aired.ToShortDateString()</MudText>
+                    </div>
+                    @if (episode.Directors.Any())
+                    {
+                        var sorted = episode.Directors.OrderBy(w => w).ToList();
+
+                        <div style="display: flex; flex-direction: row; flex-wrap: wrap">
+                            <MudText GutterBottom="true">Directors:&nbsp;</MudText>
+                            <MudLink Href="@(@$"director:""{sorted.Head().ToLowerInvariant()}""".GetRelativeSearchQuery())">@sorted.Head()</MudLink>
+                            @foreach (string director in sorted.Skip(1))
+                            {
+                                <MudText>,&nbsp;</MudText>
+                                <MudLink Href="@(@$"director:""{director.ToLowerInvariant()}""".GetRelativeSearchQuery())">@director</MudLink>
+                            }
+                        </div>
+                    }
+                    @if (episode.Writers.Any())
+                    {
+                        var sorted = episode.Writers.OrderBy(w => w).ToList();
+
+                        <div style="display: flex; flex-direction: row; flex-wrap: wrap">
+                            <MudText GutterBottom="true">Writers:&nbsp;</MudText>
+                            <MudLink Href="@(@$"writer:""{sorted.Head().ToLowerInvariant()}""".GetRelativeSearchQuery())">@sorted.Head()</MudLink>
+                            @foreach (string writer in sorted.Skip(1))
+                            {
+                                <MudText>,&nbsp;</MudText>
+                                <MudLink Href="@(@$"writer:""{writer.ToLowerInvariant()}""".GetRelativeSearchQuery())">@writer</MudLink>
+                            }
+                        </div>
+                    }
+                </div>
+            </MudCard>
+        }
+    </MudStack>
+</MudContainer>
+
+@code {
+    private CancellationTokenSource _cts;
+
+    [Parameter]
+    public int SeasonId { get; set; }
+
+    private TelevisionSeasonViewModel _season;
+
+    private static int PageSize => 100;
+    private const int PageNumber = 1;
+
+    private TelevisionEpisodeCardResultsViewModel _data = new(0, new List<TelevisionEpisodeCardViewModel>(), null);
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                await NavigationManager.NavigateToFragmentAsync(JsRuntime);
+            }
+            catch (Exception)
+            {
+                // ignored
+            }
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        try
+        {
+            await Mediator.Send(new GetTelevisionSeasonById(SeasonId), token).IfSomeAsync(vm => _season = vm);
+            _data = await Mediator.Send(new GetTelevisionEpisodeCards(SeasonId, PageNumber, PageSize), token);
+        }
+        catch (OperationCanceledException)
+        {
+            // do nothing
+        }
+    }
+
+    private async Task AddToCollection()
+    {
+        var parameters = new DialogParameters { { "EntityType", "season" }, { "EntityName", $"{_season.Title} - {_season.Name}" } };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        IDialogReference dialog = await Dialog.ShowAsync<AddToCollectionDialog>("Add To Collection", parameters, options);
+        DialogResult result = await dialog.Result;
+        if (result is { Canceled: false, Data: MediaCollectionViewModel collection })
+        {
+            await Mediator.Send(new AddSeasonToCollection(collection.Id, SeasonId), _cts.Token);
+            NavigationManager.NavigateTo($"media/collections/{collection.Id}");
+        }
+    }
+
+    private async Task AddToPlaylist()
+    {
+        var parameters = new DialogParameters { { "EntityType", "season" }, { "EntityName", $"{_season.Title} - {_season.Name}" } };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        IDialogReference dialog = await Dialog.ShowAsync<AddToPlaylistDialog>("Add To Playlist", parameters, options);
+        DialogResult result = await dialog.Result;
+        if (result is { Canceled: false, Data: PlaylistViewModel playlist })
+        {
+            await Mediator.Send(new AddSeasonToPlaylist(playlist.Id, SeasonId), _cts.Token);
+            NavigationManager.NavigateTo($"media/playlists/{playlist.Id}");
+        }
+    }
+
+    private async Task AddToSchedule()
+    {
+        var parameters = new DialogParameters { { "EntityType", "season" }, { "EntityName", $"{_season.Title} - {_season.Name}" } };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        IDialogReference dialog = await Dialog.ShowAsync<AddToScheduleDialog>("Add To Schedule", parameters, options);
+        DialogResult result = await dialog.Result;
+        if (result is { Canceled: false, Data: ProgramScheduleViewModel schedule })
+        {
+            await Mediator.Send(AddProgramScheduleItem.ForMediaItem(schedule.Id, CollectionType.TelevisionSeason, SeasonId), _cts.Token);
+            NavigationManager.NavigateTo($"schedules/{schedule.Id}/items");
+        }
+    }
+
+    private async Task AddEpisodeToCollection(TelevisionEpisodeCardViewModel episode)
+    {
+        var parameters = new DialogParameters { { "EntityType", "episode" }, { "EntityName", episode.Title } };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        IDialogReference dialog = await Dialog.ShowAsync<AddToCollectionDialog>("Add To Collection", parameters, options);
+        DialogResult result = await dialog.Result;
+        if (result is { Canceled: false, Data: MediaCollectionViewModel collection })
+        {
+            var request = new AddEpisodeToCollection(collection.Id, episode.EpisodeId);
+            Either<BaseError, Unit> addResult = await Mediator.Send(request, _cts.Token);
+            addResult.Match(
+                Left: error =>
+                {
+                    Snackbar.Add($"Unexpected error adding episode to collection: {error.Value}");
+                    Logger.LogError("Unexpected error adding episode to collection: {Error}", error.Value);
+                },
+                Right: _ => Snackbar.Add($"Added {episode.Title} to collection {collection.Name}", Severity.Success));
+        }
+    }
+
+    private async Task AddEpisodeToPlaylist(TelevisionEpisodeCardViewModel episode)
+    {
+        var parameters = new DialogParameters { { "EntityType", "episode" }, { "EntityName", episode.Title } };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        IDialogReference dialog = await Dialog.ShowAsync<AddToPlaylistDialog>("Add To Playlist", parameters, options);
+        DialogResult result = await dialog.Result;
+        if (result is { Canceled: false, Data: PlaylistViewModel playlist })
+        {
+            var request = new AddEpisodeToPlaylist(playlist.Id, episode.EpisodeId);
+            Either<BaseError, Unit> addResult = await Mediator.Send(request, _cts.Token);
+            addResult.Match(
+                Left: error =>
+                {
+                    Snackbar.Add($"Unexpected error adding episode to playlist: {error.Value}");
+                    Logger.LogError("Unexpected error adding episode to playlist: {Error}", error.Value);
+                },
+                Right: _ => Snackbar.Add($"Added {episode.Title} to playlist {playlist.Name}", Severity.Success));
+        }
+    }
+
+    private async Task ShowInfo(TelevisionEpisodeCardViewModel episode)
+    {
+        Either<BaseError, MediaItemInfo> maybeInfo = await Mediator.Send(new GetMediaItemInfo(episode.EpisodeId));
+
+        foreach (BaseError error in maybeInfo.LeftToSeq())
+        {
+            Snackbar.Add("Unexpected error loading media info");
+            Logger.LogError("Unexpected error loading media info: {Error}", error.Value);
+        }
+
+        foreach (MediaItemInfo info in maybeInfo.RightToSeq())
+        {
+            var parameters = new DialogParameters { { "MediaItemInfo", info } };
+            var options = new DialogOptions { CloseButton = true, CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+            IDialogReference dialog = await Dialog.ShowAsync<MediaItemInfoDialog>(
+                $"{episode.ShowTitle} - s{episode.Season:00}e{episode.Episode:00} - {episode.Title}",
+                parameters,
+                options);
+            DialogResult _ = await dialog.Result;
+        }
+    }
+
+    private static string GetPosterUrl(string poster) => poster.StartsWith("http://") || poster.StartsWith("https://") ? poster : $"artwork/posters/{poster}";
+
+    private static string GetThumbnailUrl(string poster) => poster.StartsWith("http://") || poster.StartsWith("https://") ? poster : $"artwork/thumbnails/{poster}";
+
+}

@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Feature Requests
+    url: https://features.ersatztv.org
+    about: Features
+  - name: Contact
+    url: https://ersatztv.org/contact
+    about: Chat Options
+  - name: Community
+    url: https://discuss.ersatztv.org
+    about: Forum
+  - name: Discussions
+    url: https://github.com/ErsatzTV/ErsatzTV/discussions
+    about: Discuss

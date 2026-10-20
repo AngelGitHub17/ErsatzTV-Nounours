@@ -1,0 +1,417 @@
+@page "/channels"
+@using System.Globalization
+@using ErsatzTV.Application.Channels
+@using ErsatzTV.Application.Configuration
+@using ErsatzTV.Application.FFmpegProfiles
+@using ErsatzTV.Core.Interfaces.FFmpeg
+@implements IDisposable
+@inject IDialogService Dialog
+@inject IJSRuntime JsRuntime
+@inject IMediator Mediator
+@inject NavigationManager NavigationManager
+@inject IFFmpegSegmenterService SegmenterService
+@inject IStringLocalizer<ErsatzTV.Locals.Pages.Channels> Loc;
+@inject IStringLocalizer<ErsatzTV.Locals.Shared.Common> CommonLoc;
+@inject IStringLocalizer<ErsatzTV.Locals.Shared.MainLayout> MainLayoutLoc;
+
+<MudForm Style="max-height: 100%">
+    <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-6" StartIcon="@Icons.Material.Filled.Add" Href="channels/add">
+            @Loc["ButtonAddChannel"]
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Secondary" Class="ml-3" StartIcon="@Icons.Material.Filled.Edit" Href="channels/numbers">
+            @Loc["ButtonEditChannelNumbers"]
+        </MudButton>
+    </MudPaper>
+    <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
+            <MudText Typo="Typo.h5" Class="mb-2">@MainLayoutLoc["ButtonChannels"]</MudText>
+            <MudDivider Class="mb-6"/>
+            <MudTable Hover="true"
+                      @bind-RowsPerPage="@_rowsPerPage"
+                      ServerData="@(new Func<TableState, CancellationToken, Task<TableData<ChannelViewModel>>>(ServerReload))"
+                      @ref="_table"
+                      RowClassFunc="ChannelRowClassFunc">
+                <ToolBarContent>
+                    <MudSwitch T="bool" Class="ml-6" @bind-Value="@ShowDisabled" Color="Color.Secondary" Label="@Loc["ButtonShowDisabled"]"/>
+                </ToolBarContent>
+                <ColGroup>
+                    <MudHidden Breakpoint="Breakpoint.Xs">
+                        <col style="width: 60px;"/>
+                        <col/>
+                        <col style="width: 15%"/>
+                        <col style="width: 15%"/>
+                        <col style="width: 15%"/>
+                        <col style="width: 15%"/>
+                        <col style="width: 300px;"/>
+                    </MudHidden>
+                </ColGroup>
+                <HeaderContent>
+                    <MudTh>
+                        <MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<ChannelViewModel, object>(x => decimal.Parse(x.Number, CultureInfo.InvariantCulture))">@Loc["LabelNumber"]</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>@Loc["LabelLogo"]</MudTh>
+                    <MudTh>
+                        <MudTableSortLabel SortBy="new Func<ChannelViewModel, object>(x => x.Name)">@Loc["LabelName"]</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>@Loc["LabelLanguage"]</MudTh>
+                    <MudTh>@Loc["LabelStreamingMode"]</MudTh>
+                    <MudTh>@Loc["LabelFFmpegProfile"]</MudTh>
+                    <MudTh/>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="@Loc["LabelNumber"]">
+                        @if (!context.IsEnabled)
+                        {
+                            <MudTooltip Text="@Loc["LabelChannelDisabledHelp"]">
+                                @($"({Loc["LabelChannelDisabledAbbreviation"]}) {context.Number}")
+                            </MudTooltip>
+                        }
+                        else if (!context.ShowInEpg)
+                        {
+                            <MudTooltip Text="@Loc["LabelChannelHiddenHelp"]">
+                                @($"({Loc["LabelChannelHiddenAbbreviation"]}) {context.Number}")
+                            </MudTooltip>
+                        }
+                        else
+                        {
+                            @context.Number
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="@Loc["LabelLogo"]">
+                        @if (!string.IsNullOrWhiteSpace(context.Logo?.Path))
+                        {
+                            <MudElement HtmlTag="img" src="@context.Logo.UrlWithContentType" Style="max-height: 50px"/>
+                        }
+                        else
+                        {
+                            <MudElement HtmlTag="img" src="@($"iptv/logos/gen?text={context.WebEncodedName}")" Style="max-height: 50px"/>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="@Loc["LabelName"]">@context.Name</MudTd>
+                    <MudTd DataLabel="@Loc["LabelLanguage"]">@context.PreferredAudioLanguageCode</MudTd>
+                    <MudTd DataLabel="@Loc["LabelStreamingMode"]">@GetStreamingMode(context.StreamingMode)</MudTd>
+                    <MudTd DataLabel="@Loc["LabelFFmpegProfile"]">
+                        @if (context.StreamingMode != StreamingMode.HttpLiveStreamingDirect)
+                        {
+                            @_ffmpegProfiles.Find(p => p.Id == context.FFmpegProfileId)?.Name
+                        }
+                    </MudTd>
+                    <MudTd>
+                        <div style="align-items: center; display: flex;">
+                            @if (_channelsThatCanPreview.Contains(context.Id))
+                            {
+                                Option<FFmpegProfileViewModel> maybeProfile = Optional(_ffmpegProfiles.Find(p => p.Id == context.FFmpegProfileId));
+                                bool notNormalizing = maybeProfile.Any(p => !p.NormalizeVideo || !p.NormalizeAudio);
+                                if (notNormalizing)
+                                {
+                                    <MudTooltip Text="@Loc["ButtonPreviewChannelHelpNormalize"]">
+                                        <MudIconButton Icon="@Icons.Material.Filled.PlayCircle"
+                                                       OnClick="@(_ => PreviewChannel(context))"
+                                                       Style="color: var(--mud-palette-warning-lighten);">
+                                        </MudIconButton>
+                                    </MudTooltip>
+                                }
+                                else
+                                {
+                                    <MudTooltip Text="@Loc["ButtonPreviewChannelHelp"]">
+                                        <MudIconButton Icon="@Icons.Material.Filled.PlayCircle"
+                                                       OnClick="@(_ => PreviewChannel(context))">
+                                        </MudIconButton>
+                                    </MudTooltip>
+                                }
+                            }
+                            else if (CanPreviewChannel(context) && _ffmpegProfilesThatCanPreview.ContainsKey(context.FFmpegProfileId) && !_ffmpegProfilesThatCanPreview[context.FFmpegProfileId])
+                            {
+                                <MudTooltip Text="@Loc["ButtonPreviewChannelHelpBrowser"]">
+                                    <div style="height: 48px; width: 48px; align-items: center; display: flex; justify-content: center">
+                                        <!--suppress CssUnresolvedCustomProperty -->
+                                        <MudIcon Icon="@Icons.Material.Filled.PlayCircle" Style="color: var(--mud-palette-error-lighten);">
+                                        </MudIcon>
+                                    </div>
+                                </MudTooltip>
+                            }
+                            else
+                            {
+                                <MudTooltip Text="@Loc["ButtonPreviewChannelHelpSettings"]">
+                                    <MudIconButton Icon="@Icons.Material.Filled.PlayCircle" Disabled="true">
+                                    </MudIconButton>
+                                </MudTooltip>
+                            }
+                            @if (SegmenterService.IsActive(context.Number))
+                            {
+                                <MudTooltip Text="@Loc["ButtonStopTranscodeHelp"]">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Stop"
+                                                   OnClick="@(_ => StopChannel(context))">
+                                    </MudIconButton>
+                                </MudTooltip>
+                            }
+                            else
+                            {
+                                <div style="width: 48px"></div>
+                            }
+                            <MudTooltip Text="@Loc["ButtonEditChannelHelp"]">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                               Href="@($"channels/{context.Id}")">
+                                </MudIconButton>
+                            </MudTooltip>
+                            @if (context.PlayoutCount > 0 && context.IsEnabled)
+                            {
+                                <MudTooltip Text="@Loc["ButtonTroubleshootChannelHelp"]">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Troubleshoot"
+                                                   Href="@($"system/troubleshooting/playback?channel={context.Id}")">
+                                    </MudIconButton>
+                                </MudTooltip>
+                            }
+                            else
+                            {
+                                <div style="width: 48px"></div>
+                            }
+                            <MudTooltip Text="@Loc["ButtonDeleteChannelHelp"]">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               OnClick="@(_ => DeleteChannelAsync(context))">
+                                </MudIconButton>
+                            </MudTooltip>
+                        </div>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager RowsPerPageString="@CommonLoc["LabelRowsPerPage"]" />
+                </PagerContent>
+            </MudTable>
+        </MudContainer>
+    </div>
+</MudForm>
+
+@code {
+    private CancellationTokenSource _cts;
+
+    private MudTable<ChannelViewModel> _table;
+    private List<FFmpegProfileViewModel> _ffmpegProfiles = [];
+    private readonly System.Collections.Generic.HashSet<int> _channelsThatCanPreview = [];
+    private readonly Dictionary<int, bool> _ffmpegProfilesThatCanPreview = [];
+    private bool _showDisabled;
+    private int _rowsPerPage = 10;
+
+    private bool ShowDisabled
+    {
+        get => _showDisabled;
+        set
+        {
+            if (_showDisabled != value)
+            {
+                _showDisabled = value;
+                _table?.ReloadServerData();
+            }
+        }
+    }
+
+    protected override void OnInitialized() => SegmenterService.OnWorkersChanged += WorkersChanged;
+
+    private void WorkersChanged(object sender, EventArgs e) =>
+        InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        SegmenterService.OnWorkersChanged -= WorkersChanged;
+
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        try
+        {
+            _ffmpegProfiles = await Mediator.Send(new GetAllFFmpegProfiles(), token);
+            token.ThrowIfCancellationRequested();
+            _rowsPerPage = await Mediator.Send(new GetConfigElementByKey(ConfigElementKey.ChannelsPageSize), token)
+                .Map(maybeRows => maybeRows.Match(ce => int.TryParse(ce.Value, out int rows) ? rows : 10, () => 10));
+            _showDisabled = await Mediator.Send(new GetConfigElementByKey(ConfigElementKey.ChannelsShowDisabled), token)
+                .Map(maybeShow => maybeShow.Match(ce => bool.TryParse(ce.Value, out bool show) && show, () => false));
+        }
+        catch (OperationCanceledException)
+        {
+            // do nothing
+        }
+    }
+
+    private async Task StopChannel(ChannelViewModel channel)
+    {
+        using var cts = new CancellationTokenSource();
+        await SegmenterService.StopChannel(channel.Number, cts.Token);
+    }
+
+    private bool CanPreviewChannel(ChannelViewModel channel)
+    {
+        if (!channel.IsEnabled)
+        {
+            return false;
+        }
+
+        if (channel.StreamingMode is StreamingMode.HttpLiveStreamingDirect or StreamingMode.TransportStream)
+        {
+            return false;
+        }
+
+        if (channel.PlayoutCount < 1)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private async Task<bool> CanPreviewFFmpegProfile(int ffmpegProfileId)
+    {
+        Option<FFmpegProfileViewModel> maybeProfile = Optional(_ffmpegProfiles.Find(p => p.Id == ffmpegProfileId));
+        foreach (FFmpegProfileViewModel profile in maybeProfile)
+        {
+            string videoCodec = profile.VideoFormat switch
+            {
+                FFmpegProfileVideoFormat.Av1 => "av01.0.01M.08",
+                FFmpegProfileVideoFormat.Hevc => "hvc1.1.6.L93.B0",
+                FFmpegProfileVideoFormat.H264 => "avc1.4D4028",
+                _ => string.Empty
+            };
+
+            string audioCodec = profile.AudioFormat switch
+            {
+                FFmpegProfileAudioFormat.Ac3 => "ac-3",
+                FFmpegProfileAudioFormat.Aac => "mp4a.40.2",
+                _ => string.Empty
+            };
+
+            //Console.WriteLine($"Checking video format {videoCodec} and audio format {audioCodec}");
+
+            // good luck
+            if (profile.VideoFormat == FFmpegProfileVideoFormat.Copy || profile.AudioFormat == FFmpegProfileAudioFormat.Copy)
+            {
+                return true;
+            }
+
+            if (string.IsNullOrWhiteSpace(videoCodec) || string.IsNullOrWhiteSpace(audioCodec))
+            {
+                return false;
+            }
+
+            return await BrowserSupportsCodec($"{videoCodec}, {audioCodec}");
+        }
+
+        return false;
+    }
+
+    private async Task PreviewChannel(ChannelViewModel channel)
+    {
+        if (!CanPreviewChannel(channel) || !await CanPreviewFFmpegProfile(channel.FFmpegProfileId))
+        {
+            return;
+        }
+
+        var uri = new UriBuilder(NavigationManager.ToAbsoluteUri(NavigationManager.Uri));
+        uri.Path = uri.Path.Replace("/channels", $"/iptv/channel/{channel.Number}.m3u8");
+        uri.Query = channel.StreamingMode switch
+        {
+            _ => "?mode=segmenter"
+        };
+
+        if (JwtHelper.IsEnabled)
+        {
+            uri.Query += $"&access_token={JwtHelper.GenerateToken()}";
+        }
+
+        var parameters = new DialogParameters { { "StreamUri", uri.ToString() } };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraLarge };
+        await Dialog.ShowAsync<ChannelPreviewDialog>("Channel Preview", parameters, options);
+    }
+
+    private async Task DeleteChannelAsync(ChannelViewModel channel)
+    {
+        var parameters = new DialogParameters { { "EntityType", "channel" }, { "EntityName", channel.Name } };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        IDialogReference dialog = await Dialog.ShowAsync<DeleteDialog>("Delete Channel", parameters, options);
+        DialogResult result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            using var cts = new CancellationTokenSource();
+            await Mediator.Send(new DeleteChannel(channel.Id), cts.Token);
+            if (_table != null)
+            {
+                await _table.ReloadServerData();
+            }
+        }
+    }
+
+    private async Task<TableData<ChannelViewModel>> ServerReload(TableState state, CancellationToken cancellationToken)
+    {
+        await Mediator.Send(new SaveConfigElementByKey(ConfigElementKey.ChannelsPageSize, state.PageSize.ToString()), cancellationToken);
+        await Mediator.Send(new SaveConfigElementByKey(ConfigElementKey.ChannelsShowDisabled, _showDisabled.ToString()), cancellationToken);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        List<ChannelViewModel> channels = await Mediator.Send(new GetAllChannels(_showDisabled), cancellationToken);
+        // TODO: properly page this data
+        IOrderedEnumerable<ChannelViewModel> sorted = channels.OrderBy(c => decimal.Parse(c.Number, CultureInfo.InvariantCulture))
+            .Skip(state.Page * state.PageSize)
+            .Take(state.PageSize)
+            .OrderBy(c => decimal.Parse(c.Number, CultureInfo.InvariantCulture));
+
+        CultureInfo[] allCultures = CultureInfo.GetCultures(CultureTypes.NeutralCultures);
+        var processedChannels = new List<ChannelViewModel>();
+        _channelsThatCanPreview.Clear();
+        _ffmpegProfilesThatCanPreview.Clear();
+        foreach (ChannelViewModel channel in sorted)
+        {
+            Option<CultureInfo> maybeCultureInfo = allCultures.Find(ci => string.Equals(
+                ci.ThreeLetterISOLanguageName,
+                channel.PreferredAudioLanguageCode,
+                StringComparison.OrdinalIgnoreCase));
+
+            maybeCultureInfo.Match(
+                cultureInfo => processedChannels.Add(channel with { PreferredAudioLanguageCode = cultureInfo.EnglishName }),
+                () => processedChannels.Add(channel));
+
+            if (!_ffmpegProfilesThatCanPreview.TryGetValue(channel.FFmpegProfileId, out bool canPreviewFFmpegProfile))
+            {
+                canPreviewFFmpegProfile = await CanPreviewFFmpegProfile(channel.FFmpegProfileId);
+                _ffmpegProfilesThatCanPreview.Add(channel.FFmpegProfileId, canPreviewFFmpegProfile);
+            }
+
+            if (CanPreviewChannel(channel) && canPreviewFFmpegProfile)
+            {
+                _channelsThatCanPreview.Add(channel.Id);
+            }
+        }
+
+        return new TableData<ChannelViewModel>
+        {
+            TotalItems = channels.Count,
+            Items = processedChannels
+        };
+    }
+
+    private static string GetStreamingMode(StreamingMode streamingMode) => streamingMode switch
+    {
+        StreamingMode.HttpLiveStreamingDirect => "HLS Direct",
+        StreamingMode.HttpLiveStreamingSegmenter => "HLS Segmenter",
+        StreamingMode.TransportStreamHybrid => "MPEG-TS",
+        _ => "MPEG-TS (Legacy)"
+    };
+
+    private async Task<bool> BrowserSupportsCodec(string codecString)
+    {
+        return await JsRuntime.InvokeAsync<bool>("mediaSourceSupports", codecString);
+    }
+
+    private string ChannelRowClassFunc(ChannelViewModel channel, int index)
+    {
+        return channel.IsEnabled && channel.ShowInEpg ? string.Empty : "channel-disabled";
+    }
+
+}

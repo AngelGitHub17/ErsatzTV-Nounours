@@ -1,0 +1,61 @@
+﻿@inject IJSRuntime JsRuntime
+@implements IDisposable
+
+<div>
+    <MudDialog>
+        <DialogContent>
+            <media-controller style="width: 800px; height: calc(800px * 9/16)">
+                <video id="video" slot="media"></video>
+                <media-control-bar>
+                    <media-mute-button></media-mute-button>
+                    <media-volume-range></media-volume-range>
+                    <media-captions-button></media-captions-button>
+                    <media-fullscreen-button></media-fullscreen-button>
+                </media-control-bar>
+            </media-controller>
+        </DialogContent>
+        <DialogActions>
+            <MudButton Color="Color.Primary" OnClick="Close">Close</MudButton>
+        </DialogActions>
+    </MudDialog>
+</div>
+
+@code {
+
+    [CascadingParameter]
+    IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public string StreamUri { get; set; }
+
+    protected override Task OnParametersSetAsync() => Task.CompletedTask;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try
+        {
+            await JsRuntime.InvokeVoidAsync("previewChannel", StreamUri);
+        }
+        catch (Exception)
+        {
+            // ignored
+        }
+
+        await base.OnAfterRenderAsync(true);
+    }
+
+    private void Close() => MudDialog.Close(DialogResult.Ok(true));
+
+    public void Dispose()
+    {
+        try
+        {
+            JsRuntime.InvokeVoidAsync("stopPreview");
+        }
+        catch (Exception)
+        {
+            // ignore
+        }
+    }
+
+}

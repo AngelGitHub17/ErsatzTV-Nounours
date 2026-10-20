@@ -1,0 +1,157 @@
+using ErsatzTV.FFmpeg.Capabilities;
+using ErsatzTV.FFmpeg.Decoder;
+using ErsatzTV.FFmpeg.Encoder;
+using ErsatzTV.FFmpeg.Encoder.VideoToolbox;
+using ErsatzTV.FFmpeg.Filter;
+using ErsatzTV.FFmpeg.Format;
+using ErsatzTV.FFmpeg.GlobalOption.HardwareAcceleration;
+using ErsatzTV.FFmpeg.OutputFormat;
+using ErsatzTV.FFmpeg.OutputOption;
+using Microsoft.Extensions.Logging;
+
+namespace ErsatzTV.FFmpeg.Pipeline;
+
+public class VideoToolboxPipelineBuilder : SoftwarePipelineBuilder
+{
+    private readonly IHardwareCapabilities _hardwareCapabilities;
+    private readonly ILogger _logger;
+
+    public VideoToolboxPipelineBuilder(
+        IFFmpegCapabilities ffmpegCapabilities,
+        IHardwareCapabilities hardwareCapabilities,
+        HardwareAccelerationMode hardwareAccelerationMode,
+        Option<VideoInputFile> videoInputFile,
+        Option<AudioInputFile> audioInputFile,
+        Option<WatermarkInputFile> watermarkInputFile,
+        Option<SubtitleInputFile> subtitleInputFile,
+        Option<ConcatInputFile> concatInputFile,
+        Option<GraphicsEngineInput> graphicsEngineInput,
+        string reportsFolder,
+        string fontsFolder,
+        ILogger logger) : base(
+        ffmpegCapabilities,
+        hardwareAccelerationMode,
+        videoInputFile,
+        audioInputFile,
+        watermarkInputFile,
+        subtitleInputFile,
+        concatInputFile,
+        graphicsEngineInput,
+        reportsFolder,
+        fontsFolder,
+        logger)
+    {
+        _hardwareCapabilities = hardwareCapabilities;
+        _logger = logger;
+    }
+
+    protected override FFmpegState SetAccelState(
+        VideoStream videoStream,
+        FFmpegState ffmpegState,
+        FrameState desiredState,
+        PipelineContext context,
+        ICollection<IPipelineStep> pipelineSteps)
+    {
+        FFmpegCapability decodeCapability = _hardwareCapabilities.CanDecode(
+            videoStream.Codec,
+            videoStream.Profile,
+            videoStream.PixelFormat,
+            videoStream.ColorParams);
+        FFmpegCapability encodeCapability = _hardwareCapabilities.CanEncode(
+            desiredState.VideoFormat,
+            desiredState.VideoProfile,
+            desiredState.PixelFormat);
+
+        // use software encoding (rawvideo) when piping to parent hls segmenter
+        if (ffmpegState.OutputFormat is OutputFormatKind.Nut)
+        {
+            encodeCapability = FFmpegCapability.Software;
+        }
+
+        if (decodeCapability is FFmpegCapability.Hardware)
+        {
+            pipelineSteps.Add(new VideoToolboxHardwareAccelerationOption());
+        }
+
+        // disable hw accel if decoder/encoder isn't supported
+        return ffmpegState with
+        {
+            DecoderHardwareAccelerationMode = decodeCapability == FFmpegCapability.Hardware
+                ? HardwareAccelerationMode.VideoToolbox
+                : HardwareAccelerationMode.None,
+            EncoderHardwareAccelerationMode = encodeCapability == FFmpegCapability.Hardware
+                ? HardwareAccelerationMode.VideoToolbox
+                : HardwareAccelerationMode.None
+        };
+    }
+
+    protected override Option<IDecoder> SetDecoder(
+        VideoInputFile videoInputFile,
+        VideoStream videoStream,
+        FFmpegState ffmpegState,
+        PipelineContext context)
+    {
+        Option<IDecoder> maybeDecoder = (ffmpegState.DecoderHardwareAccelerationMode, videoStream.Codec) switch
+        {
+            (HardwareAccelerationMode.VideoToolbox, _) => new DecoderVideoToolbox(),
+
+            _ => GetSoftwareDecoder(videoStream)
+        };
+
+        foreach (IDecoder decoder in maybeDecoder)
+        {
+            videoInputFile.AddOption(decoder);
+            return Some(decoder);
+        }
+
+        return None;
+    }
+
+    protected override Option<IEncoder> GetEncoder(
+        FFmpegState ffmpegState,
+        FrameState currentState,
+        FrameState desiredState) =>
+        (ffmpegState.EncoderHardwareAccelerationMode, desiredState.VideoFormat) switch
+        {
+            (HardwareAccelerationMode.VideoToolbox, VideoFormat.Hevc) =>
+                new EncoderHevcVideoToolbox(desiredState.BitDepth),
+            (HardwareAccelerationMode.VideoToolbox, VideoFormat.H264) =>
+                new EncoderH264VideoToolbox(desiredState.VideoProfile),
+
+            _ => GetSoftwareEncoder(ffmpegState, currentState, desiredState)
+        };
+
+    protected override List<IPipelineFilterStep> SetPixelFormat(
+        VideoStream videoStream,
+        FrameState desiredState,
+        FrameState currentState,
+        ICollection<IPipelineStep> pipelineSteps)
+    {
+        var result = new List<IPipelineFilterStep>();
+
+        foreach (IPixelFormat pixelFormat in desiredState.PixelFormat)
+        {
+            if (desiredState.ColorsAreBt709 && !videoStream.ColorParams.IsBt709)
+            {
+                // _logger.LogDebug("Adding colorspace filter");
+                var colorspace = new ColorspaceFilter(currentState, videoStream, pixelFormat);
+                currentState = colorspace.NextState(currentState);
+                result.Add(colorspace);
+            }
+
+            if (currentState.PixelFormat.Map(f => f.FFmpegName) != pixelFormat.FFmpegName)
+            {
+                _logger.LogDebug(
+                    "Format {A} doesn't equal {B}",
+                    currentState.PixelFormat.Map(f => f.FFmpegName),
+                    pixelFormat.FFmpegName);
+
+                //result.Add(new PixelFormatFilter(pixelFormat));
+            }
+
+            pipelineSteps.Add(new PixelFormatOutputOption(pixelFormat));
+        }
+
+        return result;
+    }
+}

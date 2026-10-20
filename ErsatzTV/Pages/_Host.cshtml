@@ -1,0 +1,161 @@
+﻿@page "/"
+@using System.Reflection
+@using MudBlazor
+@namespace ErsatzTV.Pages
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>@if (Assembly.GetEntryAssembly().GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration?.ToLower() != "release") { @(System.Environment.MachineName + " ") }ErsatzTV Legacy</title>
+    <base href="~/"/>
+    <link href="_content/MudBlazor/MudBlazor.min.css?v=@(Assembly.GetAssembly(typeof(AbstractLocalizationInterceptor))?.GetName().Version?.ToString())" rel="stylesheet"/>
+    <link href="css/site.css" asp-append-version="true" rel="stylesheet"/>
+    <link href="lib/roboto/roboto.css" asp-append-version="true" rel="stylesheet"/>
+    <link href="lib/jqueryui/themes/base/jquery-ui.css" asp-append-version="true" rel="stylesheet"/>
+    <link href="_content/BlazorSortable/css/blazor-sortable.css" rel="stylesheet"/>
+    <script src="lib/jquery/jquery.min.js" asp-append-version="true"></script>
+    <script src="lib/jqueryui/jquery-ui.min.js" asp-append-version="true"></script>
+    <script src="lib/sortablejs/Sortable.js" asp-append-version="true"></script>
+    <script type="module" src="lib/media-chrome/media-chrome.min.js" asp-append-version="true"></script>
+    <script src="lib/hls/hls.min.js" asp-append-version="true"></script>
+    @await Html.PartialAsync("../Shared/_Favicons")
+    <script>
+        function sortableCollection(collectionId) {
+            $("#sortable-collection").sortable({
+                update: function(event, ui) {
+                    const data = $(this).sortable('serialize');
+                    $.ajax({
+                        data: data,
+                        type: 'POST',
+                        url: `media/collections/${collectionId}/items`
+                    });
+                }
+            });
+            $("#sortable-collection").disableSelection();
+        }
+
+        function disableSorting() {
+            $("#sortable-collection").sortable("option", "disabled", true);
+        }
+
+        function enableSorting() {
+            $("#sortable-collection").sortable("option", "disabled", false);
+        }
+
+        function styleMarkdown() {
+            $("h2").addClass("mud-typography mud-typography-h4");
+            $("h3").addClass("mud-typography mud-typography-h5");
+        }
+
+        function mediaSourceSupports(codecString) {
+            if (window.MediaSource && MediaSource.isTypeSupported) {
+                return MediaSource.isTypeSupported('video/mp4; codecs="' + codecString + '"');
+            }
+            return false;
+        }
+
+        function previewChannel(uri) {
+          var video = document.getElementById('video');
+          if (Hls.isSupported()) {
+            var hls = new Hls({
+              debug: true,
+              manifestLoadPolicy: {
+                default: {
+                  maxTimeToFirstByteMs: Infinity,
+                  maxLoadTimeMs: 60000,
+                  timeoutRetry: null,
+                  errorRetry: null
+                },
+              },
+            });
+            $('#video').data('hls', hls);
+            hls.loadSource(uri);
+            if (uri.endsWith('ts')) {
+                hls.on(Hls.Events.MEDIA_ATTACHED, function () {
+                  video.play();
+                });
+            } else {
+                hls.on(Hls.Events.MANIFEST_PARSED, function () {
+                  video.play();
+                });
+            }
+            hls.attachMedia(video);
+          }
+          // hls.js is not supported on platforms that do not have Media Source Extensions (MSE) enabled.
+          // When the browser has built-in HLS support (check using `canPlayType`), we can provide an HLS manifest (i.e. .m3u8 URL) directly to the video element through the `src` property.
+          // This is using the built-in support of the plain video element, without using hls.js.
+          else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = uri;
+            video.addEventListener('canplay', function () {
+              video.play();
+            });
+          }
+        }
+
+        function stopPreview() {
+            var hls = $('#video').data('hls');
+            hls && hls.destroy();
+        }
+    </script>
+</head>
+<body>
+<component type="typeof(App)" render-mode="ServerPrerendered"/>
+
+<div id="blazor-error-ui">
+    <environment include="Staging,Production">
+        An error has occurred. This application may no longer respond until reloaded.
+    </environment>
+    <environment include="Development">
+        An unhandled exception has occurred. See browser dev tools for details.
+    </environment>
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">🗙</a>
+</div>
+
+<script src="_framework/blazor.server.js"></script>
+<script src="_content/MudBlazor/MudBlazor.min.js?v=@(Assembly.GetAssembly(typeof(AbstractLocalizationInterceptor))?.GetName().Version?.ToString())"></script>
+<script type="text/javascript">
+    window.blazorHelpers = {
+        scrollToFragment: (elementId) => {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.scrollIntoView({
+                    behavior: 'smooth'
+                });
+            }
+        }
+    };
+
+    window.clipboardCopy = {
+        copyText: async function (codeElement) {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(codeElement.textContent);
+            } else {
+                const textArea = document.createElement("textarea");
+                textArea.value = codeElement.textContent;
+                textArea.style.position = "absolute";
+                textArea.style.left = "-999999px";
+
+                document.body.prepend(textArea);
+                textArea.select();
+
+                try {
+                    document.execCommand('copy');
+                } catch (error) {
+                    console.error(error);
+                } finally {
+                    textArea.remove();
+                }
+            }
+        }
+    };
+</script>
+<persist-component-state/>
+</body>
+</html>

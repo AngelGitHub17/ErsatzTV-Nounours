@@ -1,0 +1,158 @@
+﻿@using ErsatzTV.Application.MediaCollections
+@using Microsoft.Extensions.Caching.Memory
+@implements IDisposable
+@inject IMediator Mediator
+@inject IMemoryCache MemoryCache
+@inject ISnackbar Snackbar
+@inject ILogger<AddToCollectionDialog> Logger
+
+<MudDialog>
+    <DialogContent>
+        <EditForm Model="@_dummyModel" OnSubmit="@(_ => Submit())">
+            <MudContainer Class="mb-6">
+                <MudHighlighter Class="mud-primary-text"
+                                Style="background-color: transparent; font-weight: bold"
+                                Text="@FormatText()"
+                                HighlightedText="@EntityName"/>
+            </MudContainer>
+            <MudSelect Label="Collection" @bind-Value="_selectedCollection" Class="mb-6 mx-4">
+                @foreach (MediaCollectionViewModel collection in _collections)
+                {
+                    <MudSelectItem Value="@collection">@collection.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField T="string" Label="New Collection Name"
+                          Disabled="@(_selectedCollection != _newCollection)"
+                          @bind-Text="@_newCollectionName"
+                          Class="mb-6 mx-4">
+            </MudTextField>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" ButtonType="ButtonType.Reset">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">
+            Add To Collection
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+
+@code {
+    private CancellationTokenSource _cts;
+
+    [CascadingParameter]
+    IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public string EntityType { get; set; }
+
+    [Parameter]
+    public string EntityName { get; set; }
+
+    [Parameter]
+    public string DetailText { get; set; }
+
+    [Parameter]
+    public string DetailHighlight { get; set; }
+
+    private readonly MediaCollectionViewModel _newCollection = new(
+        CollectionType.Collection,
+        -1,
+        "(New Collection)",
+        false,
+        MediaItemState.Normal);
+
+    private string _newCollectionName;
+
+    private List<MediaCollectionViewModel> _collections = [];
+
+    private MediaCollectionViewModel _selectedCollection;
+
+    private record DummyModel;
+
+    private readonly DummyModel _dummyModel = new();
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+
+    private bool CanSubmit() =>
+        _selectedCollection != null && (_selectedCollection != _newCollection || !string.IsNullOrWhiteSpace(_newCollectionName));
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        try
+        {
+            _collections = await Mediator.Send(new GetAllCollections(), token)
+                .Map(list => new[] { _newCollection }.Append(list.OrderBy(vm => vm.Name, StringComparer.CurrentCultureIgnoreCase)).ToList());
+
+            if (MemoryCache.TryGetValue("AddToCollectionDialog.SelectedCollectionId", out int id))
+            {
+                _selectedCollection = _collections.SingleOrDefault(c => c.Id == id) ?? _newCollection;
+            }
+            else
+            {
+                _selectedCollection = _newCollection;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // do nothing
+        }
+    }
+
+    private string FormatText() => $"Select the collection to add the {EntityType} {EntityName}";
+
+    private async Task Submit()
+    {
+        if (!CanSubmit())
+        {
+            return;
+        }
+
+        if (_selectedCollection == _newCollection)
+        {
+            Either<BaseError, MediaCollectionViewModel> maybeResult =
+                await Mediator.Send(new CreateCollection(_newCollectionName), _cts.Token);
+
+            maybeResult.Match(
+                collection =>
+                {
+                    MemoryCache.Set("AddToCollectionDialog.SelectedCollectionId", collection.Id);
+                    MudDialog.Close(DialogResult.Ok(collection));
+                },
+                error =>
+                {
+                    Snackbar.Add(error.Value, Severity.Error);
+                    Logger.LogError("Error creating new collection: {Error}", error.Value);
+                    MudDialog.Close(DialogResult.Cancel());
+                });
+        }
+        else
+        {
+            MemoryCache.Set("AddToCollectionDialog.SelectedCollectionId", _selectedCollection.Id);
+            MudDialog.Close(DialogResult.Ok(_selectedCollection));
+        }
+    }
+
+    private async Task Cancel(MouseEventArgs e)
+    {
+        // this is gross, but [enter] seems to sometimes trigger cancel instead of submit
+        if (e.Detail == 0)
+        {
+            await Submit();
+        }
+        else
+        {
+            MudDialog.Cancel();
+        }
+    }
+
+}

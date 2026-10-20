@@ -1,0 +1,472 @@
+﻿@page "/playouts/{Id:int}/alternate-schedules"
+@using System.Globalization
+@using System.Text
+@using ErsatzTV.Application.Channels
+@using ErsatzTV.Application.Playouts
+@using ErsatzTV.Application.ProgramSchedules
+@using ErsatzTV.Core.Scheduling
+@implements IDisposable
+@inject NavigationManager NavigationManager
+@inject ILogger<ScheduleItemsEditor> Logger
+@inject ISnackbar Snackbar
+@inject IMediator Mediator
+
+<MudForm Style="max-height: 100%">
+    <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
+        <div style="display: flex; flex-direction: row; margin-bottom: auto; margin-top: auto; width: 100%; align-items: center" class="ml-6 mr-6">
+            <div class="d-none d-md-flex">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(_ => SaveChanges())" StartIcon="@Icons.Material.Filled.Save">
+                    Save Alternate Schedules
+                </MudButton>
+                <MudButton Class="ml-3" Variant="Variant.Filled" Color="Color.Default" OnClick="@(_ => AddAlternateSchedule())" StartIcon="@Icons.Material.Filled.PlaylistAdd">
+                    Add Alternate Schedule
+                </MudButton>
+            </div>
+            <div style="align-items: center; display: flex; margin-left: auto;" class="d-md-none">
+                <div class="flex-grow-1"></div>
+                <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                    <MudMenuItem Icon="@Icons.Material.Filled.Save" Label="Save Alternate Schedules" OnClick="@SaveChanges"/>
+                    <MudMenuItem Icon="@Icons.Material.Filled.PlaylistAdd" Label="Add Alternate Schedule" OnClick="AddAlternateSchedule"/>
+                </MudMenu>
+            </div>
+        </div>
+    </MudPaper>
+    <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
+            <MudText Typo="Typo.h5" Class="mb-2">@_channelName - Content</MudText>
+            <MudDivider Class="mb-6"/>
+            <MudText Typo="Typo.body2" Class="mb-6">In priority order from top to bottom. The bottom entry will *always* match all days and all months, as a catch-all.</MudText>
+            <MudTable Hover="true" Items="_items.OrderBy(i => i.Index)" Dense="true" @bind-SelectedItem="_selectedItem" RowClassFunc="@SelectedRowClassFunc">
+                <ColGroup>
+                    <MudHidden Breakpoint="Breakpoint.Xs">
+                        <col/>
+                        <col/>
+                        <col/>
+                        <col/>
+                        <col style="width: 180px;"/>
+                    </MudHidden>
+                </ColGroup>
+                <HeaderContent>
+                    <MudTh>Schedule</MudTh>
+                    <MudTh>Days of the Week</MudTh>
+                    <MudTh>Days of the Month</MudTh>
+                    <MudTh>Months</MudTh>
+                    <MudTh/>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>
+                        <MudText Typo="@(context == _selectedItem ? Typo.subtitle2 : Typo.body2)">
+                            @context.ProgramSchedule.Name
+                        </MudText>
+                    </MudTd>
+                    <MudTd>
+                        <MudText Typo="@(context == _selectedItem ? Typo.subtitle2 : Typo.body2)">
+                            @ToDaysOfWeekString(context.DaysOfWeek)
+                        </MudText>
+                    </MudTd>
+                    <MudTd>
+                        <MudText Typo="@(context == _selectedItem ? Typo.subtitle2 : Typo.body2)">
+                            @ToDaysOfMonthString(context.DaysOfMonth)
+                        </MudText>
+                    </MudTd>
+                    <MudTd>
+                        <MudText Typo="@(context == _selectedItem ? Typo.subtitle2 : Typo.body2)">
+                            @ToMonthsOfYearString(context.MonthsOfYear)
+                        </MudText>
+                    </MudTd>
+                    <MudTd>
+                        <div class="d-flex">
+                            <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward"
+                                           OnClick="@(_ => MoveItemUp(context))"
+                                           Disabled="@(_items.All(x => x.Index >= context.Index))">
+                            </MudIconButton>
+                            <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward"
+                                           OnClick="@(_ => MoveItemDown(context))"
+                                           Disabled="@(_items.All(x => x.Index <= context.Index))">
+                            </MudIconButton>
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                           OnClick="@(_ => RemoveAlternateSchedule(context))"
+                                           Disabled="@(_items.Count == 1)">
+                            </MudIconButton>
+                        </div>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+            @if (_selectedItem is not null)
+            {
+                <MudText Typo="Typo.h5" Class="mt-10 mb-2">Edit Content</MudText>
+                <MudDivider Class="mb-6"/>
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <div class="d-flex">
+                        <MudText>Schedule</MudText>
+                    </div>
+                    <MudSelect @bind-Value="_selectedItem.ProgramSchedule" For="@(() => _selectedItem.ProgramSchedule)">
+                        @foreach (ProgramScheduleViewModel schedule in _schedules)
+                        {
+                            <MudSelectItem Value="@schedule">@schedule.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudStack>
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <div class="d-flex">
+                        <MudText>Limit to Date Range</MudText>
+                    </div>
+                    <MudCheckBox T="bool" @bind-Value="_selectedItem.LimitToDateRange" Dense="true"/>
+                </MudStack>
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <div class="d-flex">
+                        <MudText>Start Day</MudText>
+                    </div>
+                    <MudSelect T="int" @bind-Value="_selectedItem.StartMonth" Disabled="@(!_selectedItem.LimitToDateRange)">
+                        @foreach (int month in Enumerable.Range(1, 12))
+                        {
+                            <MudSelectItem Value="@month">@_dtf.GetMonthName(month)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudStack>
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <div class="d-flex"></div>
+                    <MudSelect T="int" @bind-Value="_selectedItem.StartDay" Disabled="@(!_selectedItem.LimitToDateRange)">
+                        @foreach (int day in Enumerable.Range(1, 31))
+                        {
+                            <MudSelectItem Value="@day">@day.ToString()</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudStack>
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <div class="d-flex"></div>
+                    <MudSelect T="int?" @bind-Value="_selectedItem.StartYear" Disabled="@(!_selectedItem.LimitToDateRange)" Clearable="true">
+                        @foreach (int year in Enumerable.Range(DateTime.Today.Year, 50))
+                        {
+                            <MudSelectItem T="int?" Value="@year">@year.ToString()</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudStack>
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <div class="d-flex">
+                        <MudText>End Day</MudText>
+                    </div>
+                    <MudSelect T="int" @bind-Value="_selectedItem.EndMonth" Disabled="@(!_selectedItem.LimitToDateRange)">
+                        @foreach (int month in Enumerable.Range(1, 12))
+                        {
+                            <MudSelectItem Value="@month">@_dtf.GetMonthName(month)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudStack>
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <div class="d-flex"></div>
+                    <MudSelect T="int" @bind-Value="_selectedItem.EndDay" Disabled="@(!_selectedItem.LimitToDateRange)">
+                        @foreach (int day in Enumerable.Range(1, 31))
+                        {
+                            <MudSelectItem Value="@day">@day.ToString()</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudStack>
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <div class="d-flex"></div>
+                    <MudSelect T="int?" @bind-Value="_selectedItem.EndYear" Disabled="@(!_selectedItem.LimitToDateRange)" Clearable="true">
+                        @foreach (int year in Enumerable.Range(DateTime.Today.Year, 50))
+                        {
+                            <MudSelectItem T="int?" Value="@year">@year.ToString()</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudStack>
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <div class="d-flex">
+                        <MudText>Days of the Week</MudText>
+                    </div>
+                    <MudSelect T="DayOfWeek" SelectedValues="@_selectedItem.DaysOfWeek" SelectedValuesChanged="OnSelectedDaysChanged" MultiSelection="true" Clearable="true" SelectAll="true" SelectAllText="Select All Days">
+                        <MudSelectItem Value="@DayOfWeek.Monday">@_dtf.GetDayName(DayOfWeek.Monday)</MudSelectItem>
+                        <MudSelectItem Value="@DayOfWeek.Tuesday">@_dtf.GetDayName(DayOfWeek.Tuesday)</MudSelectItem>
+                        <MudSelectItem Value="@DayOfWeek.Wednesday">@_dtf.GetDayName(DayOfWeek.Wednesday)</MudSelectItem>
+                        <MudSelectItem Value="@DayOfWeek.Thursday">@_dtf.GetDayName(DayOfWeek.Thursday)</MudSelectItem>
+                        <MudSelectItem Value="@DayOfWeek.Friday">@_dtf.GetDayName(DayOfWeek.Friday)</MudSelectItem>
+                        <MudSelectItem Value="@DayOfWeek.Saturday">@_dtf.GetDayName(DayOfWeek.Saturday)</MudSelectItem>
+                        <MudSelectItem Value="@DayOfWeek.Sunday">@_dtf.GetDayName(DayOfWeek.Sunday)</MudSelectItem>
+                    </MudSelect>
+                </MudStack>
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <div class="d-flex"></div>
+                    <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="@(_ => SelectWeekdays())">
+                        Weekdays
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="@(_ => SelectWeekends())">
+                        Weekends
+                    </MudButton>
+                </MudStack>
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <div class="d-flex">
+                        <MudText>Days of the Month</MudText>
+                    </div>
+                    <MudSelect T="int" SelectedValues="@_selectedItem.DaysOfMonth" SelectedValuesChanged="OnSelectedDaysChanged" MultiSelection="true" Clearable="true" SelectAll="true" SelectAllText="Select All Days">
+                        @foreach (int day in Enumerable.Range(1, 31))
+                        {
+                            <MudSelectItem Value="@day">@day</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudStack>
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <div class="d-flex">
+                        <MudText>Months</MudText>
+                    </div>
+                    <MudSelect T="int" SelectedValues="@_selectedItem.MonthsOfYear" SelectedValuesChanged="OnSelectedMonthsChanged" MultiSelection="true" Clearable="true" SelectAll="true" SelectAllText="Select All Months">
+                        @foreach (int month in Enumerable.Range(1, 12))
+                        {
+                            <MudSelectItem Value="@month">@_dtf.GetMonthName(month)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudStack>
+            }
+        </MudContainer>
+    </div>
+</MudForm>
+
+@code {
+    private CancellationTokenSource _cts;
+
+    private readonly DateTimeFormatInfo _dtf = CultureInfo.CurrentCulture.DateTimeFormat;
+
+    [Parameter]
+    public int Id { get; set; }
+
+    private string _channelName;
+    private List<PlayoutAlternateScheduleEditViewModel> _items = [];
+    private List<ProgramScheduleViewModel> _schedules = [];
+
+    private PlayoutAlternateScheduleEditViewModel _selectedItem;
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        try
+        {
+            _schedules = await Mediator.Send(new GetAllProgramSchedules(), token)
+                .Map(list => list.OrderBy(vm => vm.Name, StringComparer.CurrentCultureIgnoreCase).ToList());
+
+            _channelName = (await Mediator.Send(new GetChannelNameByPlayoutId(Id), token)).IfNone(string.Empty);
+
+            List<PlayoutAlternateScheduleViewModel> results = await Mediator.Send(new GetPlayoutAlternateSchedules(Id), token);
+            _items = results.Map(ProjectToEditViewModel).ToList();
+            if (_items.Count == 1)
+            {
+                _selectedItem = _items.Head();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // do nothing
+        }
+    }
+
+    private PlayoutAlternateScheduleEditViewModel ProjectToEditViewModel(PlayoutAlternateScheduleViewModel item) =>
+        new()
+        {
+            Id = item.Id,
+            Index = item.Index,
+            ProgramSchedule = _schedules.Find(vm => vm.Id == item.ProgramScheduleId),
+            DaysOfWeek = item.DaysOfWeek.OrderBy(x => ((int)x + 6) % 7).ToList(),
+            DaysOfMonth = item.DaysOfMonth.ToList(),
+            MonthsOfYear = item.MonthsOfYear.ToList(),
+            LimitToDateRange = item.LimitToDateRange,
+            StartMonth = item.StartMonth,
+            StartDay = item.StartDay,
+            StartYear = item.StartYear,
+            EndMonth = item.EndMonth,
+            EndDay = item.EndDay,
+            EndYear = item.EndYear
+        };
+
+    private void SelectWeekdays()
+    {
+        _selectedItem.DaysOfWeek.Clear();
+        _selectedItem.DaysOfWeek.AddRange(
+        [
+            DayOfWeek.Monday,
+            DayOfWeek.Tuesday,
+            DayOfWeek.Wednesday,
+            DayOfWeek.Thursday,
+            DayOfWeek.Friday
+        ]);
+    }
+
+    private void SelectWeekends()
+    {
+        _selectedItem.DaysOfWeek.Clear();
+        _selectedItem.DaysOfWeek.AddRange(
+        [
+            DayOfWeek.Saturday,
+            DayOfWeek.Sunday
+        ]);
+    }
+
+    private void AddAlternateSchedule()
+    {
+        var item = new PlayoutAlternateScheduleEditViewModel
+        {
+            Index = _items.Map(i => i.Index).DefaultIfEmpty().Max() + 1,
+            ProgramSchedule = _schedules.Head(),
+            DaysOfWeek = AlternateScheduleSelector.AllDaysOfWeek(),
+            DaysOfMonth = AlternateScheduleSelector.AllDaysOfMonth(),
+            MonthsOfYear = AlternateScheduleSelector.AllMonthsOfYear(),
+            LimitToDateRange = false,
+            StartMonth = 1,
+            StartDay = 1,
+            StartYear = null,
+            EndMonth = 1,
+            EndDay = 1,
+            EndYear = null
+        };
+
+        _items.Add(item);
+        _selectedItem = item;
+    }
+
+    private void RemoveAlternateSchedule(PlayoutAlternateScheduleEditViewModel item)
+    {
+        _selectedItem = null;
+        _items.Remove(item);
+    }
+
+    private void MoveItemUp(PlayoutAlternateScheduleEditViewModel item)
+    {
+        // swap with lower index
+        PlayoutAlternateScheduleEditViewModel toSwap = _items.OrderByDescending(x => x.Index).First(x => x.Index < item.Index);
+        (toSwap.Index, item.Index) = (item.Index, toSwap.Index);
+    }
+
+    private void MoveItemDown(PlayoutAlternateScheduleEditViewModel item)
+    {
+        // swap with higher index
+        PlayoutAlternateScheduleEditViewModel toSwap = _items.OrderBy(x => x.Index).First(x => x.Index > item.Index);
+        (toSwap.Index, item.Index) = (item.Index, toSwap.Index);
+    }
+
+    private async Task SaveChanges()
+    {
+        var items = _items.Map(item => new ReplacePlayoutAlternateSchedule(
+            item.Id,
+            item.Index,
+            item.ProgramSchedule.Id,
+            item.DaysOfWeek,
+            item.DaysOfMonth,
+            item.MonthsOfYear,
+            item.LimitToDateRange,
+            item.StartMonth,
+            item.StartDay,
+            item.StartYear,
+            item.EndMonth,
+            item.EndDay,
+            item.EndYear)).ToList();
+
+        Seq<BaseError> errorMessages = await Mediator.Send(new ReplacePlayoutAlternateScheduleItems(Id, items), _cts.Token)
+            .Map(e => e.LeftToSeq());
+
+        errorMessages.HeadOrNone().Match(
+            error =>
+            {
+                Snackbar.Add($"Unexpected error saving alternate schedules: {error.Value}", Severity.Error);
+                Logger.LogError("Unexpected error saving alternate schedules: {Error}", error.Value);
+            },
+            () => NavigationManager.NavigateTo("playouts"));
+    }
+
+    private string ToDaysOfWeekString(List<DayOfWeek> daysOfWeek)
+    {
+        if (daysOfWeek.Count is 0 or 7)
+        {
+            return "*any*";
+        }
+
+        daysOfWeek.Sort();
+
+        return string.Join(", ", daysOfWeek.Map(_dtf.GetAbbreviatedDayName));
+    }
+
+    private string ToDaysOfMonthString(List<int> daysOfMonth)
+    {
+        if (daysOfMonth.Count is 0 or 31)
+        {
+            return "*any*";
+        }
+
+        return ToRangeString(daysOfMonth);
+    }
+
+    private string ToMonthsOfYearString(List<int> monthsOfYear)
+    {
+        if (monthsOfYear.Count is 0 or 12)
+        {
+            return "*any*";
+        }
+
+        monthsOfYear.Sort();
+
+        return string.Join(", ", monthsOfYear.Map(_dtf.GetAbbreviatedMonthName));
+    }
+
+    private static string ToRangeString(List<int> list)
+    {
+        list = list.Distinct().ToList();
+        list.Sort();
+
+        var result = new StringBuilder();
+        for (var i = 0; i < list.Count; i++)
+        {
+            int temp = list[i];
+
+            //add a number
+            result.Append(list[i]);
+
+            //skip number(s) between a range
+            while (i < list.Count - 1 && list[i + 1] == list[i] + 1)
+            {
+                i++;
+            }
+
+            //add the range
+            if (temp != list[i])
+            {
+                result.Append("-").Append(list[i]);
+            }
+
+            //add comma
+            if (i != list.Count - 1)
+            {
+                result.Append(", ");
+            }
+        }
+
+        return result.ToString();
+    }
+
+    private string SelectedRowClassFunc(PlayoutAlternateScheduleEditViewModel element, int rowNumber) => _selectedItem != null && _selectedItem == element ? "selected" : string.Empty;
+
+    private void OnSelectedDaysChanged(IEnumerable<DayOfWeek> selectedDays)
+    {
+        _selectedItem.DaysOfWeek.Clear();
+        _selectedItem.DaysOfWeek.AddRange(selectedDays);
+    }
+
+    private void OnSelectedDaysChanged(IEnumerable<int> selectedDays)
+    {
+        _selectedItem.DaysOfMonth.Clear();
+        _selectedItem.DaysOfMonth.AddRange(selectedDays);
+    }
+
+    private void OnSelectedMonthsChanged(IEnumerable<int> selectedMonths)
+    {
+        _selectedItem.MonthsOfYear.Clear();
+        _selectedItem.MonthsOfYear.AddRange(selectedMonths);
+    }
+
+}

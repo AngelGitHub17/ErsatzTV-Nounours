@@ -1,0 +1,140 @@
+﻿@page "/system/logs"
+@using System.Globalization
+@using ErsatzTV.Application.Configuration
+@using ErsatzTV.Application.Logs
+@implements IDisposable
+@inject IMediator Mediator
+
+<MudForm Style="max-height: 100%">
+    <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
+            <MudText Typo="Typo.h5" Class="mb-2">Logs</MudText>
+            <MudDivider Class="mb-6"/>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex">
+                    <MudText>Search</MudText>
+                </div>
+                <MudTextField T="string" ValueChanged="@(s => OnSearch(s))" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium"/>
+            </MudStack>
+            <MudTable FixedHeader="true"
+                      @bind-RowsPerPage="@_rowsPerPage"
+                      ServerData="@(new Func<TableState, CancellationToken, Task<TableData<LogEntryViewModel>>>(ServerReload))"
+                      Dense="true"
+                      Class="mt-10"
+                      @ref="_table">
+                <HeaderContent>
+                    <MudTh>
+                        <MudTableSortLabel T="LogEntryViewModel" SortLabel="Timestamp">
+                            Timestamp
+                        </MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel T="LogEntryViewModel" SortLabel="Level">
+                            Level
+                        </MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>Message</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Timestamp.ToString("G", _dtf)</MudTd>
+                    <MudTd>@context.Level</MudTd>
+                    <MudTd>@context.Message</MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText>No matching records found</MudText>
+                </NoRecordsContent>
+                <LoadingContent>
+                    <MudText>Loading...</MudText>
+                </LoadingContent>
+                <PagerContent>
+                    <MudTablePager/>
+                </PagerContent>
+            </MudTable>
+        </MudContainer>
+    </div>
+</MudForm>
+
+@code {
+    private CancellationTokenSource _cts;
+
+    private readonly DateTimeFormatInfo _dtf = CultureInfo.CurrentCulture.DateTimeFormat;
+
+    private MudTable<LogEntryViewModel> _table;
+    private int _rowsPerPage = 10;
+    private string _searchString;
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        try
+        {
+            _rowsPerPage = await Mediator.Send(new GetConfigElementByKey(ConfigElementKey.LogsPageSize), token)
+                .Map(maybeRows => maybeRows.Match(ce => int.TryParse(ce.Value, out int rows) ? rows : 10, () => 10));
+        }
+        catch (OperationCanceledException)
+        {
+            // do nothing
+        }
+    }
+
+    private async Task<TableData<LogEntryViewModel>> ServerReload(TableState state, CancellationToken cancellationToken)
+    {
+        await Mediator.Send(new SaveConfigElementByKey(ConfigElementKey.LogsPageSize, state.PageSize.ToString()), cancellationToken);
+
+        PagedLogEntriesViewModel data;
+
+        switch (state.SortLabel?.ToLowerInvariant())
+        {
+            case "timestamp":
+                data = await Mediator.Send(
+                    new GetRecentLogEntries(state.Page, state.PageSize, _searchString)
+                    {
+                        SortExpression = le => le.Timestamp,
+                        SortDescending = state.SortDirection == SortDirection.None
+                            ? Option<bool>.None
+                            : state.SortDirection == SortDirection.Descending
+                    },
+                    cancellationToken);
+                break;
+            case "level":
+                data = await Mediator.Send(
+                    new GetRecentLogEntries(state.Page, state.PageSize, _searchString)
+                    {
+                        SortExpression = le => le.Level,
+                        SortDescending = state.SortDirection == SortDirection.None
+                            ? Option<bool>.None
+                            : state.SortDirection == SortDirection.Descending
+                    },
+                    cancellationToken);
+                break;
+            default:
+                data = await Mediator.Send(
+                    new GetRecentLogEntries(state.Page, state.PageSize, _searchString)
+                    {
+                        SortDescending = Option<bool>.None
+                    },
+                    cancellationToken);
+                break;
+        }
+
+        return new TableData<LogEntryViewModel> { TotalItems = data.TotalCount, Items = data.Page };
+    }
+
+    private void OnSearch(string text)
+    {
+        _searchString = text;
+        _table.ReloadServerData();
+    }
+
+}

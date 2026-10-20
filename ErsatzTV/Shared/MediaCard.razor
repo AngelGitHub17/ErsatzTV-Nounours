@@ -1,0 +1,263 @@
+﻿@using ErsatzTV.Application.MediaCards
+@using ErsatzTV.Application.MediaItems
+@using static Prelude
+@inject NavigationManager NavigationManager
+@inject IDialogService Dialog
+@inject IMediator Mediator
+
+<div class="@((ContainerClass ?? "media-card-container mr-6") + " pb-3")" id="@($"item_{Data.MediaItemId}")">
+    @if (SelectClicked.HasDelegate || !string.IsNullOrWhiteSpace(Href))
+    {
+        <div class="@(IsSelected ? DeleteClicked.HasDelegate ? "media-card-selected-delete" : "media-card-selected" : "")"
+             style="border-radius: 4px; position: relative;">
+            <MudPaper Class="@($"media-card {CardClass}")" Style="position: relative; overflow: hidden;">
+                @if (string.IsNullOrWhiteSpace(Data.Poster))
+                {
+                    string placeholder = GetPlaceholder(Data.SortTitle);
+                    Typo typo = placeholder.Length switch
+                    {
+                        > 12 => Typo.h3,
+                        > 2 => Typo.h2,
+                        _ => Typo.h1
+                    };
+                    <MudText Align="Align.Center" Typo="@typo" Class="media-card-poster-placeholder mud-text-primary">
+                        @placeholder
+                    </MudText>
+                }
+                else
+                {
+                    <img src="@GetPosterUrl()"
+                         loading="lazy"
+                         style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: center;"
+                         alt="@Data.SortTitle"/>
+                }
+            </MudPaper>
+            @if (IsSelected)
+            {
+                <div style="display: flex; height: 48px; left: 0; position: absolute; top: 0; width: 48px;">
+                    <MudIcon Color="@SelectColor"
+                             Icon="@Icons.Material.Filled.CheckBox"
+                             Style="margin: auto"/>
+                </div>
+            }
+            @if (Data.State == MediaItemState.FileNotFound)
+            {
+                <div style="position: absolute; right: 12px; top: 12px;">
+                    <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error"/>
+                </div>
+            }
+            else if (Data.State == MediaItemState.Unavailable)
+            {
+                <div style="position: absolute; right: 12px; top: 12px;">
+                    <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning"/>
+                </div>
+            }
+            <MudElement HtmlTag="div" Class="@_overlayClass" Style="">
+                <MudButton Style="height: 100%; width: 100%" OnClick="@OnOverlayClick"/>
+                @if (SelectClicked.HasDelegate)
+                {
+                    <MudIconButton Color="@SelectColor"
+                                   Icon="@(IsSelected ? Icons.Material.Filled.CheckBox : Icons.Material.Filled.CheckBoxOutlineBlank)"
+                                   Style="left: 0; position: absolute; top: 0;"
+                                   Class="media-card-select-checkbox"
+                                   OnClick="@(e => SelectClicked.InvokeAsync(e))"/>
+                }
+                @if (!IsSelectMode)
+                {
+                    @if (AddToCollectionClicked.HasDelegate || AddToPlaylistClicked.HasDelegate || Data.HasMediaInfo)
+                    {
+                        <MudMenu Icon="@Icons.Material.Filled.MoreVert"
+                                 Style="bottom: 0; left: 0; position: absolute;"
+                                 OpenChanged="@OnMenuOpenChanged">
+                            @if (AddToCollectionClicked.HasDelegate)
+                            {
+                                <MudMenuItem Icon="@Icons.Material.Filled.Add"
+                                             Label="Add To Collection"
+                                             OnClick="@(() => AddToCollectionClicked.InvokeAsync(Data))"/>
+                            }
+                            @if (AddToPlaylistClicked.HasDelegate)
+                            {
+                                <MudMenuItem Icon="@Icons.Material.Filled.PlaylistAdd"
+                                             Label="Add To Playlist"
+                                             OnClick="@(() => AddToPlaylistClicked.InvokeAsync(Data))"/>
+                            }
+                            @if (Data.HasMediaInfo)
+                            {
+                                <MudMenuItem Icon="@Icons.Material.Filled.Info"
+                                             Label="Show Media Info"
+                                             OnClick="@ShowMediaInfo"/>
+
+                                <MudMenuItem Icon="@Icons.Material.Filled.Troubleshoot"
+                                             Label="Troubleshoot Playback"
+                                             OnClick="@TroubleshootPlayback"/>
+                            }
+                        </MudMenu>
+                    }
+
+                    @if (DeleteClicked.HasDelegate)
+                    {
+                        <MudIconButton Color="Color.Error"
+                                       Icon="@Icons.Material.Filled.Delete"
+                                       Style="bottom: 0; position: absolute; right: 0;"
+                                       OnClick="@(() => DeleteClicked.InvokeAsync(Data))"/>
+                    }
+                }
+            </MudElement>
+        </div>
+    }
+    else
+    {
+        <MudPaper Class="@($"media-card {CardClass}")" Style="position: relative; overflow: hidden;">
+            @if (string.IsNullOrWhiteSpace(Data.Poster))
+            {
+                string placeholder = GetPlaceholder(Data.SortTitle);
+                Typo typo = placeholder.Length switch
+                {
+                    > 12 => Typo.h3,
+                    > 2 => Typo.h2,
+                    _ => Typo.h1
+                };
+                <MudText Align="Align.Center" Typo="@typo" Class="media-card-poster-placeholder mud-text-primary">
+                    @placeholder
+                </MudText>
+            }
+            else
+            {
+                <img src="@GetPosterUrl()"
+                     loading="lazy"
+                     style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: center;"
+                     alt="@Data.SortTitle"/>
+            }
+        </MudPaper>
+    }
+    <MudText Align="Align.Center" Class="media-card-title" UserAttributes="@(new Dictionary<string, object> { { "title", Data.Title } })">
+        @(Title ?? Data.Title)
+    </MudText>
+    <MudText Typo="Typo.body2" Align="Align.Center" Class="media-card-title mud-text-secondary">
+        @(Subtitle ?? Data.Subtitle)
+    </MudText>
+</div>
+
+@code {
+
+    [Parameter]
+    public MediaCardViewModel Data { get; set; }
+
+    [Parameter]
+    public string Href { get; set; }
+
+    [Parameter]
+    public EventCallback<Unit> DataRefreshed { get; set; }
+
+    [Parameter]
+    public string Placeholder { get; set; }
+
+    [Parameter]
+    public string Title { get; set; }
+
+    [Parameter]
+    public string Subtitle { get; set; }
+
+    [Parameter]
+    public string ContainerClass { get; set; }
+
+    [Parameter]
+    public string CardClass { get; set; }
+
+    [Parameter]
+    public ArtworkKind ArtworkKind { get; set; }
+
+    [Parameter]
+    public EventCallback<MediaCardViewModel> DeleteClicked { get; set; }
+
+    [Parameter]
+    public EventCallback<MediaCardViewModel> AddToCollectionClicked { get; set; }
+
+    [Parameter]
+    public EventCallback<MediaCardViewModel> AddToPlaylistClicked { get; set; }
+
+    [Parameter]
+    public EventCallback<MouseEventArgs> SelectClicked { get; set; }
+
+    [Parameter]
+    public bool IsSelectMode { get; set; }
+
+    [Parameter]
+    public bool IsSelected { get; set; }
+
+    [Parameter]
+    public Color SelectColor { get; set; } = Color.Tertiary;
+
+    [Parameter]
+    public bool IsRemoteArtwork { get; set; }
+
+    private string _overlayClass = "media-card-overlay";
+
+    private string GetPlaceholder(string sortTitle)
+    {
+        if (Placeholder != null)
+        {
+            return Placeholder;
+        }
+
+        char first = Optional(sortTitle).Map(t => t.ToUpperInvariant().HeadOrNone()).Flatten().Match(head => head, () => ' ');
+        return char.IsDigit(first) || !char.IsLetter(first) ? "#" : first.ToString();
+    }
+
+    private string GetPosterUrl()
+    {
+        if (string.IsNullOrWhiteSpace(Data.Poster))
+        {
+            return null;
+        }
+
+        if (IsRemoteArtwork || Data.Poster.StartsWith("http://") || Data.Poster.StartsWith("https://"))
+        {
+            return Data.Poster;
+        }
+
+        return $"artwork/{PathForArtwork()}/{Data.Poster}";
+    }
+
+    private string PathForArtwork() => ArtworkKind switch
+    {
+        ArtworkKind.Thumbnail => "thumbnails",
+        _ => "posters"
+    };
+
+    private void OnOverlayClick(MouseEventArgs e)
+    {
+        if (IsSelectMode || string.IsNullOrWhiteSpace(Href))
+        {
+            SelectClicked.InvokeAsync(e);
+        }
+        else
+        {
+            NavigationManager.NavigateTo(Href);
+        }
+    }
+
+    private void OnMenuOpenChanged(bool open)
+    {
+        _overlayClass = open
+            ? "media-card-overlay media-card-overlay-menu-open"
+            : "media-card-overlay";
+
+        StateHasChanged();
+    }
+
+    private async Task ShowMediaInfo()
+    {
+        Either<BaseError, MediaItemInfo> maybeInfo = await Mediator.Send(new GetMediaItemInfo(Data.MediaItemId));
+        foreach (MediaItemInfo info in maybeInfo.RightToSeq())
+        {
+            var parameters = new DialogParameters { { "MediaItemInfo", info } };
+            var options = new DialogOptions { CloseButton = true, CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+            IDialogReference dialog = await Dialog.ShowAsync<MediaItemInfoDialog>(Data.Title, parameters, options);
+            DialogResult _ = await dialog.Result;
+        }
+    }
+
+    private void TroubleshootPlayback() => NavigationManager.NavigateTo($"system/troubleshooting/playback?mediaItem={Data.MediaItemId}");
+
+}

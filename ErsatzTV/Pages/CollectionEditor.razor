@@ -1,0 +1,92 @@
+﻿@page "/media/collections/{Id:int}/edit"
+@page "/media/collections/add"
+@using ErsatzTV.Application.MediaCollections
+@implements IDisposable
+@inject NavigationManager NavigationManager
+@inject ILogger<CollectionEditor> Logger
+@inject ISnackbar Snackbar
+@inject IMediator Mediator
+
+<MudForm @ref="_form" @bind-IsValid="@_success" Style="max-height: 100%">
+    <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-6" OnClick="@HandleSubmitAsync" StartIcon="@(IsEdit ? Icons.Material.Filled.Save : Icons.Material.Filled.Add)">@(IsEdit ? "Save Collection" : "Add Collection")</MudButton>
+    </MudPaper>
+    <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
+            <MudText Typo="Typo.h5" Class="mb-2">Collection</MudText>
+            <MudDivider Class="mb-6"/>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex">
+                    <MudText>Name</MudText>
+                </div>
+                <MudTextField @bind-Value="_model.Name" For="@(() => _model.Name)" Required="true" RequiredError="Collection name is required!"/>
+            </MudStack>
+        </MudContainer>
+    </div>
+</MudForm>
+
+@code {
+    private CancellationTokenSource _cts;
+
+    [Parameter]
+    public int Id { get; set; }
+
+    private readonly CollectionEditViewModel _model = new();
+    private MudForm _form;
+    private bool _success;
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        try
+        {
+            if (IsEdit)
+            {
+                Option<MediaCollectionViewModel> maybeCollection = await Mediator.Send(new GetCollectionById(Id), token);
+                maybeCollection.IfSome(collection =>
+                {
+                    _model.Id = collection.Id;
+                    _model.Name = collection.Name;
+                });
+            }
+            else
+            {
+                _model.Name = "New Collection";
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // do nothing
+        }
+    }
+
+    private bool IsEdit => Id != 0;
+
+    private async Task HandleSubmitAsync()
+    {
+        await _form.ValidateAsync();
+        if (_success)
+        {
+            Seq<BaseError> errorMessage = IsEdit ? (await Mediator.Send(new UpdateCollection(Id, _model.Name), _cts.Token)).LeftToSeq() : (await Mediator.Send(new CreateCollection(_model.Name), _cts.Token)).LeftToSeq();
+
+            errorMessage.HeadOrNone().Match(
+                error =>
+                {
+                    Snackbar.Add(error.Value, Severity.Error);
+                    Logger.LogError("Error saving collection: {Error}", error.Value);
+                },
+                () => NavigationManager.NavigateTo(_model.Id > 0 ? $"media/collections/{_model.Id}" : "media/collections"));
+        }
+    }
+
+}

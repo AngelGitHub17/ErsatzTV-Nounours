@@ -1,0 +1,42 @@
+﻿using ErsatzTV.Core;
+using ErsatzTV.Core.Interfaces.Repositories;
+using ErsatzTV.Core.Interfaces.Search;
+using ErsatzTV.Core.Search;
+
+namespace ErsatzTV.Application.Maintenance;
+
+public class EmptyTrashHandler : IRequestHandler<EmptyTrash, Either<BaseError, Unit>>
+{
+    private readonly IMediaItemRepository _mediaItemRepository;
+    private readonly ISearchIndex _searchIndex;
+
+    public EmptyTrashHandler(
+        IMediaItemRepository mediaItemRepository,
+        ISearchIndex searchIndex)
+    {
+        _mediaItemRepository = mediaItemRepository;
+        _searchIndex = searchIndex;
+    }
+
+    public async Task<Either<BaseError, Unit>> Handle(
+        EmptyTrash request,
+        CancellationToken cancellationToken)
+    {
+        SearchResult result = await _searchIndex.Search(
+            "state:FileNotFound",
+            string.Empty,
+            0,
+            10_000,
+            cancellationToken);
+        var ids = result.Items.Map(i => i.Id).ToList();
+
+        // ElasticSearch remove items may fail, so do that first
+        if (await _searchIndex.RemoveItems(ids))
+        {
+            _searchIndex.Commit();
+            return await _mediaItemRepository.DeleteItems(ids);
+        }
+
+        return BaseError.New("Failed to empty trash");
+    }
+}

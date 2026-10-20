@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <NoWarn>VSTHRD200,CA1873</NoWarn>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <AnalysisLevel>latest-Recommended</AnalysisLevel>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <Configurations>Debug;Release;Debug No Sync</Configurations>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="CliWrap" Version="3.10.1" />
+        <PackageReference Include="Humanizer.Core" Version="3.0.10" />
+        <PackageReference Include="MediatR" Version="[12.5.0]" />
+        <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.8" />
+        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.8" />
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+        <PackageReference Include="Serilog.Formatting.Compact.Reader" Version="4.0.0" />
+        <PackageReference Include="WebMarkupMin.Core" Version="2.21.0" />
+        <PackageReference Include="Winista.MimeDetect" Version="1.1.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\ErsatzTV.Core\ErsatzTV.Core.csproj" />
+        <ProjectReference Include="..\ErsatzTV.Infrastructure\ErsatzTV.Infrastructure.csproj" />
+    </ItemGroup>
+
+</Project>

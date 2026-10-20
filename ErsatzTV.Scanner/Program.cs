@@ -1,0 +1,269 @@
+using System.IO.Abstractions;
+using Dapper;
+using ErsatzTV.Core;
+using ErsatzTV.Core.Emby;
+using ErsatzTV.Core.FFmpeg;
+using ErsatzTV.Core.Interfaces.Emby;
+using ErsatzTV.Core.Interfaces.FFmpeg;
+using ErsatzTV.Core.Interfaces.Images;
+using ErsatzTV.Core.Interfaces.Jellyfin;
+using ErsatzTV.Core.Interfaces.Metadata;
+using ErsatzTV.Core.Interfaces.Plex;
+using ErsatzTV.Core.Interfaces.Repositories;
+using ErsatzTV.Core.Interfaces.Search;
+using ErsatzTV.Core.Jellyfin;
+using ErsatzTV.Core.Metadata;
+using ErsatzTV.Core.Plex;
+using ErsatzTV.Core.Search;
+using ErsatzTV.FFmpeg.Capabilities;
+using ErsatzTV.FFmpeg.Runtime;
+using ErsatzTV.Infrastructure;
+using ErsatzTV.Infrastructure.Data;
+using ErsatzTV.Infrastructure.Data.Repositories;
+using ErsatzTV.Infrastructure.Emby;
+using ErsatzTV.Infrastructure.Images;
+using ErsatzTV.Infrastructure.Jellyfin;
+using ErsatzTV.Infrastructure.Metadata;
+using ErsatzTV.Infrastructure.Plex;
+using ErsatzTV.Infrastructure.Runtime;
+using ErsatzTV.Infrastructure.Search;
+using ErsatzTV.Infrastructure.Sqlite.Data;
+using ErsatzTV.Scanner.Core;
+using ErsatzTV.Scanner.Core.Emby;
+using ErsatzTV.Scanner.Core.FFmpeg;
+using ErsatzTV.Scanner.Core.Interfaces;
+using ErsatzTV.Scanner.Core.Interfaces.FFmpeg;
+using ErsatzTV.Scanner.Core.Interfaces.Metadata;
+using ErsatzTV.Scanner.Core.Interfaces.Metadata.Nfo;
+using ErsatzTV.Scanner.Core.Jellyfin;
+using ErsatzTV.Scanner.Core.Metadata;
+using ErsatzTV.Scanner.Core.Metadata.Nfo;
+using ErsatzTV.Scanner.Core.Plex;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.IO;
+using Serilog;
+using Serilog.Events;
+using Serilog.Formatting.Compact;
+using Testably.Abstractions;
+using Exception = System.Exception;
+
+namespace ErsatzTV.Scanner;
+
+public class Program
+{
+    public static async Task<int> Main(string[] args)
+    {
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
+            .MinimumLevel.Override("Microsoft", LogEventLevel.Error)
+            .MinimumLevel.Override("System.Net.Http.HttpClient", LogEventLevel.Warning)
+            .Enrich.FromLogContext()
+            .WriteTo.Console(new CompactJsonFormatter(), standardErrorFromLevel: LogEventLevel.Debug)
+            .CreateLogger();
+
+        try
+        {
+            Environment.SetEnvironmentVariable("DOTNET_HOSTBUILDER__RELOADCONFIGONCHANGE", "false");
+            await CreateHostBuilder(args).Build().RunAsync();
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "ErsatzTV.Scanner host terminated unexpectedly");
+            return 1;
+        }
+        finally
+        {
+            await Log.CloseAndFlushAsync();
+        }
+    }
+
+    private static IHostBuilder CreateHostBuilder(string[] args)
+    {
+        Settings.UiPort = SystemEnvironment.UiPort;
+        Settings.StreamingPort = SystemEnvironment.StreamingPort;
+
+        return Host.CreateDefaultBuilder(args)
+            .ConfigureServices((context, services) =>
+            {
+                string databaseProvider = context.Configuration.GetValue("provider", Provider.Sqlite.Name) ??
+                                          string.Empty;
+                var sqliteConnectionString = $"Data Source={FileSystemLayout.DatabasePath};foreign keys=true;";
+                string mySqlConnectionString =
+                    context.Configuration.GetValue<string>("MySql:ConnectionString") ?? string.Empty;
+
+                services.AddDbContext<TvContext>(
+                    options =>
+                    {
+                        if (databaseProvider == Provider.Sqlite.Name)
+                        {
+                            options.UseSqlite(
+                                sqliteConnectionString,
+                                o =>
+                                {
+                                    o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+                                    o.MigrationsAssembly("ErsatzTV.Infrastructure.Sqlite");
+                                });
+                        }
+
+                        if (databaseProvider == Provider.MySql.Name)
+                        {
+                            options.UseMySql(
+                                mySqlConnectionString,
+                                ServerVersion.AutoDetect(mySqlConnectionString),
+                                o =>
+                                {
+                                    o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+                                    o.MigrationsAssembly("ErsatzTV.Infrastructure.MySql");
+                                }
+                            );
+                        }
+                    },
+                    ServiceLifetime.Scoped,
+                    ServiceLifetime.Singleton);
+
+                services.AddDbContextFactory<TvContext>(options =>
+                {
+                    if (databaseProvider == Provider.Sqlite.Name)
+                    {
+                        options.UseSqlite(
+                            sqliteConnectionString,
+                            o =>
+                            {
+                                o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+                                o.MigrationsAssembly("ErsatzTV.Infrastructure.Sqlite");
+                            });
+                    }
+
+                    if (databaseProvider == Provider.MySql.Name)
+                    {
+                        options.UseMySql(
+                            mySqlConnectionString,
+                            ServerVersion.AutoDetect(mySqlConnectionString),
+                            o =>
+                            {
+                                o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+                                o.MigrationsAssembly("ErsatzTV.Infrastructure.MySql");
+                            }
+                        );
+                    }
+                });
+
+                if (databaseProvider == Provider.Sqlite.Name)
+                {
+                    TvContext.LastInsertedRowId = "last_insert_rowid()";
+                    TvContext.CaseInsensitiveCollation = "NOCASE";
+
+                    SqlMapper.AddTypeHandler(new DateTimeOffsetHandler());
+                    SqlMapper.AddTypeHandler(new GuidHandler());
+                    SqlMapper.AddTypeHandler(new TimeSpanHandler());
+                }
+
+                if (databaseProvider == Provider.MySql.Name)
+                {
+                    TvContext.LastInsertedRowId = "last_insert_id()";
+                    TvContext.CaseInsensitiveCollation = "utf8mb4_general_ci";
+                }
+
+                services.AddHttpClient();
+
+                services.AddHttpClient("RefitCustomClient").AddHttpMessageHandler<SlowApiHandler>();
+
+                services.AddScoped<IConfigElementRepository, ConfigElementRepository>();
+                services.AddScoped<IMetadataRepository, MetadataRepository>();
+                services.AddScoped<IMediaSourceRepository, MediaSourceRepository>();
+                services.AddScoped<IMediaItemRepository, MediaItemRepository>();
+                services.AddScoped<IMovieRepository, MovieRepository>();
+                services.AddScoped<ITelevisionRepository, TelevisionRepository>();
+                services.AddScoped<IArtistRepository, ArtistRepository>();
+                services.AddScoped<IMusicVideoRepository, MusicVideoRepository>();
+                services.AddScoped<IOtherVideoRepository, OtherVideoRepository>();
+                services.AddScoped<ISongRepository, SongRepository>();
+                services.AddScoped<IImageRepository, ImageRepository>();
+                services.AddScoped<IRemoteStreamRepository, RemoteStreamRepository>();
+                services.AddScoped<ILibraryRepository, LibraryRepository>();
+                services.AddScoped<ISearchRepository, SearchRepository>();
+                services.AddScoped<ILanguageCodeService, LanguageCodeService>();
+                services.AddScoped<ILocalMetadataProvider, LocalMetadataProvider>();
+                services.AddScoped<IFallbackMetadataProvider, FallbackMetadataProvider>();
+                services.AddScoped<ILocalStatisticsProvider, LocalStatisticsProvider>();
+                services.AddScoped<ILocalSubtitlesProvider, LocalSubtitlesProvider>();
+                services.AddScoped<ILocalChaptersProvider, LocalChaptersProvider>();
+                services.AddScoped<IImageCache, ImageCache>();
+                services.AddScoped<ILocalFileSystem, LocalFileSystem>();
+                services.AddScoped<IMovieFolderScanner, MovieFolderScanner>();
+                services.AddScoped<ITelevisionFolderScanner, TelevisionFolderScanner>();
+                services.AddScoped<IMusicVideoFolderScanner, MusicVideoFolderScanner>();
+                services.AddScoped<IOtherVideoFolderScanner, OtherVideoFolderScanner>();
+                services.AddScoped<ISongFolderScanner, SongFolderScanner>();
+                services.AddScoped<IImageFolderScanner, ImageFolderScanner>();
+                services.AddScoped<IRemoteStreamFolderScanner, RemoteStreamFolderScanner>();
+                services.AddScoped<IEpisodeNfoReader, EpisodeNfoReader>();
+                services.AddScoped<IMovieNfoReader, MovieNfoReader>();
+                services.AddScoped<IArtistNfoReader, ArtistNfoReader>();
+                services.AddScoped<IMusicVideoNfoReader, MusicVideoNfoReader>();
+                services.AddScoped<IShowNfoReader, ShowNfoReader>();
+                services.AddScoped<IOtherVideoNfoReader, OtherVideoNfoReader>();
+                services.AddScoped<IFFmpegPngService, FFmpegPngService>();
+                services.AddScoped<IRuntimeInfo, RuntimeInfo>();
+                services.AddScoped<IHardwareCapabilitiesFactory, HardwareCapabilitiesFactory>();
+
+                services.AddScoped<IPlexMovieLibraryScanner, PlexMovieLibraryScanner>();
+                services.AddScoped<IPlexOtherVideoLibraryScanner, PlexOtherVideoLibraryScanner>();
+                services.AddScoped<IPlexTelevisionLibraryScanner, PlexTelevisionLibraryScanner>();
+                services.AddScoped<IPlexCollectionScanner, PlexCollectionScanner>();
+                services.AddScoped<IPlexNetworkScanner, PlexNetworkScanner>();
+                services.AddScoped<IPlexServerApiClient, PlexServerApiClient>();
+                services.AddScoped<IPlexCollectionRepository, PlexCollectionRepository>();
+                services.AddScoped<IPlexMovieRepository, PlexMovieRepository>();
+                services.AddScoped<IPlexOtherVideoRepository, PlexOtherVideoRepository>();
+                services.AddScoped<IPlexTelevisionRepository, PlexTelevisionRepository>();
+                services.AddScoped<IPlexMetadataRepository, PlexMetadataRepository>();
+                services.AddScoped<IPlexPathReplacementService, PlexPathReplacementService>();
+                services.AddScoped<PlexEtag>();
+
+                services.AddScoped<IEmbyMovieLibraryScanner, EmbyMovieLibraryScanner>();
+                services.AddScoped<IEmbyTelevisionLibraryScanner, EmbyTelevisionLibraryScanner>();
+                services.AddScoped<IEmbyCollectionScanner, EmbyCollectionScanner>();
+                services.AddScoped<IEmbyApiClient, EmbyApiClient>();
+                services.AddScoped<IEmbyCollectionRepository, EmbyCollectionRepository>();
+                services.AddScoped<IEmbyMovieRepository, EmbyMovieRepository>();
+                services.AddScoped<IEmbyTelevisionRepository, EmbyTelevisionRepository>();
+                services.AddScoped<IEmbyPathReplacementService, EmbyPathReplacementService>();
+
+                services.AddScoped<IJellyfinMovieLibraryScanner, JellyfinMovieLibraryScanner>();
+                services.AddScoped<IJellyfinTelevisionLibraryScanner, JellyfinTelevisionLibraryScanner>();
+                services.AddScoped<IJellyfinCollectionScanner, JellyfinCollectionScanner>();
+                services.AddScoped<IJellyfinApiClient, JellyfinApiClient>();
+                services.AddScoped<IJellyfinCollectionRepository, JellyfinCollectionRepository>();
+                services.AddScoped<IJellyfinMovieRepository, JellyfinMovieRepository>();
+                services.AddScoped<IJellyfinTelevisionRepository, JellyfinTelevisionRepository>();
+                services.AddScoped<IJellyfinPathReplacementService, JellyfinPathReplacementService>();
+
+                services.AddSingleton<ITempFilePool, TempFilePool>();
+                services.AddSingleton<IPlexSecretStore, PlexSecretStore>();
+                services.AddSingleton<IEmbySecretStore, EmbySecretStore>();
+                services.AddSingleton<IJellyfinSecretStore, JellyfinSecretStore>();
+                services.AddSingleton<ISmartCollectionCache, SmartCollectionCache>();
+                services.AddSingleton<SearchQueryParser>();
+                services.AddSingleton<ISearchIndex, LuceneSearchIndex>();
+                services.AddSingleton<RecyclableMemoryStreamManager>();
+                services.AddSingleton<IScannerProxy, ScannerProxy>();
+                services.AddSingleton<ILanguageCodeCache, LanguageCodeCache>();
+
+                services.AddSingleton<IFileSystem, RealFileSystem>();
+
+                services.AddTransient<SlowApiHandler>();
+                services.AddTransient<SlowQueryInterceptor>();
+
+                services.AddMediatR(config => config.RegisterServicesFromAssemblyContaining<Worker>());
+                services.AddMemoryCache();
+
+                services.AddHostedService<Worker>();
+            })
+            .UseSerilog();
+    }
+}

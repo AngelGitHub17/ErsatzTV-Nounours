@@ -1,0 +1,91 @@
+﻿@using ErsatzTV.Application.ProgramSchedules
+@using NaturalSort.Extension
+@implements IDisposable
+@inject IMediator Mediator
+
+<div @onkeydown="@OnKeyDown">
+    <MudDialog>
+        <DialogContent>
+            <MudContainer Class="mb-6">
+                <MudHighlighter Class="mud-primary-text"
+                                Style="background-color: transparent; font-weight: bold"
+                                Text="@FormatText()"
+                                HighlightedText="@EntityName"/>
+            </MudContainer>
+            <MudSelect T="ProgramScheduleViewModel" Label="Schedule" @bind-Value="_selectedSchedule" Class="mb-6 mx-4">
+                @foreach (ProgramScheduleViewModel schedule in _schedules)
+                {
+                    <MudSelectItem Value="@schedule">@schedule.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="Cancel">Cancel</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_selectedSchedule == null)" OnClick="Submit">
+                Add To Schedule
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
+</div>
+
+@code {
+    private CancellationTokenSource _cts;
+
+    [CascadingParameter]
+    IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public string EntityType { get; set; }
+
+    [Parameter]
+    public string EntityName { get; set; }
+
+    [Parameter]
+    public string DetailText { get; set; }
+
+    [Parameter]
+    public string DetailHighlight { get; set; }
+
+    private List<ProgramScheduleViewModel> _schedules;
+
+    private ProgramScheduleViewModel _selectedSchedule;
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        try
+        {
+            _schedules = await Mediator.Send(new GetAllProgramSchedules(), token)
+                .Map(list => list.OrderBy(vm => vm.Name, new NaturalSortComparer(StringComparison.CurrentCultureIgnoreCase)).ToList());
+        }
+        catch (OperationCanceledException)
+        {
+            // do nothing
+        }
+    }
+
+    private string FormatText() => $"Select the schedule to add the {EntityType} {EntityName}";
+
+    private void Submit() => MudDialog.Close(DialogResult.Ok(_selectedSchedule));
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Code is "Enter" or "NumpadEnter")
+        {
+            Submit();
+        }
+    }
+
+}

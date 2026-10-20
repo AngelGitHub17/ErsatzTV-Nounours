@@ -1,0 +1,87 @@
+﻿@implements IDisposable
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject ILogger<RemoteMediaSourceEditor> Logger
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
+    <MudText Typo="Typo.h4" Class="mb-4">@Name Media Source</MudText>
+    <div style="max-width: 400px;">
+        <EditForm EditContext="_editContext" OnSubmit="@HandleSubmitAsync">
+            <FluentValidationValidator/>
+            <MudCard>
+                <MudCardContent>
+                    <MudTextField Label="Address" @bind-Value="_model.Address" For="@(() => _model.Address)" Placeholder="http://192.168.1.100:8096"/>
+                    <MudTextField Label="Api Key" @bind-Value="_model.ApiKey" For="@(() => _model.ApiKey)"/>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto">
+                        Save Changes
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        </EditForm>
+    </div>
+</MudContainer>
+
+@code {
+    private CancellationTokenSource _cts;
+
+    [Parameter]
+    public string Name { get; set; }
+
+    [Parameter]
+    public Func<RemoteMediaSourceEditViewModel, CancellationToken, Task<Unit>> LoadSecrets { get; set; }
+
+    [Parameter]
+    public Func<RemoteMediaSourceEditViewModel, CancellationToken, Task<Either<BaseError, Unit>>> SaveSecrets { get; set; }
+
+    private readonly RemoteMediaSourceEditViewModel _model = new();
+    private EditContext _editContext;
+    private ValidationMessageStore _messageStore;
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        try
+        {
+            await LoadSecrets(_model, token);
+        }
+        catch (OperationCanceledException)
+        {
+            // do nothing
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        _editContext = new EditContext(_model);
+        _messageStore = new ValidationMessageStore(_editContext);
+    }
+
+    private async Task HandleSubmitAsync()
+    {
+        _messageStore.Clear();
+        if (_editContext.Validate())
+        {
+            Either<BaseError, Unit> result = await SaveSecrets(_model, _cts.Token);
+            result.Match(
+                _ => NavigationManager.NavigateTo($"media/sources/{Name.ToLowerInvariant()}"),
+                error =>
+                {
+                    Snackbar.Add(error.Value, Severity.Error);
+                    Logger.LogError("Error saving {MediaSource} secrets: {Error}", Name, error.Value);
+                });
+        }
+    }
+
+}

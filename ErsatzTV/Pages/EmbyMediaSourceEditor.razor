@@ -1,0 +1,26 @@
+﻿@page "/media/sources/emby/edit"
+@using ErsatzTV.Application.Emby
+@using ErsatzTV.Core.Emby
+@inject IMediator Mediator
+
+<RemoteMediaSourceEditor
+    Name="Emby"
+    LoadSecrets="LoadSecrets"
+    SaveSecrets="SaveSecrets"/>
+
+@code {
+    private async Task<Unit> LoadSecrets(RemoteMediaSourceEditViewModel viewModel, CancellationToken cancellationToken)
+    {
+        EmbySecrets secrets = await Mediator.Send(new GetEmbySecrets(), cancellationToken);
+        viewModel.Address = secrets.Address;
+        viewModel.ApiKey = secrets.ApiKey;
+        return Unit.Default;
+    }
+
+    private async Task<Either<BaseError, Unit>> SaveSecrets(RemoteMediaSourceEditViewModel viewModel, CancellationToken cancellationToken)
+    {
+        var secrets = new EmbySecrets { Address = viewModel.Address, ApiKey = viewModel.ApiKey };
+        return await Mediator.Send(new SaveEmbySecrets(secrets), cancellationToken);
+    }
+
+}

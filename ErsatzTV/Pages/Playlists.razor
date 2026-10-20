@@ -1,0 +1,235 @@
+@page "/media/playlists"
+@using ErsatzTV.Application.MediaCollections
+@using ErsatzTV.Application.Tree
+@implements IDisposable
+@inject ILogger<Playlists> Logger
+@inject ISnackbar Snackbar
+@inject IMediator Mediator
+@inject IDialogService Dialog
+
+<MudForm Style="max-height: 100%">
+    <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
+            <MudText Typo="Typo.h5" Class="mb-2">Playlist Groups</MudText>
+            <MudDivider Class="mb-6"/>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex">
+                    <MudText>Playlist Group Name</MudText>
+                </div>
+                <MudTextField @bind-Value="_playlistGroupName" For="@(() => _playlistGroupName)"/>
+            </MudStack>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex"></div>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(_ => AddPlaylistGroup())" StartIcon="@Icons.Material.Filled.Add">
+                    Add Playlist Group
+                </MudButton>
+            </MudStack>
+            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Playlists</MudText>
+            <MudDivider Class="mb-6"/>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex">
+                    <MudText>Playlist Group</MudText>
+                </div>
+                <MudSelect @bind-Value="_selectedPlaylistGroup">
+                    @foreach (PlaylistGroupViewModel playlistGroup in _playlistGroups)
+                    {
+                        <MudSelectItem Value="@playlistGroup">@playlistGroup.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudStack>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex">
+                    <MudText>Playlist Name</MudText>
+                </div>
+                <MudTextField @bind-Value="_playlistName" For="@(() => _playlistName)"/>
+            </MudStack>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex"></div>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(_ => AddPlaylist())" StartIcon="@Icons.Material.Filled.Add">
+                    Add Playlist
+                </MudButton>
+            </MudStack>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex"></div>
+                <MudTreeView T="PlaylistTreeItemViewModel" Items="@_treeItems" Hover="true" Style="width: 100%">
+                    <ItemTemplate Context="item">
+                        <MudTreeViewItem T="PlaylistTreeItemViewModel" Items="@item.Value!.TreeItems" Icon="@item.Value.Icon" Value="@item.Value">
+                            <BodyContent>
+                                <div style="display: grid; grid-template-columns: 1fr auto; align-items: center; width: 100%">
+                                    <MudGrid Justify="Justify.FlexStart">
+                                        <MudItem xs="5">
+                                            <MudText>@item.Value.Text</MudText>
+                                        </MudItem>
+                                        @if (!string.IsNullOrWhiteSpace(item.Value.EndText))
+                                        {
+                                            <MudItem xs="6">
+                                                <MudText>@item.Value.EndText</MudText>
+                                            </MudItem>
+                                        }
+                                    </MudGrid>
+                                    <div style="justify-self: end;">
+                                        @foreach (int playlistId in Optional(item.Value.PlaylistId))
+                                        {
+                                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Medium" Color="Color.Inherit" Href="@($"media/playlists/{playlistId}")"/>
+                                        }
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                       Size="Size.Medium"
+                                                       Color="Color.Inherit"
+                                                       Disabled="@item.Value.IsSystem"
+                                                       OnClick="@(_ => DeleteItem(item.Value))"/>
+                                    </div>
+                                </div>
+                            </BodyContent>
+                        </MudTreeViewItem>
+                    </ItemTemplate>
+                </MudTreeView>
+            </MudStack>
+        </MudContainer>
+    </div>
+</MudForm>
+
+@code {
+    private CancellationTokenSource _cts;
+    private readonly List<TreeItemData<PlaylistTreeItemViewModel>> _treeItems = [];
+    private List<PlaylistGroupViewModel> _playlistGroups = [];
+    private PlaylistGroupViewModel _selectedPlaylistGroup;
+    private string _playlistGroupName;
+    private string _playlistName;
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        try
+        {
+            await ReloadPlaylistTree(token);
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException)
+        {
+            // do nothing
+        }
+    }
+
+    private async Task ReloadPlaylistTree(CancellationToken cancellationToken)
+    {
+        _playlistGroups = await Mediator.Send(new GetAllPlaylistGroups(), cancellationToken);
+
+        _treeItems.Clear();
+        TreeViewModel tree = await Mediator.Send(new GetPlaylistTree(), cancellationToken);
+        foreach (TreeGroupViewModel group in tree.Groups)
+        {
+            _treeItems.Add(new TreeItemData<PlaylistTreeItemViewModel> { Value = new PlaylistTreeItemViewModel(group) });
+        }
+    }
+
+    private async Task AddPlaylistGroup()
+    {
+        if (!string.IsNullOrWhiteSpace(_playlistGroupName))
+        {
+            Either<BaseError, PlaylistGroupViewModel> result = await Mediator.Send(new CreatePlaylistGroup(_playlistGroupName), _cts.Token);
+
+            foreach (BaseError error in result.LeftToSeq())
+            {
+                Snackbar.Add(error.Value, Severity.Error);
+                Logger.LogError("Unexpected error adding playlist group: {Error}", error.Value);
+            }
+
+            foreach (PlaylistGroupViewModel _ in result.RightToSeq())
+            {
+                await ReloadPlaylistTree(_cts.Token);
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    private async Task AddPlaylist()
+    {
+        if (_selectedPlaylistGroup is not null && !string.IsNullOrWhiteSpace(_playlistName))
+        {
+            Either<BaseError, PlaylistViewModel> result = await Mediator.Send(new CreatePlaylist(_selectedPlaylistGroup.Id, _playlistName), _cts.Token);
+
+            foreach (BaseError error in result.LeftToSeq())
+            {
+                Snackbar.Add(error.Value, Severity.Error);
+                Logger.LogError("Unexpected error adding playlist: {Error}", error.Value);
+            }
+
+            foreach (PlaylistViewModel playlist in result.RightToSeq())
+            {
+                foreach (PlaylistTreeItemViewModel item in _treeItems.Map(i => i.Value).Where(item => item.PlaylistGroupId == _selectedPlaylistGroup.Id))
+                {
+                    item.TreeItems.Add(new TreeItemData<PlaylistTreeItemViewModel> { Value = new PlaylistTreeItemViewModel(playlist) });
+                }
+
+                _playlistName = null;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    private async Task DeleteItem(PlaylistTreeItemViewModel treeItem)
+    {
+        foreach (int playlistGroupId in Optional(treeItem.PlaylistGroupId))
+        {
+            var parameters = new DialogParameters { { "EntityType", "playlist group" }, { "EntityName", treeItem.Text } };
+            var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+            IDialogReference dialog = await Dialog.ShowAsync<DeleteDialog>("Delete Playlist Group", parameters, options);
+            DialogResult result = await dialog.Result;
+            if (result is not null && !result.Canceled)
+            {
+                Option<BaseError> deleteResult = await Mediator.Send(new DeletePlaylistGroup(playlistGroupId), _cts.Token);
+                foreach (BaseError error in deleteResult)
+                {
+                    Snackbar.Add(error.ToString(), Severity.Error);
+                    return;
+                }
+
+                _treeItems.RemoveAll(i => i.Value?.PlaylistGroupId == playlistGroupId);
+                if (_selectedPlaylistGroup?.Id == playlistGroupId)
+                {
+                    _selectedPlaylistGroup = null;
+                }
+
+                _playlistGroups = await Mediator.Send(new GetAllPlaylistGroups(), _cts.Token);
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+
+        foreach (int playlistId in Optional(treeItem.PlaylistId))
+        {
+            var parameters = new DialogParameters { { "EntityType", "playlist" }, { "EntityName", treeItem.Text } };
+            var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+            IDialogReference dialog = await Dialog.ShowAsync<DeleteDialog>("Delete Playlist", parameters, options);
+            DialogResult result = await dialog.Result;
+            if (result is not null && !result.Canceled)
+            {
+                Option<BaseError> deleteResult = await Mediator.Send(new DeletePlaylist(playlistId), _cts.Token);
+                foreach (BaseError error in deleteResult)
+                {
+                    Snackbar.Add(error.ToString(), Severity.Error);
+                    return;
+                }
+
+                foreach (PlaylistTreeItemViewModel parent in _treeItems.Map(i => i.Value))
+                {
+                    parent.TreeItems.RemoveAll(i => i.Value == treeItem);
+                }
+
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+}

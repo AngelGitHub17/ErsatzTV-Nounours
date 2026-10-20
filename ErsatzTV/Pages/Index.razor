@@ -1,0 +1,168 @@
+﻿@page "/"
+@page "/system/health"
+@using ErsatzTV.Application.Health
+@using ErsatzTV.Core.Health
+@implements IDisposable
+@inject IMediator Mediator
+@inject SystemStartup SystemStartup;
+
+<MudForm Style="max-height: 100%">
+    <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
+            @if (!SystemStartup.IsDatabaseReady)
+            {
+                <MudCard>
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h4">Database is initializing</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudText>Please wait, this may take a few minutes.</MudText>
+                        <MudText>This page will automatically refresh when the database is ready.</MudText>
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudProgressCircular Color="Color.Primary" Size="Size.Medium" Indeterminate="true"/>
+                    </MudCardActions>
+                </MudCard>
+            }
+            else if (!SystemStartup.IsSearchIndexReady)
+            {
+                <MudCard>
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h4">Search Index is initializing</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudText>Please wait, this may take a few minutes.</MudText>
+                        <MudText>This page will automatically refresh when the search index is ready.</MudText>
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudProgressCircular Color="Color.Primary" Size="Size.Medium" Indeterminate="true"/>
+                    </MudCardActions>
+                </MudCard>
+            }
+            else
+            {
+                <MudText Typo="Typo.h5" Class="mb-2">Health Checks</MudText>
+                <MudDivider Class="mb-6"/>
+                <MudTable Hover="true"
+                          Dense="true"
+                          Breakpoint="Breakpoint.None"
+                          ServerData="@(ServerReload)">
+                    <HeaderContent>
+                        <MudTh>Check</MudTh>
+                        <MudTh>Message</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>
+                            <div style="align-items: center; display: flex; flex-direction: row;">
+                                @if (context.Status == HealthCheckStatus.Fail)
+                                {
+                                    <MudIcon Color="@Color.Error" Icon="@Icons.Material.Filled.Error"/>
+                                }
+                                else if (context.Status == HealthCheckStatus.Warning)
+                                {
+                                    <MudIcon Color="@Color.Warning" Icon="@Icons.Material.Filled.Warning"/>
+                                }
+                                else if (context.Status == HealthCheckStatus.Info)
+                                {
+                                    <MudIcon Color="@Color.Info" Icon="@Icons.Material.Filled.Info"/>
+                                }
+                                else
+                                {
+                                    <MudIcon Color="@Color.Success" Icon="@Icons.Material.Filled.Check"/>
+                                }
+                                <div class="ml-2">@context.Title</div>
+                            </div>
+                        </MudTd>
+                        <MudTd>
+                            <MudHidden Breakpoint="Breakpoint.Xs">
+                                @if (context.Link.IsSome)
+                                {
+                                    foreach (HealthCheckLink link in context.Link)
+                                    {
+                                        if (link.Link.StartsWith("http"))
+                                        {
+                                            <MudLink Href="@link.Link" Target="_blank">
+                                                @context.Message
+                                            </MudLink>
+                                        }
+                                        else
+                                        {
+                                            <MudLink Href="@link.Link">
+                                                @context.Message
+                                            </MudLink>
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    <MudText>
+                                        @context.Message
+                                    </MudText>
+                                }
+                            </MudHidden>
+                            <MudHidden Breakpoint="Breakpoint.Xs" Invert="true">
+                                @if (context.Link.IsSome)
+                                {
+                                    foreach (HealthCheckLink link in context.Link)
+                                    {
+                                        <MudLink Href="@link.Link">
+                                            @context.BriefMessage
+                                        </MudLink>
+                                    }
+                                }
+                                else
+                                {
+                                    <MudText>
+                                        @context.BriefMessage
+                                    </MudText>
+                                }
+                            </MudHidden>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudContainer>
+    </div>
+</MudForm>
+
+@code {
+    protected override void OnInitialized()
+    {
+        SystemStartup.OnDatabaseReady += OnStartupProgress;
+        SystemStartup.OnSearchIndexReady += OnStartupProgress;
+    }
+
+    public void Dispose()
+    {
+        SystemStartup.OnDatabaseReady -= OnStartupProgress;
+        SystemStartup.OnSearchIndexReady -= OnStartupProgress;
+    }
+
+    private async void OnStartupProgress(object sender, EventArgs e)
+    {
+        try
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception)
+        {
+            // do nothing
+        }
+    }
+
+    private async Task<TableData<HealthCheckResult>> ServerReload(TableState state, CancellationToken cancellationToken)
+    {
+        List<HealthCheckResult> healthCheckResults = await Mediator.Send(new GetAllHealthCheckResults(), cancellationToken);
+
+        return new TableData<HealthCheckResult>
+        {
+            TotalItems = healthCheckResults.Count,
+            Items = healthCheckResults
+        };
+    }
+
+}

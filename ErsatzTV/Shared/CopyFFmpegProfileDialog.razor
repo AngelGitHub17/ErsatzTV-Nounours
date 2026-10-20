@@ -1,0 +1,73 @@
+﻿@using ErsatzTV.Application.FFmpegProfiles
+@implements IDisposable
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject ILogger<CopyFFmpegProfileDialog> Logger
+
+<MudDialog>
+    <DialogContent>
+        <EditForm Model="@_dummyModel" OnSubmit="@(_ => Submit())">
+            <MudContainer Class="mb-6">
+                <MudText>
+                    Enter a name for the new FFmpeg Profile
+                </MudText>
+            </MudContainer>
+            <MudTextField T="string" Label="New FFmpeg Profile Name"
+                          @bind-Text="@_newFFmpegProfileName"
+                          Class="mb-6 mx-4">
+            </MudTextField>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@Cancel" ButtonType="ButtonType.Reset">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@Submit">
+            Copy Profile
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private readonly CancellationTokenSource _cts = new();
+
+    [CascadingParameter]
+    IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public int FFmpegProfileId { get; set; }
+
+    private record DummyModel;
+
+    private readonly DummyModel _dummyModel = new();
+
+    private string _newFFmpegProfileName;
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+
+    private bool CanSubmit() => !string.IsNullOrWhiteSpace(_newFFmpegProfileName);
+
+    private async Task Submit()
+    {
+        if (!CanSubmit())
+        {
+            return;
+        }
+
+        Either<BaseError, FFmpegProfileViewModel> maybeResult =
+            await Mediator.Send(new CopyFFmpegProfile(FFmpegProfileId, _newFFmpegProfileName), _cts.Token);
+
+        maybeResult.Match(
+            ffmpegProfile => { MudDialog.Close(DialogResult.Ok(ffmpegProfile)); },
+            error =>
+            {
+                Snackbar.Add(error.Value, Severity.Error);
+                Logger.LogError("Error copying FFmpeg Profile: {Error}", error.Value);
+                MudDialog.Close(DialogResult.Cancel());
+            });
+    }
+
+    private void Cancel(MouseEventArgs e) => MudDialog.Cancel();
+}

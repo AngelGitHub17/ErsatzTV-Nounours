@@ -1,0 +1,134 @@
+﻿using ErsatzTV.Core;
+using ErsatzTV.Core.Domain;
+using ErsatzTV.Core.Interfaces.Jellyfin;
+using ErsatzTV.Core.Interfaces.Repositories;
+using ErsatzTV.Core.Jellyfin;
+using ErsatzTV.Scanner.Core.Interfaces;
+
+namespace ErsatzTV.Scanner.Application.Jellyfin;
+
+public class
+    SynchronizeJellyfinCollectionsHandler : IRequestHandler<SynchronizeJellyfinCollections, Either<BaseError, Unit>>
+{
+    private readonly IConfigElementRepository _configElementRepository;
+    private readonly IScannerProxy _scannerProxy;
+    private readonly IJellyfinSecretStore _jellyfinSecretStore;
+    private readonly IMediaSourceRepository _mediaSourceRepository;
+    private readonly IJellyfinCollectionScanner _scanner;
+
+    public SynchronizeJellyfinCollectionsHandler(
+        IMediaSourceRepository mediaSourceRepository,
+        IJellyfinSecretStore jellyfinSecretStore,
+        IJellyfinCollectionScanner scanner,
+        IConfigElementRepository configElementRepository,
+        IScannerProxy scannerProxy)
+    {
+        _mediaSourceRepository = mediaSourceRepository;
+        _jellyfinSecretStore = jellyfinSecretStore;
+        _scanner = scanner;
+        _configElementRepository = configElementRepository;
+        _scannerProxy = scannerProxy;
+    }
+
+
+    public async Task<Either<BaseError, Unit>> Handle(
+        SynchronizeJellyfinCollections request,
+        CancellationToken cancellationToken)
+    {
+        Validation<BaseError, RequestParameters> validation = await Validate(request, cancellationToken);
+        return await validation.Match(
+            SynchronizeCollections,
+            error => Task.FromResult<Either<BaseError, Unit>>(error.Join()));
+    }
+
+    private async Task<Validation<BaseError, RequestParameters>> Validate(
+        SynchronizeJellyfinCollections request,
+        CancellationToken cancellationToken)
+    {
+        Task<Validation<BaseError, ConnectionAndSource>> mediaSource = MediaSourceMustExist(request)
+            .BindT(MediaSourceMustHaveActiveConnection)
+            .BindT(MediaSourceMustHaveApiKey);
+
+        return (await mediaSource, await ValidateLibraryRefreshInterval(cancellationToken))
+            .Apply((connectionParameters, libraryRefreshInterval) => new RequestParameters(
+                connectionParameters.ConnectionParameters,
+                connectionParameters.MediaSource,
+                request.ForceScan,
+                request.DeepScan,
+                libraryRefreshInterval,
+                request.BaseUrl));
+    }
+
+    private Task<Validation<BaseError, int>> ValidateLibraryRefreshInterval(CancellationToken cancellationToken) =>
+        _configElementRepository.GetValue<int>(ConfigElementKey.LibraryRefreshInterval, cancellationToken)
+            .FilterT(lri => lri is >= 0 and < 1_000_000)
+            .Map(lri => lri.ToValidation<BaseError>("Library refresh interval is invalid"));
+
+    private Task<Validation<BaseError, JellyfinMediaSource>> MediaSourceMustExist(
+        SynchronizeJellyfinCollections request) =>
+        _mediaSourceRepository.GetJellyfin(request.JellyfinMediaSourceId)
+            .Map(o => o.ToValidation<BaseError>("Jellyfin media source does not exist."));
+
+    private static Validation<BaseError, ConnectionAndSource> MediaSourceMustHaveActiveConnection(
+        JellyfinMediaSource jellyfinMediaSource)
+    {
+        Option<JellyfinConnection> maybeConnection = jellyfinMediaSource.Connections.HeadOrNone();
+        return maybeConnection.Map(connection => new ConnectionAndSource(
+                new JellyfinConnectionParameters(connection.Address, string.Empty, connection.JellyfinMediaSourceId),
+                jellyfinMediaSource))
+            .ToValidation<BaseError>("Jellyfin media source requires an active connection");
+    }
+
+    private async Task<Validation<BaseError, ConnectionAndSource>> MediaSourceMustHaveApiKey(
+        ConnectionAndSource connectionAndSource)
+    {
+        JellyfinSecrets secrets = await _jellyfinSecretStore.ReadSecrets();
+        return Optional(secrets.Address == connectionAndSource.ConnectionParameters.Address)
+            .Where(match => match)
+            .Map(_ => connectionAndSource with
+            {
+                ConnectionParameters = connectionAndSource.ConnectionParameters with { ApiKey = secrets.ApiKey }
+            })
+            .ToValidation<BaseError>("Jellyfin media source requires an api key");
+    }
+
+    private async Task<Either<BaseError, Unit>> SynchronizeCollections(RequestParameters parameters)
+    {
+        _scannerProxy.SetBaseUrl(parameters.BaseUrl);
+
+        var lastScan = new DateTimeOffset(
+            parameters.MediaSource.LastCollectionsScan ?? SystemTime.MinValueUtc,
+            TimeSpan.Zero);
+        DateTimeOffset nextScan = lastScan + TimeSpan.FromHours(parameters.LibraryRefreshInterval);
+        if (parameters.ForceScan || parameters.LibraryRefreshInterval > 0 && nextScan < DateTimeOffset.Now)
+        {
+            Either<BaseError, Unit> result = await _scanner.ScanCollections(
+                parameters.ConnectionParameters.Address,
+                parameters.ConnectionParameters.AuthorizationHeader,
+                parameters.MediaSource.Id,
+                parameters.DeepScan);
+
+            if (result.IsRight)
+            {
+                parameters.MediaSource.LastCollectionsScan = DateTime.UtcNow;
+                await _mediaSourceRepository.UpdateLastCollectionScan(parameters.MediaSource);
+            }
+
+            return result;
+        }
+
+        return Unit.Default;
+    }
+
+    private record RequestParameters(
+        JellyfinConnectionParameters ConnectionParameters,
+        JellyfinMediaSource MediaSource,
+        bool ForceScan,
+        bool DeepScan,
+        int LibraryRefreshInterval,
+        string BaseUrl);
+
+    private sealed record ConnectionAndSource(
+        JellyfinConnectionParameters ConnectionParameters,
+        JellyfinMediaSource MediaSource);
+}

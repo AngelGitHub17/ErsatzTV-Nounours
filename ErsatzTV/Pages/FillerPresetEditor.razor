@@ -1,0 +1,416 @@
+﻿@page "/media/filler/presets/{Id:int}/edit"
+@page "/media/filler/presets/add"
+@using ErsatzTV.Application.Artists
+@using ErsatzTV.Application.Filler
+@using ErsatzTV.Application.MediaCollections
+@using ErsatzTV.Application.MediaItems
+@using ErsatzTV.Application.Television
+@using ErsatzTV.Core.Domain.Filler
+@using ErsatzTV.Validators
+@using FluentValidation.Results
+@implements IDisposable
+@inject NavigationManager NavigationManager
+@inject ILogger<FillerPresetEditor> Logger
+@inject ISnackbar Snackbar
+@inject IMediator Mediator
+
+<MudForm Model="@_model" @ref="@_form" Validation="@(_validator.ValidateValue)" ValidationDelay="0" Style="max-height: 100%">
+    <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-6" OnClick="@HandleSubmitAsync" StartIcon="@(IsEdit ? Icons.Material.Filled.Save : Icons.Material.Filled.Add)">@(IsEdit ? "Save Filler Preset" : "Add Filler Preset")</MudButton>
+    </MudPaper>
+    <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
+            <MudText Typo="Typo.h5" Class="mb-2">Filler Preset</MudText>
+            <MudDivider Class="mb-6"/>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex">
+                    <MudText>Name</MudText>
+                </div>
+                <MudTextField @bind-Value="_model.Name" For="@(() => _model.Name)"/>
+            </MudStack>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex">
+                    <MudText>Kind</MudText>
+                </div>
+                <MudSelect @bind-Value="_model.FillerKind" For="@(() => _model.FillerKind)" Disabled="@IsEdit">
+                    <MudSelectItem Value="@(FillerKind.PreRoll)">Pre-Roll</MudSelectItem>
+                    <MudSelectItem Value="@(FillerKind.MidRoll)">Mid-Roll</MudSelectItem>
+                    <MudSelectItem Value="@(FillerKind.PostRoll)">Post-Roll</MudSelectItem>
+                    <MudSelectItem Value="@(FillerKind.Tail)">Tail</MudSelectItem>
+                    <MudSelectItem Value="@(FillerKind.Fallback)">Fallback</MudSelectItem>
+                </MudSelect>
+            </MudStack>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex">
+                    <MudText>Mode</MudText>
+                </div>
+                <MudSelect @bind-Value="_model.FillerMode" For="@(() => _model.FillerMode)"
+                           Disabled="@(_model.FillerKind is FillerKind.Fallback or FillerKind.Tail || _model.CollectionType is CollectionType.Playlist)">
+                    <MudSelectItem Value="@(FillerMode.Duration)">Duration</MudSelectItem>
+                    <MudSelectItem Value="@(FillerMode.Count)">Count</MudSelectItem>
+                    <MudSelectItem Value="@(FillerMode.Pad)">Pad</MudSelectItem>
+                    <MudSelectItem Value="@(FillerMode.RandomCount)">Random Count</MudSelectItem>
+                </MudSelect>
+            </MudStack>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex">
+                    <MudText>Duration</MudText>
+                </div>
+                <MudTextField T="int"
+                              @bind-Value="_model.DurationHours"
+                              Adornment="Adornment.End"
+                              AdornmentText="hours"
+                              Disabled="@(_model.FillerMode != FillerMode.Duration)"/>
+            </MudStack>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex"></div>
+                <MudTextField T="int"
+                              @bind-Value="_model.DurationMinutes"
+                              Adornment="Adornment.End"
+                              AdornmentText="minutes"
+                              Disabled="@(_model.FillerMode != FillerMode.Duration)"/>
+            </MudStack>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex"></div>
+                <MudTextField T="int"
+                              @bind-Value="_model.DurationSeconds"
+                              Adornment="Adornment.End"
+                              AdornmentText="seconds"
+                              Disabled="@(_model.FillerMode != FillerMode.Duration)"/>
+            </MudStack>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex">
+                    <MudText>Count</MudText>
+                </div>
+                <MudTextField @bind-Value="@_model.Count" For="@(() => _model.Count)" Disabled="@(_model.FillerMode != FillerMode.Count && _model.FillerMode != FillerMode.RandomCount)"/>
+            </MudStack>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex">
+                    <MudText>Pad To Nearest Minute</MudText>
+                </div>
+                <MudSelect @bind-Value="_model.PadToNearestMinute" For="@(() => _model.PadToNearestMinute)" Disabled="@(_model.FillerMode != FillerMode.Pad)">
+                    <MudSelectItem T="int?" Value="5">5 (:00, :05, :10, :15, :20, etc)</MudSelectItem>
+                    <MudSelectItem T="int?" Value="10">10 (:00, :10, :20, :30, :40, :50)</MudSelectItem>
+                    <MudSelectItem T="int?" Value="15">15 (:00, :15, :30, :45)</MudSelectItem>
+                    <MudSelectItem T="int?" Value="30">30 (:00, :30)</MudSelectItem>
+                </MudSelect>
+            </MudStack>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex">
+                    <MudText>Allow Watermarks</MudText>
+                </div>
+                <MudCheckBox @bind-Value="@_model.AllowWatermarks" For="@(() => _model.AllowWatermarks)" Dense="true"/>
+            </MudStack>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex">
+                    <MudText>Collection Type</MudText>
+                </div>
+                <MudSelect @bind-Value="_model.CollectionType" For="@(() => _model.CollectionType)">
+                    <MudSelectItem Value="CollectionType.Collection">Collection</MudSelectItem>
+                    <MudSelectItem Value="CollectionType.TelevisionShow">Television Show</MudSelectItem>
+                    <MudSelectItem Value="CollectionType.TelevisionSeason">Television Season</MudSelectItem>
+                    <MudSelectItem Value="CollectionType.Artist">Artist</MudSelectItem>
+                    <MudSelectItem Value="CollectionType.MultiCollection">Multi Collection</MudSelectItem>
+                    <MudSelectItem Value="CollectionType.SmartCollection">Smart Collection</MudSelectItem>
+                    @if (_model.FillerKind is not FillerKind.Fallback and not FillerKind.Tail)
+                    {
+                        <MudSelectItem Value="CollectionType.Playlist">Playlist</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudStack>
+            @if (_model.CollectionType == CollectionType.Collection)
+            {
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <div class="d-flex">
+                        <MudText>Collection</MudText>
+                    </div>
+                    <MudSelect T="MediaCollectionViewModel" @bind-value="_model.Collection">
+                        @foreach (MediaCollectionViewModel collection in _mediaCollections)
+                        {
+                            <MudSelectItem Value="@collection">@collection.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudStack>
+            }
+            @if (_model.CollectionType == CollectionType.MultiCollection)
+            {
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <div class="d-flex">
+                        <MudText>Multi Collection</MudText>
+                    </div>
+                    <MudSelect T="MultiCollectionViewModel" @bind-value="_model.MultiCollection">
+                        @foreach (MultiCollectionViewModel collection in _multiCollections)
+                        {
+                            <MudSelectItem Value="@collection">@collection.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudStack>
+            }
+            @if (_model.CollectionType == CollectionType.SmartCollection)
+            {
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <div class="d-flex">
+                        <MudText>Smart Collection</MudText>
+                    </div>
+                    <MudSelect T="SmartCollectionViewModel" @bind-value="_model.SmartCollection">
+                        @foreach (SmartCollectionViewModel collection in _smartCollections)
+                        {
+                            <MudSelectItem Value="@collection">@collection.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudStack>
+            }
+            @if (_model.CollectionType == CollectionType.TelevisionShow)
+            {
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <div class="d-flex">
+                        <MudText>Television Show</MudText>
+                    </div>
+                    <MudSelect T="NamedMediaItemViewModel" @bind-value="_model.MediaItem">
+                        @foreach (NamedMediaItemViewModel show in _televisionShows)
+                        {
+                            <MudSelectItem Value="@show">@show.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudStack>
+            }
+            @if (_model.CollectionType == CollectionType.TelevisionSeason)
+            {
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <div class="d-flex">
+                        <MudText>Television Season</MudText>
+                    </div>
+                    <MudSelect T="NamedMediaItemViewModel" @bind-value="_model.MediaItem">
+                        @foreach (NamedMediaItemViewModel season in _televisionSeasons)
+                        {
+                            <MudSelectItem Value="@season">@season.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudStack>
+            }
+            @if (_model.CollectionType == CollectionType.Artist)
+            {
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <div class="d-flex">
+                        <MudText>Artist</MudText>
+                    </div>
+                    <MudSelect T="NamedMediaItemViewModel" @bind-value="_model.MediaItem">
+                        @foreach (NamedMediaItemViewModel artist in _artists)
+                        {
+                            <MudSelectItem Value="@artist">@artist.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudStack>
+            }
+            @if (_model.CollectionType == CollectionType.Playlist)
+            {
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <div class="d-flex">
+                        <MudText>Playlist Group</MudText>
+                    </div>
+                    <MudSelect T="PlaylistGroupViewModel"
+                               Value="@_selectedPlaylistGroup"
+                               ValueChanged="@(vm => UpdatePlaylistGroupItems(vm))">
+                        @foreach (PlaylistGroupViewModel playlistGroup in _playlistGroups)
+                        {
+                            <MudSelectItem Value="@playlistGroup">@playlistGroup.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudStack>
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <div class="d-flex">
+                        <MudText>Playlist</MudText>
+                    </div>
+                    <MudSelect T="PlaylistViewModel" @bind-value="_model.Playlist">
+                        @foreach (PlaylistViewModel playlist in _playlists)
+                        {
+                            <MudSelectItem Value="@playlist">@playlist.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudStack>
+            }
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex">
+                    <MudText>Use Chapters As Media Items</MudText>
+                </div>
+                <MudCheckBox @bind-Value="@_model.UseChaptersAsMediaItems"
+                             For="@(() => _model.UseChaptersAsMediaItems)"
+                             Dense="true"
+                             Disabled="@(_model.FillerKind is FillerKind.Fallback)">
+                    <MudText Typo="Typo.caption" Style="font-weight: normal">Schedule individual chapters instead of entire files</MudText>
+                </MudCheckBox>
+            </MudStack>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex">
+                    <MudText>Expression</MudText>
+                </div>
+                <MudTextField @bind-Value="_model.Expression"
+                              For="@(() => _model.Expression)"
+                              Disabled="@(_model.FillerKind is not FillerKind.MidRoll)"
+                              HelperText="For mid-roll filler, only add filler when this expression evaluates to true for a given mid-roll point."/>
+            </MudStack>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="gap-md-8 mb-5">
+                <div class="d-flex" style="width: 300px"></div>
+                <MudText Typo="Typo.body2">
+                    <span style="font-weight: bold;">total_points</span>: total number of potential mid-roll points
+                    <br/>
+                    <span style="font-weight: bold;">matched_points</span>: number of mid-roll points that have already matched the expression
+                    <br/>
+                    <span style="font-weight: bold;">total_duration</span>: total duration of the content, in seconds
+                    <br/>
+                    <span style="font-weight: bold;">total_progress</span>: normalized position from 0 to 1
+                    <br/>
+                    <span style="font-weight: bold;">last_mid_filler</span>: seconds since last mid-roll filler
+                    <br/>
+                    <span style="font-weight: bold;">remaining_duration</span>: duration of the content after this mid-roll point, in seconds
+                    <br/>
+                    <span style="font-weight: bold;">point</span>: the position of the mid-roll point, in seconds
+                    <br/>
+                    <span style="font-weight: bold;">num</span>: the mid-roll point number, starting with 1
+                </MudText>
+            </MudStack>
+        </MudContainer>
+    </div>
+</MudForm>
+
+@code {
+    private CancellationTokenSource _cts;
+
+    [Parameter]
+    public int Id { get; set; }
+
+    private readonly FillerPresetEditViewModel _model = new();
+    private readonly FillerPresetEditViewModelValidator _validator = new();
+    private MudForm _form;
+
+    private readonly List<MediaCollectionViewModel> _mediaCollections = [];
+    private readonly List<MultiCollectionViewModel> _multiCollections = [];
+    private readonly List<SmartCollectionViewModel> _smartCollections = [];
+    private readonly List<NamedMediaItemViewModel> _televisionShows = [];
+    private readonly List<NamedMediaItemViewModel> _televisionSeasons = [];
+    private readonly List<NamedMediaItemViewModel> _artists = [];
+    private readonly List<PlaylistGroupViewModel> _playlistGroups = [];
+    private readonly List<PlaylistViewModel> _playlists = [];
+
+    private PlaylistGroupViewModel _selectedPlaylistGroup;
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        try
+        {
+            _mediaCollections.AddRange(
+                await Mediator.Send(new GetAllCollections(), token)
+                    .Map(list => list.OrderBy(vm => vm.Name, StringComparer.CurrentCultureIgnoreCase).ToList()));
+            _multiCollections.AddRange(
+                await Mediator.Send(new GetAllMultiCollections(), token)
+                    .Map(list => list.OrderBy(vm => vm.Name, StringComparer.CurrentCultureIgnoreCase).ToList()));
+            _smartCollections.AddRange(
+                await Mediator.Send(new GetAllSmartCollections(), token)
+                    .Map(list => list.OrderBy(vm => vm.Name, StringComparer.CurrentCultureIgnoreCase).ToList()));
+            _televisionShows.AddRange(
+                await Mediator.Send(new GetAllTelevisionShows(), token)
+                    .Map(list => list.OrderBy(vm => vm.Name, StringComparer.CurrentCultureIgnoreCase).ToList()));
+            _televisionSeasons.AddRange(
+                await Mediator.Send(new GetAllTelevisionSeasons(), token)
+                    .Map(list => list.OrderBy(vm => vm.Name, StringComparer.CurrentCultureIgnoreCase).ToList()));
+            _artists.AddRange(
+                await Mediator.Send(new GetAllArtists(), token)
+                    .Map(list => list.OrderBy(vm => vm.Name, StringComparer.CurrentCultureIgnoreCase).ToList()));
+
+            _playlistGroups.AddRange(await Mediator.Send(new GetAllPlaylistGroups(), token));
+
+            if (IsEdit)
+            {
+                Option<FillerPresetViewModel> maybeFillerPreset = await Mediator.Send(new GetFillerPresetById(Id), token);
+                maybeFillerPreset.IfSome(fillerPreset =>
+                {
+                    _model.Id = fillerPreset.Id;
+                    _model.Name = fillerPreset.Name;
+                    _model.FillerKind = fillerPreset.FillerKind;
+                    _model.FillerMode = fillerPreset.FillerMode;
+                    _model.Duration = fillerPreset.Duration;
+                    _model.Count = fillerPreset.Count;
+                    _model.PadToNearestMinute = fillerPreset.PadToNearestMinute;
+                    _model.AllowWatermarks = fillerPreset.AllowWatermarks;
+                    _model.CollectionType = fillerPreset.CollectionType;
+                    _model.Collection = fillerPreset.CollectionId.HasValue
+                        ? _mediaCollections.Find(c => c.Id == fillerPreset.CollectionId.Value)
+                        : null;
+                    _model.MultiCollection = fillerPreset.MultiCollectionId.HasValue
+                        ? _multiCollections.Find(c => c.Id == fillerPreset.MultiCollectionId.Value)
+                        : null;
+                    _model.SmartCollection = fillerPreset.SmartCollectionId.HasValue
+                        ? _smartCollections.Find(c => c.Id == fillerPreset.SmartCollectionId.Value)
+                        : null;
+                    _model.MediaItem = fillerPreset.MediaItemId.HasValue
+                        ? _televisionShows.Append(_televisionSeasons).Append(_artists).ToList().Find(vm => vm.MediaItemId == fillerPreset.MediaItemId.Value)
+                        : null;
+                    _model.Expression = fillerPreset.Expression;
+                    _model.UseChaptersAsMediaItems = fillerPreset.UseChaptersAsMediaItems;
+                    _model.Playlist = fillerPreset.Playlist;
+                });
+            }
+            else
+            {
+                _model.Name = "New Filler Preset";
+                _model.FillerKind = FillerKind.PreRoll;
+                _model.FillerMode = FillerMode.Duration;
+            }
+
+            foreach (int playlistGroupId in Optional(_model.Playlist?.PlaylistGroupId))
+            {
+                foreach (PlaylistGroupViewModel group in Optional(_playlistGroups.Find(g => g.Id == playlistGroupId)))
+                {
+                    _selectedPlaylistGroup = group;
+                    await UpdatePlaylistGroupItems(group);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // do nothing
+        }
+    }
+
+    private bool IsEdit => Id != 0;
+
+    private async Task UpdatePlaylistGroupItems(PlaylistGroupViewModel playlistGroup)
+    {
+        _selectedPlaylistGroup = playlistGroup;
+
+        _playlists.Clear();
+        _playlists.AddRange(await Mediator.Send(new GetPlaylistsByPlaylistGroupId(playlistGroup.Id), _cts.Token));
+    }
+
+    private async Task HandleSubmitAsync()
+    {
+        await _form.ValidateAsync();
+        ValidationResult result = await _validator.ValidateAsync(_model, _cts.Token);
+        if (result.IsValid)
+        {
+            IRequest<Either<BaseError, Unit>> request = IsEdit ? _model.ToEdit() : _model.ToUpdate();
+
+            Seq<BaseError> errorMessage = (await Mediator.Send(request, _cts.Token)).LeftToSeq();
+
+            errorMessage.HeadOrNone().Match(
+                error =>
+                {
+                    Snackbar.Add(error.Value, Severity.Error);
+                    Logger.LogError("Error saving filler preset: {Error}", error.Value);
+                },
+                () => NavigationManager.NavigateTo("media/filler/presets"));
+        }
+    }
+
+}

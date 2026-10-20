@@ -1,0 +1,46 @@
+﻿@page "/media/sources/plex/{Id:int}/libraries"
+@using ErsatzTV.Application.MediaSources
+@using ErsatzTV.Application.Plex
+@inject IMediator Mediator
+@inject ChannelWriter<IScannerBackgroundServiceRequest> ScannerWorkerChannel
+
+<RemoteMediaSourceLibrariesEditor
+    Id="@Id"
+    Name="Plex"
+    GetUpdateLibraryRequest="GetUpdateLibraryRequest"
+    GetLibrariesBySourceId="GetLibrariesBySourceId"
+    GetMediaSourceById="GetMediaSourceById"
+    SynchronizeLibraryByIdIfNeeded="SynchronizeLibraryByIdIfNeeded"/>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private IRequest<Either<BaseError, Unit>> GetUpdateLibraryRequest(List<RemoteMediaSourceLibraryEditViewModel> libraries) =>
+        new UpdatePlexLibraryPreferences(
+            libraries.Map(l => new PlexLibraryPreference(l.Id, l.ShouldSyncItems)).ToList());
+
+    private async Task<List<RemoteMediaSourceLibraryEditViewModel>> GetLibrariesBySourceId(int mediaSourceId, CancellationToken cancellationToken) =>
+        await Mediator.Send(new GetPlexLibrariesBySourceId(Id), cancellationToken)
+            .Map(list => list.Map(ProjectToEditViewModel).OrderBy(x => x.MediaKind).ThenBy(x => x.Name).ToList());
+
+    private async Task<Option<RemoteMediaSourceViewModel>> GetMediaSourceById(int mediaSourceId, CancellationToken cancellationToken) =>
+        await Mediator.Send(new GetPlexMediaSourceById(Id), cancellationToken)
+            .MapT(vm => new RemoteMediaSourceViewModel(vm.Id, vm.Name, vm.Address));
+
+    private RemoteMediaSourceLibraryEditViewModel ProjectToEditViewModel(PlexLibraryViewModel library) => new()
+    {
+        Id = library.Id,
+        Name = library.Name,
+        MediaKind = library.MediaKind,
+        ShouldSyncItems = library.ShouldSyncItems
+    };
+
+    private async Task<Unit> SynchronizeLibraryByIdIfNeeded(RemoteMediaSourceLibrariesEditor.SynchronizeParameters parameters, CancellationToken cancellationToken)
+    {
+        await ScannerWorkerChannel.WriteAsync(new SynchronizePlexLibraryByIdIfNeeded(parameters.LibraryId), cancellationToken);
+        await ScannerWorkerChannel.WriteAsync(new SynchronizePlexNetworks(parameters.LibraryId, false), cancellationToken);
+        return Unit.Default;
+    }
+
+}

@@ -1,0 +1,23 @@
+﻿namespace ErsatzTV.FFmpeg.State;
+
+public record AudioState(
+    Option<string> AudioFormat,
+    Option<int> AudioChannels,
+    Option<int> AudioBitrate,
+    Option<int> AudioBufferSize,
+    Option<int> AudioSampleRate,
+    bool PadAudio,
+    AudioFilter NormalizeLoudnessFilter,
+    Option<double> TargetLoudness)
+{
+    public static readonly AudioState Copy = new(
+        Format.AudioFormat.Copy,
+        Option<int>.None,
+        Option<int>.None,
+        Option<int>.None,
+        Option<int>.None,
+        false,
+        AudioFilter.None,
+        Option<double>.None
+    );
+}

@@ -1,0 +1,163 @@
+﻿@page "/media/movies"
+@page "/media/movies/page/{PageNumber:int}"
+@inherits MultiSelectBase<MovieList>
+@inject NavigationManager NavigationManager
+@inject PersistentComponentState ApplicationState
+@using ErsatzTV.Application.MediaCards
+@using ErsatzTV.Application.MediaCollections
+@using ErsatzTV.Application.Search
+@using ErsatzTV.Extensions
+@implements IDisposable
+
+<MudForm Style="max-height: 100%">
+    <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100;">
+        <MediaCardPager Query="@_query"
+                        PageNumber="@PageNumber"
+                        PageSize="@PageSize"
+                        TotalCount="@_data.Count"
+                        NextPage="@NextPage"
+                        PrevPage="@PrevPage"
+                        AddSelectionToCollection="@AddSelectionToCollection"
+                        AddSelectionToPlaylist="@AddSelectionToPlaylist"
+                        ClearSelection="@ClearSelection"
+                        CanSelectAllOnPage="@(() => _data.Cards.Count > 0)"
+                        SelectAllOnPage="@(() => SelectAllPageItems(_data.Cards))"
+                        IsSelectMode="@IsSelectMode"
+                        SelectionLabel="@SelectionLabel"/>
+    </MudPaper>
+    <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
+            <MudStack Row="true" Wrap="Wrap.Wrap">
+                <FragmentLetterAnchor TCard="MovieCardViewModel" Cards="@_data.Cards">
+                    <MediaCard Data="@context"
+                               Href="@($"media/movies/{context.MovieId}")"
+                               AddToCollectionClicked="@AddToCollection"
+                               SelectClicked="@(e => SelectClicked(context, e))"
+                               IsSelected="@IsSelected(context)"
+                               IsSelectMode="@IsSelectMode()"/>
+                </FragmentLetterAnchor>
+            </MudStack>
+        </MudContainer>
+    </div>
+</MudForm>
+
+@if (_data.PageMap is not null)
+{
+    <LetterBar PageMap="@_data.PageMap"
+               BaseUri="media/movies"
+               Query="@_query"/>
+}
+
+@code {
+    private static int PageSize => 100;
+
+    [Parameter]
+    public int PageNumber { get; set; }
+
+    private MovieCardResultsViewModel _data = new(0, new List<MovieCardViewModel>(), null);
+    private string _query;
+    private PersistingComponentStateSubscription _persistingSubscription;
+
+    protected override Task OnInitializedAsync()
+    {
+        _persistingSubscription = ApplicationState.RegisterOnPersisting(PersistData);
+        _query = NavigationManager.Uri.GetSearchQuery();
+
+        return base.OnInitializedAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (PageNumber == 0)
+        {
+            PageNumber = 1;
+        }
+
+        if (!ApplicationState.TryTakeFromJson("_data", out MovieCardResultsViewModel restored))
+        {
+            _data = await RefreshData(CancellationToken);
+        }
+        else
+        {
+            _data = restored;
+        }
+    }
+
+    private Task PersistData()
+    {
+        ApplicationState.PersistAsJson("_data", _data);
+
+        return Task.CompletedTask;
+    }
+
+    void IDisposable.Dispose()
+    {
+        _persistingSubscription.Dispose();
+        base.Dispose();
+    }
+
+    protected override async Task<MovieCardResultsViewModel> RefreshData(CancellationToken cancellationToken)
+    {
+        string searchQuery = string.IsNullOrWhiteSpace(_query) ? "type:movie" : $"type:movie AND ({_query})";
+        return await Mediator.Send(new QuerySearchIndexMovies(searchQuery, PageNumber, PageSize), cancellationToken);
+    }
+
+    private void PrevPage()
+    {
+        var uri = $"media/movies/page/{PageNumber - 1}";
+        if (!string.IsNullOrWhiteSpace(_query))
+        {
+            (string key, string value) = _query.EncodeQuery();
+            uri = $"{uri}?{key}={value}";
+        }
+
+        NavigationManager.NavigateTo(uri);
+    }
+
+    private void NextPage()
+    {
+        var uri = $"media/movies/page/{PageNumber + 1}";
+        if (!string.IsNullOrWhiteSpace(_query))
+        {
+            (string key, string value) = _query.EncodeQuery();
+            uri = $"{uri}?{key}={value}";
+        }
+
+        NavigationManager.NavigateTo(uri);
+    }
+
+    private void SelectClicked(MediaCardViewModel card, MouseEventArgs e)
+    {
+        List<MediaCardViewModel> GetSortedItems()
+        {
+            return _data.Cards.OrderBy(m => m.SortTitle).ToList<MediaCardViewModel>();
+        }
+
+        SelectClicked(GetSortedItems, card, e);
+    }
+
+    private async Task AddToCollection(MediaCardViewModel card)
+    {
+        if (card is MovieCardViewModel movie)
+        {
+            var parameters = new DialogParameters { { "EntityType", "movie" }, { "EntityName", movie.Title } };
+            var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+            IDialogReference dialog = await Dialog.ShowAsync<AddToCollectionDialog>("Add To Collection", parameters, options);
+            DialogResult result = await dialog.Result;
+            if (result is { Canceled: false, Data: MediaCollectionViewModel collection })
+            {
+                var request = new AddMovieToCollection(collection.Id, movie.MovieId);
+                Either<BaseError, Unit> addResult = await Mediator.Send(request, CancellationToken);
+                addResult.Match(
+                    Left: error =>
+                    {
+                        Snackbar.Add($"Unexpected error adding movie to collection: {error.Value}");
+                        Logger.LogError("Unexpected error adding movie to collection: {Error}", error.Value);
+                    },
+                    Right: _ => Snackbar.Add($"Added {movie.Title} to collection {collection.Name}", Severity.Success));
+            }
+        }
+    }
+
+}

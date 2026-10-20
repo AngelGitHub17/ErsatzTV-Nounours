@@ -1,0 +1,150 @@
+﻿@page "/playouts/add"
+@page "/playouts/add/{kind}"
+@using System.Globalization
+@using ErsatzTV.Application.Channels
+@using ErsatzTV.Application.ProgramSchedules
+@using ErsatzTV.Validators
+@using FluentValidation.Results
+@implements IDisposable
+@inject NavigationManager NavigationManager
+@inject ILogger<PlayoutEditor> Logger
+@inject ISnackbar Snackbar
+@inject IMediator Mediator
+
+<MudForm @ref="_form" Validation="@(_validator.ValidateValue)" ValidationDelay="0" Style="max-height: 100%">
+    <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
+        <MudButton Class="ml-6" OnClick="@HandleSubmitAsync" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">
+            Add Playout
+        </MudButton>
+    </MudPaper>
+    <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
+            <MudText Typo="Typo.h5" Class="mb-2">Playout</MudText>
+            <MudDivider Class="mb-6"/>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex">
+                    <MudText>Channel</MudText>
+                </div>
+                <MudSelect T="ChannelViewModel" @bind-value="_model.Channel" HelperText="Disabled channels already have a playout">
+                    @foreach (ChannelViewModel channel in _channels)
+                    {
+                        <MudSelectItem Disabled="@(channel.PlayoutCount > 0)" Value="@channel">
+                            @($"{channel.Number} - {channel.Name}")
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            </MudStack>
+            @switch (Kind)
+            {
+                case PlayoutKind.ExternalJson:
+                    <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                        <div class="d-flex">
+                            <MudText>JSON (dizqueTV) Schedule</MudText>
+                        </div>
+                        <MudTextField @bind-Value="_model.ScheduleFile" For="@(() => _model.ScheduleFile)"/>
+                    </MudStack>
+                    break;
+                case PlayoutKind.Sequential:
+                    <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                        <div class="d-flex">
+                            <MudText>Sequential Schedule</MudText>
+                        </div>
+                        <MudTextField @bind-Value="_model.ScheduleFile" For="@(() => _model.ScheduleFile)" HelperText="The full path to the sequential schedule (YAML) file" />
+                    </MudStack>
+                    break;
+                case PlayoutKind.Scripted:
+                    <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                        <div class="d-flex">
+                            <MudText>Scripted Schedule</MudText>
+                        </div>
+                        <MudTextField @bind-Value="_model.ScheduleFile" For="@(() => _model.ScheduleFile)"/>
+                    </MudStack>
+                    break;
+                case PlayoutKind.Block:
+                    <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                        <div class="d-flex"></div>
+                        <MudText Typo="Typo.caption" Style="font-weight: normal">Block templates are added later</MudText>
+                    </MudStack>
+                    break;
+                default:
+                    <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                        <div class="d-flex">
+                            <MudText>Classic Schedule</MudText>
+                        </div>
+                        <MudSelect T="ProgramScheduleViewModel" @bind-value="_model.ProgramSchedule">
+                            @foreach (ProgramScheduleViewModel schedule in _programSchedules)
+                            {
+                                <MudSelectItem Value="@schedule">@schedule.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudStack>
+                    break;
+            }
+        </MudContainer>
+    </div>
+</MudForm>
+
+@code {
+    private CancellationTokenSource _cts;
+
+    private readonly PlayoutEditViewModel _model = new();
+    private readonly PlayoutEditViewModelValidator _validator = new();
+    private MudForm _form;
+
+    private List<ChannelViewModel> _channels = [];
+    private List<ProgramScheduleViewModel> _programSchedules = [];
+
+    [Parameter]
+    public string Kind { get; set; }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        try
+        {
+            _model.Kind = Kind;
+
+            _channels = await Mediator.Send(new GetAllChannels(), token)
+                .Map(list => list.OrderBy(vm => decimal.Parse(vm.Number, CultureInfo.InvariantCulture)).ToList());
+
+            if (string.IsNullOrWhiteSpace(Kind))
+            {
+                _programSchedules = await Mediator.Send(new GetAllProgramSchedules(), token)
+                    .Map(list => list.OrderBy(vm => vm.Name).ToList());
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // do nothing
+        }
+    }
+
+    private async Task HandleSubmitAsync()
+    {
+        await _form.ValidateAsync();
+        ValidationResult result = await _validator.ValidateAsync(_model, _cts.Token);
+        if (result.IsValid)
+        {
+            Seq<BaseError> errorMessage = (await Mediator.Send(_model.ToCreate(), _cts.Token)).LeftToSeq();
+
+            errorMessage.HeadOrNone().Match(
+                error =>
+                {
+                    Snackbar.Add(error.Value, Severity.Error);
+                    Logger.LogError("Unexpected error saving playout: {Error}", error.Value);
+                },
+                () => NavigationManager.NavigateTo("playouts"));
+        }
+    }
+
+}

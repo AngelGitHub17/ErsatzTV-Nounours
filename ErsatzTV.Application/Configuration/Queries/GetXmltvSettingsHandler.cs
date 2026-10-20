@@ -1,0 +1,30 @@
+﻿using ErsatzTV.Core.Domain;
+using ErsatzTV.Core.Interfaces.Repositories;
+
+namespace ErsatzTV.Application.Configuration;
+
+public class GetXmltvSettingsHandler(IConfigElementRepository configElementRepository)
+    : IRequestHandler<GetXmltvSettings, XmltvSettingsViewModel>
+{
+    public async Task<XmltvSettingsViewModel> Handle(GetXmltvSettings request, CancellationToken cancellationToken)
+    {
+        Option<int> daysToBuild = await configElementRepository.GetValue<int>(
+            ConfigElementKey.XmltvDaysToBuild,
+            cancellationToken);
+
+        Option<XmltvTimeZone> maybeTimeZone =
+            await configElementRepository.GetValue<XmltvTimeZone>(ConfigElementKey.XmltvTimeZone, cancellationToken);
+
+        Option<XmltvBlockBehavior> maybeBlockBehavior =
+            await configElementRepository.GetValue<XmltvBlockBehavior>(
+                ConfigElementKey.XmltvBlockBehavior,
+                cancellationToken);
+
+        return new XmltvSettingsViewModel
+        {
+            DaysToBuild = await daysToBuild.IfNoneAsync(2),
+            TimeZone = await maybeTimeZone.IfNoneAsync(XmltvTimeZone.Local),
+            BlockBehavior = await maybeBlockBehavior.IfNoneAsync(XmltvBlockBehavior.SplitTimeEvenly)
+        };
+    }
+}

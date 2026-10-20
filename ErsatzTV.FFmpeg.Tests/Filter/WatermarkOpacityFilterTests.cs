@@ -1,0 +1,49 @@
+﻿using System.Collections.Generic;
+using ErsatzTV.FFmpeg.Filter;
+using ErsatzTV.FFmpeg.State;
+using LanguageExt;
+using NUnit.Framework;
+using Shouldly;
+
+namespace ErsatzTV.FFmpeg.Tests.Filter;
+
+[TestFixture]
+public class WatermarkOpacityFilterTests
+{
+    [Test]
+    // this needs to be a culture where ',' is a decimal separator
+    [SetCulture("it-IT")]
+    public void Should_Return_Filter_With_Period_Decimal_Unlike_Local_Culture()
+    {
+        var filter = new WatermarkOpacityFilter(
+            new WatermarkState(
+                Option<List<WatermarkFadePoint>>.None,
+                WatermarkLocation.BottomRight,
+                WatermarkSize.ActualSize,
+                50,
+                50,
+                50,
+                75,
+                false));
+
+        filter.Filter.ShouldBe("format=yuva420p|yuva444p|yuva422p|rgba|abgr|bgra|gbrap|ya8,colorchannelmixer=aa=0.75");
+    }
+
+    [Test]
+    [SetCulture("en-US")]
+    public void Should_Return_Filter_With_Period_Decimal()
+    {
+        var filter = new WatermarkOpacityFilter(
+            new WatermarkState(
+                Option<List<WatermarkFadePoint>>.None,
+                WatermarkLocation.BottomRight,
+                WatermarkSize.ActualSize,
+                50,
+                50,
+                50,
+                75,
+                false));
+
+        filter.Filter.ShouldBe("format=yuva420p|yuva444p|yuva422p|rgba|abgr|bgra|gbrap|ya8,colorchannelmixer=aa=0.75");
+    }
+}

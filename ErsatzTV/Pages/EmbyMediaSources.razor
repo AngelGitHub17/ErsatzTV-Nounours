@@ -1,0 +1,22 @@
+﻿@page "/media/sources/emby"
+@using ErsatzTV.Application.Emby
+@using ErsatzTV.Core.Emby
+@using ErsatzTV.Core.Interfaces.Emby
+@inject IEmbySecretStore EmbySecretStore
+@inject ChannelWriter<IScannerBackgroundServiceRequest> ScannerWorkerChannel
+
+<RemoteMediaSources
+    TViewModel="EmbyMediaSourceViewModel"
+    TSecrets="EmbySecrets"
+    TMediaSource="EmbyMediaSource"
+    Name="Emby"
+    GetAllMediaSourcesCommand="@(new GetAllEmbyMediaSources())"
+    DisconnectCommand="@(new DisconnectEmby())"
+    RefreshLibrariesCommand="@RefreshLibraries"
+    SecretStore="@EmbySecretStore"
+    CanEdit="true"/>
+
+@code {
+    private async Task RefreshLibraries(int mediaSourceId, CancellationToken cancellationToken) =>
+        await ScannerWorkerChannel.WriteAsync(new SynchronizeEmbyLibraries(mediaSourceId), cancellationToken);
+}

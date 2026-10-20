@@ -1,0 +1,63 @@
+﻿using ErsatzTV.Core;
+using ErsatzTV.Core.Domain;
+using ErsatzTV.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
+
+namespace ErsatzTV.Application.ProgramSchedules;
+
+public class CreateProgramScheduleHandler(IDbContextFactory<TvContext> dbContextFactory) :
+    IRequestHandler<CreateProgramSchedule, Either<BaseError, CreateProgramScheduleResult>>
+{
+    public async Task<Either<BaseError, CreateProgramScheduleResult>> Handle(
+        CreateProgramSchedule request,
+        CancellationToken cancellationToken)
+    {
+        await using TvContext dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        Validation<BaseError, ProgramSchedule> validation = await Validate(dbContext, request);
+        return await validation.Apply(ps => PersistProgramSchedule(dbContext, ps));
+    }
+
+    private static async Task<CreateProgramScheduleResult> PersistProgramSchedule(
+        TvContext dbContext,
+        ProgramSchedule programSchedule)
+    {
+        await dbContext.ProgramSchedules.AddAsync(programSchedule);
+        await dbContext.SaveChangesAsync();
+        return new CreateProgramScheduleResult(programSchedule.Id);
+    }
+
+    private static Task<Validation<BaseError, ProgramSchedule>> Validate(
+        TvContext dbContext,
+        CreateProgramSchedule request) =>
+        ValidateName(dbContext, request).MapT(name =>
+        {
+            bool keepMultiPartEpisodesTogether = request.KeepMultiPartEpisodesTogether;
+            return new ProgramSchedule
+            {
+                Name = name,
+                KeepMultiPartEpisodesTogether = keepMultiPartEpisodesTogether,
+                TreatCollectionsAsShows = keepMultiPartEpisodesTogether && request.TreatCollectionsAsShows,
+                ShuffleScheduleItems = request.ShuffleScheduleItems,
+                RandomStartPoint = request.RandomStartPoint,
+                FixedStartTimeBehavior = request.FixedStartTimeBehavior
+            };
+        });
+
+    private static async Task<Validation<BaseError, string>> ValidateName(
+        TvContext dbContext,
+        CreateProgramSchedule createProgramSchedule)
+    {
+        Validation<BaseError, string> result1 = createProgramSchedule.NotEmpty(c => c.Name)
+            .Bind(_ => createProgramSchedule.NotLongerThan(50)(c => c.Name));
+
+        bool duplicateName = await dbContext.ProgramSchedules
+            .AnyAsync(ps => ps.Name == createProgramSchedule.Name);
+
+        Validation<BaseError, Unit> result2 = duplicateName
+            ? Fail<BaseError, Unit>("Schedule name must be unique")
+            : Success<BaseError, Unit>(Unit.Default);
+
+        return (result1, result2).Apply((_, _) => createProgramSchedule.Name);
+    }
+}

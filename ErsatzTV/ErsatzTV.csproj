@@ -1,0 +1,165 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <TypeScriptCompileBlocked>true</TypeScriptCompileBlocked>
+        <TypeScriptToolsVersion>Latest</TypeScriptToolsVersion>
+        <IsPackable>false</IsPackable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <NoWarn>VSTHRD200,CA1873</NoWarn>
+        <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+        <Configurations>Debug;Release;Debug No Sync</Configurations>
+        <Platforms>AnyCPU</Platforms>
+        <UserSecretsId>bf31217d-f4ec-4520-8cc3-138059044ede</UserSecretsId>
+        <AnalysisLevel>latest-Recommended</AnalysisLevel>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
+        <NeutralLanguage>en-US</NeutralLanguage>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <OpenApiDocumentsDirectory>$(MSBuildProjectDirectory)\wwwroot\openapi</OpenApiDocumentsDirectory>
+        <OpenApiGenerateDocumentsOnBuild>false</OpenApiGenerateDocumentsOnBuild>
+    </PropertyGroup>
+
+    <Target Name="RenameOpenApiFiles" AfterTargets="GenerateOpenApiDocuments">
+        <Move SourceFiles="$(OpenApiDocumentsDirectory)\ErsatzTV.json" DestinationFiles="$(OpenApiDocumentsDirectory)\v1.json" />
+        <Move SourceFiles="$(OpenApiDocumentsDirectory)\ErsatzTV_scripted-schedule.json" DestinationFiles="$(OpenApiDocumentsDirectory)\scripted-schedule.json" />
+        <Move SourceFiles="$(OpenApiDocumentsDirectory)\ErsatzTV_scripted-schedule-tagged.json" DestinationFiles="$(OpenApiDocumentsDirectory)\scripted-schedule-tagged.json" />
+    </Target>
+
+    <ItemGroup>
+        <!-- <PackageReference Include="EntityFrameworkProfiler.Appender" Version="6.0.6049" /> -->
+        <PackageReference Include="Blazored.FluentValidation" Version="2.2.0" />
+        <PackageReference Include="BlazorSortable" Version="8.1.0" />
+        <PackageReference Include="Chronic.Core" Version="0.4.0" />
+        <PackageReference Include="FluentValidation" Version="12.1.1" />
+        <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.1" />
+        <PackageReference Include="Heron.MudCalendar" Version="4.0.0" />
+        <PackageReference Include="HtmlSanitizer" Version="9.0.892" />
+        <PackageReference Include="LanguageExt.Core" Version="4.4.9" />
+        <PackageReference Include="MediatR.Courier.DependencyInjection" Version="5.0.0" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.8" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.8" />
+        <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="10.0.8" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8" />
+        <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="10.0.8" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.15">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.8">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="MudBlazor" Version="9.4.0" />
+        <PackageReference Include="NaturalSort.Extension" Version="4.4.1" />
+        <PackageReference Include="Refit.HttpClientFactory" Version="10.1.6" />
+        <PackageReference Include="Scalar.AspNetCore" Version="2.14.14" />
+        <PackageReference Include="Serilog" Version="4.3.1" />
+        <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+        <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.0" />
+        <PackageReference Include="VueCliMiddleware" Version="6.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\ErsatzTV.Application\ErsatzTV.Application.csproj" />
+        <ProjectReference Include="..\ErsatzTV.Core\ErsatzTV.Core.csproj" />
+        <ProjectReference Include="..\ErsatzTV.Infrastructure.MySql\ErsatzTV.Infrastructure.MySql.csproj" />
+        <ProjectReference Include="..\ErsatzTV.Infrastructure.Sqlite\ErsatzTV.Infrastructure.Sqlite.csproj" />
+        <ProjectReference Include="..\ErsatzTV.Infrastructure\ErsatzTV.Infrastructure.csproj" />
+        <ProjectReference Include="..\ErsatzTV.Core.Nullable\ErsatzTV.Core.Nullable.csproj" />
+        <ProjectReference Include="..\ErsatzTV.Scanner\ErsatzTV.Scanner.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="Resources\Fonts\Sen.ttf" />
+        <EmbeddedResource Include="Resources\_background.png" />
+        <EmbeddedResource Include="Resources\Fonts\OPTIKabel-Heavy.otf" />
+        <EmbeddedResource Include="Resources\Fonts\Roboto-Regular.ttf" />
+        <EmbeddedResource Include="Resources\Scripts\_threePartEpisodes.js" />
+        <EmbeddedResource Include="Resources\Scripts\_episode.js" />
+        <EmbeddedResource Include="Resources\Scripts\_movie.js" />
+        <EmbeddedResource Include="Resources\Scripts\MpegTs\run.sh" />
+        <EmbeddedResource Include="Resources\Scripts\MpegTs\run.bat" />
+        <EmbeddedResource Include="Resources\Scripts\MpegTs\mpegts.yml" />
+        <EmbeddedResource Include="Resources\_song_album_cover_512.png" />
+        <EmbeddedResource Include="Resources\_song_background_1.png" />
+        <EmbeddedResource Include="Resources\_song_background_2.png" />
+        <EmbeddedResource Include="Resources\_song_background_3.png" />
+        <EmbeddedResource Include="Resources\song_progress_overlay.png" />
+        <EmbeddedResource Include="Resources\song_progress_overlay_43.png" />
+        <EmbeddedResource Include="Resources\ErsatzTV.png" />
+        <EmbeddedResource Include="Resources\ISO-639-2_utf-8.txt" />
+        <EmbeddedResource Include="Resources\Templates\_default.ass.sbntxt" />
+        <EmbeddedResource Include="Resources\Templates\_ArtistTitle_LeftMiddle.sbntxt" />
+        <EmbeddedResource Include="Resources\Templates\_ArtistTitleAlbum_CenterTop.sbntxt" />
+        <EmbeddedResource Include="Resources\Templates\_channel.sbntxt" />
+        <EmbeddedResource Include="Resources\Templates\_episode.sbntxt" />
+        <EmbeddedResource Include="Resources\Templates\_movie.sbntxt" />
+        <EmbeddedResource Include="Resources\Templates\_musicVideo.sbntxt" />
+        <EmbeddedResource Include="Resources\Templates\_otherVideo.sbntxt" />
+        <EmbeddedResource Include="Resources\Templates\_song.sbntxt" />
+        <EmbeddedResource Include="Resources\sequential-schedule-import.schema.json" />
+        <EmbeddedResource Include="Resources\sequential-schedule.schema.json" />
+        <EmbeddedResource Include="Resources\empty.sqlite3" />
+        <EmbeddedResource Include="Resources\test.avs" />
+        <EmbeddedResource Include="Resources\Templates\_remoteStream.sbntxt" />
+        <EmbeddedResource Update="Locals\Shared\MainLayout.resx">
+          <Generator>ResXFileCodeGenerator</Generator>
+          <LastGenOutput>MainLayout.Designer.cs</LastGenOutput>
+        </EmbeddedResource>
+        <EmbeddedResource Update="Locals\Pages\Channels.resx">
+          <Generator>ResXFileCodeGenerator</Generator>
+          <LastGenOutput>Channels.Designer.cs</LastGenOutput>
+        </EmbeddedResource>
+        <EmbeddedResource Update="Locals\Shared\Common.resx">
+          <Generator>ResXFileCodeGenerator</Generator>
+          <LastGenOutput>Common.Designer.cs</LastGenOutput>
+        </EmbeddedResource>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Content Include="..\artwork\Ersatztv.icns">
+            <Link>Ersatztv.icns</Link>
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
+    <ItemGroup>
+        <_ContentIncludedByDefault Remove="wwwroot\css\open-iconic\FONT-LICENSE" />
+        <_ContentIncludedByDefault Remove="wwwroot\css\open-iconic\font\css\open-iconic-bootstrap.min.css" />
+        <_ContentIncludedByDefault Remove="wwwroot\css\open-iconic\font\fonts\open-iconic.eot" />
+        <_ContentIncludedByDefault Remove="wwwroot\css\open-iconic\font\fonts\open-iconic.otf" />
+        <_ContentIncludedByDefault Remove="wwwroot\css\open-iconic\font\fonts\open-iconic.svg" />
+        <_ContentIncludedByDefault Remove="wwwroot\css\open-iconic\font\fonts\open-iconic.ttf" />
+        <_ContentIncludedByDefault Remove="wwwroot\css\open-iconic\font\fonts\open-iconic.woff" />
+        <_ContentIncludedByDefault Remove="wwwroot\css\open-iconic\ICON-LICENSE" />
+        <_ContentIncludedByDefault Remove="wwwroot\css\open-iconic\README.md" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Update="Locals\Shared\MainLayout.Designer.cs">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>MainLayout.resx</DependentUpon>
+      </Compile>
+      <Compile Update="Locals\Pages\Channels.Designer.cs">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>Channels.resx</DependentUpon>
+      </Compile>
+      <Compile Update="Locals\Shared\Common.Designer.cs">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>Common.resx</DependentUpon>
+      </Compile>
+    </ItemGroup>
+
+    <ProjectExtensions>
+        <VisualStudio>
+            <UserProperties client-app_4package_1json__JsonSchema="https://json.schemastore.org/phraseapp.json" />
+        </VisualStudio>
+    </ProjectExtensions>
+
+</Project>

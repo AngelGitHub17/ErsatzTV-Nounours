@@ -1,0 +1,67 @@
+using System.IO.Abstractions;
+using System.Threading.Channels;
+using ErsatzTV.Core;
+using ErsatzTV.Core.Interfaces.Search;
+using ErsatzTV.Infrastructure.Data;
+using ErsatzTV.Infrastructure.Extensions;
+using Microsoft.EntityFrameworkCore;
+using Channel = ErsatzTV.Core.Domain.Channel;
+
+namespace ErsatzTV.Application.Channels;
+
+public class DeleteChannelHandler : IRequestHandler<DeleteChannel, Either<BaseError, Unit>>
+{
+    private readonly IDbContextFactory<TvContext> _dbContextFactory;
+    private readonly IFileSystem _fileSystem;
+    private readonly ISearchTargets _searchTargets;
+    private readonly ChannelWriter<IBackgroundServiceRequest> _workerChannel;
+
+    public DeleteChannelHandler(
+        ChannelWriter<IBackgroundServiceRequest> workerChannel,
+        IDbContextFactory<TvContext> dbContextFactory,
+        IFileSystem fileSystem,
+        ISearchTargets searchTargets)
+    {
+        _workerChannel = workerChannel;
+        _dbContextFactory = dbContextFactory;
+        _fileSystem = fileSystem;
+        _searchTargets = searchTargets;
+    }
+
+    public async Task<Either<BaseError, Unit>> Handle(DeleteChannel request, CancellationToken cancellationToken)
+    {
+        await using TvContext dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+        Validation<BaseError, Channel> validation = await ChannelMustExist(dbContext, request, cancellationToken);
+        return await validation.Apply(c => DoDeletion(dbContext, c, cancellationToken));
+    }
+
+    private async Task<Unit> DoDeletion(TvContext dbContext, Channel channel, CancellationToken cancellationToken)
+    {
+        dbContext.Channels.Remove(channel);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        _searchTargets.SearchTargetsChanged();
+
+        // delete channel data from channel guide cache
+        string cacheFile = Path.Combine(FileSystemLayout.ChannelGuideCacheFolder, $"{channel.Number}.xml");
+        if (_fileSystem.File.Exists(cacheFile))
+        {
+            File.Delete(cacheFile);
+        }
+
+        // refresh channel list to remove channel that has no playout
+        await _workerChannel.WriteAsync(new RefreshChannelList(), cancellationToken);
+
+        return Unit.Default;
+    }
+
+    private static async Task<Validation<BaseError, Channel>> ChannelMustExist(
+        TvContext dbContext,
+        DeleteChannel deleteChannel,
+        CancellationToken cancellationToken)
+    {
+        Option<Channel> maybeChannel = await dbContext.Channels
+            .SelectOneAsync(c => c.Id, c => c.Id == deleteChannel.ChannelId, cancellationToken);
+        return maybeChannel.ToValidation<BaseError>($"Channel {deleteChannel.ChannelId} does not exist.");
+    }
+}
