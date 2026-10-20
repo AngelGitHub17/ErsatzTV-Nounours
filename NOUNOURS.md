@@ -154,6 +154,23 @@ sans toucher au cœur. Exemples fournis : « Audience » et « Statistiques de d
   (`ProgramScheduleItemCommandBase.cs`).
 - Ta modification `frame-ancestors *` (intégration en iframe) est conservée dans `Startup.cs`.
 
+## Installer sur Windows
+
+Double-cliquez sur **`windows\Installer.bat`** (il faut le [SDK .NET 10](https://dotnet.microsoft.com/download/dotnet/10.0)). Le script :
+1. compile ErsatzTV et son scanner dans `%LOCALAPPDATA%\Programs\ErsatzTV-Nounours` ;
+2. crée le raccourci **« ErsatzTV Nounours »** sur le Bureau et dans le menu Démarrer (démarre ErsatzTV sans fenêtre et ouvre l'interface),
+   ainsi que **« Arrêter ErsatzTV Nounours »** dans le menu Démarrer ;
+3. active le **démarrage automatique** à l'ouverture de session (en arrière-plan, sans ouvrir le navigateur) ;
+4. démarre ErsatzTV et ouvre http://localhost:8409.
+
+- **Mettre à jour** : `git pull`, puis relancez `Installer.bat` (ErsatzTV est arrêté, recompilé et redémarré).
+- Sans démarrage automatique : `Installer.bat -SansDemarrageAuto` · Désinstaller : `Installer.bat -Desinstaller`.
+- Vos chaînes, plannings et réglages restent dans `%LOCALAPPDATA%\ersatztv` : ils ne sont jamais effacés.
+- Si l'ErsatzTV d'origine est installé, ne lancez pas les deux en même temps (même port 8409, même base de données) :
+  retirez son éventuel démarrage automatique.
+- Au premier lancement, Windows peut demander d'autoriser ErsatzTV dans le pare-feu : acceptez pour les réseaux privés
+  si vos téléviseurs / lecteurs IPTV sont sur d'autres appareils.
+
 ## Compiler et lancer
 Comme avant : ouvrir `ErsatzTV.sln` dans Visual Studio (SDK .NET 10) et lancer le projet `ErsatzTV`, ou
 

@@ -7,7 +7,10 @@ studio d'habillage façon OBS avec horloge en direct, et système de modules.
 - Ce qui change et comment s'en servir : [NOUNOURS.md](NOUNOURS.md)
 - Créer un module : [MODULES.md](MODULES.md)
 
-**Compiler et lancer** : ouvrir `ErsatzTV.sln` dans Visual Studio (SDK .NET 10) et démarrer le projet `ErsatzTV`,
+**Installer sur Windows (raccourci + démarrage automatique)** : double-cliquez sur `windows\Installer.bat`
+(SDK .NET 10 requis). Voir [NOUNOURS.md](NOUNOURS.md#installer-sur-windows).
+
+**Compiler et lancer à la main** : ouvrir `ErsatzTV.sln` dans Visual Studio (SDK .NET 10) et démarrer le projet `ErsatzTV`,
 ou `dotnet run --project ErsatzTV -c Release`, puis ouvrir http://localhost:8409.
 
 ---
