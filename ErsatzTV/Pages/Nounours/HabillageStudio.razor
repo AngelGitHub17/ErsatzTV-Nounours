@@ -45,6 +45,9 @@
                         <div class="n-tool" @onclick="@(() => Add("text"))"><MudIcon Icon="@Icons.Material.Filled.TextFields"/>Texte</div>
                         <div class="n-tool" @onclick="@(() => Add("title"))"><MudIcon Icon="@Icons.Material.Filled.Title"/>Titre du programme</div>
                         <div class="n-tool" @onclick="@(() => Add("next"))"><MudIcon Icon="@Icons.Material.Filled.SkipNext"/>À suivre</div>
+                        <div class="n-tool" @onclick="@(() => Add("soon"))"><MudIcon Icon="@Icons.Material.Filled.EventNote"/>Prochainement</div>
+                        <div class="n-tool" @onclick="@(() => Add("countdown"))"><MudIcon Icon="@Icons.Material.Filled.HourglassBottom"/>Compte à rebours</div>
+                        <div class="n-tool" @onclick="@(() => Add("remaining"))"><MudIcon Icon="@Icons.Material.Filled.Timelapse"/>Temps restant</div>
                         <div class="n-tool" @onclick="@(() => Add("image"))"><MudIcon Icon="@Icons.Material.Filled.Image"/>Logo / image</div>
                         <div class="n-tool" @onclick="@(() => Add("banner"))"><MudIcon Icon="@Icons.Material.Filled.CropLandscape"/>Bandeau</div>
                         <div class="n-tool" @onclick="@(() => Add("lowerthird"))"><MudIcon Icon="@Icons.Material.Filled.ViewDay"/>Bas d'écran</div>
@@ -179,7 +182,17 @@
                                 <MudTextField @bind-Value="item.Format" Label="Format personnalisé" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" Immediate="true"
                                               HelperText="HH heures · mm minutes · ss secondes · dddd jour · MMMM mois" @bind-Value:after="@MarkDirty"/>
                                 <MudTextField @bind-Value="item.Text" Label="Texte autour (facultatif)" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" Immediate="true"
-                                              HelperText="{clock} est remplacé par l'heure, ex. « Il est {clock} »" @bind-Value:after="@MarkDirty"/>
+                                              HelperText="{clock} = l'heure · {countdown} = temps avant le programme suivant · {restant} = temps restant du programme" @bind-Value:after="@MarkDirty"/>
+                                <div class="d-flex gap-1 flex-wrap mt-1">
+                                    <MudChip T="string" Size="Size.Small" OnClick="@(() => InsertClock(item, "{clock}"))">+ heure</MudChip>
+                                    <MudChip T="string" Size="Size.Small" OnClick="@(() => InsertClock(item, "{countdown}"))">+ compte à rebours</MudChip>
+                                    <MudChip T="string" Size="Size.Small" OnClick="@(() => InsertClock(item, "{restant}"))">+ temps restant</MudChip>
+                                </div>
+                                @if ((item.Text ?? string.Empty).Contains("{countdown}", StringComparison.Ordinal))
+                                {
+                                    <MudNumericField @bind-Value="item.CountdownMaxMinutes" Label="Afficher seulement les X dernières minutes" Min="0" Max="240" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"
+                                                     HelperText="0 = tout le temps. Le compte à rebours vise le début du programme suivant du guide." @bind-Value:after="@MarkDirty"/>
+                                }
                                 <MudSelect T="string" @bind-Value="item.TimeZone" Label="Fuseau horaire" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" @bind-Value:after="@MarkDirty">
                                     <MudSelectItem Value="@("Europe/Paris")">Paris</MudSelectItem>
                                     <MudSelectItem Value="@("Europe/London")">Londres</MudSelectItem>
@@ -590,6 +603,25 @@
                 Text = "{{ if Epg.size > 1 }}À suivre : {{ Epg[1].Title }} · {{ format_datetime Epg[1].Start \"Europe/Paris\" \"HH:mm\" }}{{ end }}",
                 Visibility = HabillageVisibility.ProgramEnd, VisibleSeconds = 60
             },
+            "soon" => new HabillageItem
+            {
+                Kind = HabillageItemKind.Text, Label = "Prochainement", X = 62, Y = 60, Width = 0, FontSize = 30, FontWeight = 500, EpgEntries = 4,
+                Text = "PROCHAINEMENT\n"
+                       + "{{ if Epg.size > 1 }}{{ format_datetime Epg[1].Start \"Europe/Paris\" \"HH:mm\" }}  {{ Epg[1].Title }}{{ end }}\n"
+                       + "{{ if Epg.size > 2 }}{{ format_datetime Epg[2].Start \"Europe/Paris\" \"HH:mm\" }}  {{ Epg[2].Title }}{{ end }}\n"
+                       + "{{ if Epg.size > 3 }}{{ format_datetime Epg[3].Start \"Europe/Paris\" \"HH:mm\" }}  {{ Epg[3].Title }}{{ end }}",
+                Visibility = HabillageVisibility.ProgramEnd, VisibleSeconds = 45
+            },
+            "countdown" => new HabillageItem
+            {
+                Kind = HabillageItemKind.Clock, Label = "Compte à rebours", X = 36, Y = 84, Width = 0, FontSize = 44,
+                Text = "Début dans {countdown}", CountdownMaxMinutes = 2
+            },
+            "remaining" => new HabillageItem
+            {
+                Kind = HabillageItemKind.Clock, Label = "Temps restant", X = 86, Y = 11, Width = 0, FontSize = 28, FontWeight = 400,
+                Text = "-{restant}"
+            },
             "image" => new HabillageItem { Kind = HabillageItemKind.Image, Label = "Logo", X = 87, Y = 82, Width = 9, Opacity = 85 },
             "banner" => new HabillageItem { Kind = HabillageItemKind.Banner, Label = "Bandeau", X = 0, Y = 86, Width = 100, Height = 10, BackgroundColor = "#101828CC", CornerRadius = 0, ZIndex = 5 },
             "lowerthird" => new HabillageItem
@@ -659,6 +691,12 @@
             item.X = 0;
         }
 
+        MarkDirty();
+    }
+
+    private void InsertClock(HabillageItem item, string token)
+    {
+        item.Text = string.IsNullOrWhiteSpace(item.Text) ? token : $"{item.Text} {token}";
         MarkDirty();
     }
 
@@ -841,7 +879,11 @@
                 clock = "format ?";
             }
 
-            return string.IsNullOrWhiteSpace(item.Text) ? clock : item.Text.Replace("{clock}", clock, StringComparison.Ordinal);
+            return string.IsNullOrWhiteSpace(item.Text)
+                ? clock
+                : item.Text.Replace("{clock}", clock, StringComparison.Ordinal)
+                    .Replace("{countdown}", "1:30", StringComparison.Ordinal)
+                    .Replace("{restant}", "12:05", StringComparison.Ordinal);
         }
 
         string text = item.Text ?? string.Empty;

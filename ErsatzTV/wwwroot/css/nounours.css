@@ -171,3 +171,35 @@ div.ersatztv-light.nounours {
 .n-rundown-title { font-size: .82rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .n-rundown-breaks { bottom: 0; left: 0; position: absolute; right: 0; top: 0; pointer-events: none; }
 .n-rundown-breaks span { background: #ff7a45; bottom: 0; position: absolute; top: 0; width: 3px; }
+
+/* ---------- audience ---------- */
+.n-bars { align-items: flex-end; display: flex; gap: 3px; height: 160px; padding-top: 8px; }
+.n-bars > div { display: flex; flex: 1; flex-direction: column; height: 100%; justify-content: flex-end; min-width: 0; }
+.n-bars .n-bar { background: var(--n-accent); border-radius: 4px 4px 0 0; min-height: 2px; opacity: .85; transition: height .3s; }
+.n-bars .n-bar.is-now { background: var(--n-onair); }
+.n-bars .n-bar-label { color: var(--n-muted); font-size: .68rem; margin-top: 4px; text-align: center; font-variant-numeric: tabular-nums; }
+.n-live-dot { animation: n-pulse 1.6s infinite; background: var(--n-onair); border-radius: 50%; display: inline-block; height: 9px; margin-right: 6px; width: 9px; }
+@keyframes n-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.n-meter { background: var(--n-border); border-radius: 99px; height: 6px; overflow: hidden; }
+.n-meter > div { background: var(--n-accent); height: 100%; }
+
+/* ---------- semaine type ---------- */
+.n-weekplan { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+.n-weekplan-day { border-top: 4px solid var(--n-day); padding: 14px; }
+.n-weekplan-day.is-today { box-shadow: 0 0 0 1px var(--n-day); }
+.n-weekplan-name { font-weight: 700; margin-bottom: 10px; text-transform: capitalize; }
+
+/* ---------- import ---------- */
+.n-folder { align-items: center; border-radius: 8px; cursor: pointer; display: flex; gap: 8px; padding: 6px 8px; }
+.n-folder:hover { background: var(--n-border); }
+.n-dropzone { align-items: center; border: 2px dashed var(--n-border); border-radius: 14px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; padding: 32px 16px; text-align: center; }
+.n-dropzone:hover { border-color: var(--n-accent); }
+
+/* ---------- régie ---------- */
+.n-regie { display: grid; gap: 16px; grid-template-columns: minmax(220px, 300px) 1fr; }
+@media (max-width: 900px) { .n-regie { grid-template-columns: 1fr; } }
+.n-regie-channel { cursor: pointer; padding: 12px 14px; }
+.n-regie-channel.is-selected { box-shadow: 0 0 0 2px var(--n-accent); }
+.n-regie-channel.is-onair { border-left: 4px solid var(--n-onair); }
+.n-regie-badge { align-items: center; background: var(--n-onair); border-radius: 6px; color: #fff; display: inline-flex; font-size: .7rem; font-weight: 800; letter-spacing: .06em; padding: 2px 8px; }
+.n-regie-live { border: 1px solid var(--n-onair); box-shadow: 0 0 24px -8px var(--n-onair); }

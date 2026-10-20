@@ -1,0 +1,50 @@
+@using System.Globalization
+@using ErsatzTV.Nounours.Audience
+@implements IDisposable
+@inject AudienceTracker Tracker
+
+<div class="d-flex gap-6 flex-wrap">
+    <div class="n-stat">
+        <span class="n-stat-value"><span class="n-live-dot"></span>@_live</span>
+        <span class="n-stat-label">spectateur(s) en direct</span>
+    </div>
+    <div class="n-stat">
+        <span class="n-stat-value">@AudienceFormat.Hours(_todayMinutes)</span>
+        <span class="n-stat-label">regardées aujourd'hui</span>
+    </div>
+    <div class="n-stat">
+        <span class="n-stat-value">@_unique</span>
+        <span class="n-stat-label">spectateur(s) distinct(s) aujourd'hui</span>
+    </div>
+</div>
+@if (!string.IsNullOrEmpty(_top))
+{
+    <MudText Typo="Typo.body2" Class="mt-3">Chaîne la plus regardée aujourd'hui : <b>@_top</b></MudText>
+}
+<MudLink Href="modules/audience" Typo="Typo.body2" Class="d-block mt-3">Voir l'audience détaillée →</MudLink>
+
+@code {
+    private Timer _timer;
+    private int _live;
+    private double _todayMinutes;
+    private int _unique;
+    private string _top;
+
+    protected override void OnInitialized()
+    {
+        Refresh();
+        _timer = new Timer(_ => InvokeAsync(() => { Refresh(); StateHasChanged(); }), null, TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(15));
+    }
+
+    private void Refresh()
+    {
+        _live = Tracker.Active().Values.Sum(v => v.Count);
+        AudienceDay today = AudienceSampler.Today;
+        _todayMinutes = today.Channels.Values.Sum(c => c.TotalMinutes);
+        _unique = today.Channels.Values.SelectMany(c => c.Viewers).Distinct().Count();
+        KeyValuePair<string, AudienceChannelDay> top = today.Channels.OrderByDescending(c => c.Value.TotalMinutes).FirstOrDefault();
+        _top = top.Value is { TotalMinutes: > 0 } ? $"{top.Key} · {top.Value.Name}" : null;
+    }
+
+    public void Dispose() => _timer?.Dispose();
+}

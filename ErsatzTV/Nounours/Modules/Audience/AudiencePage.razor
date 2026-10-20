@@ -1,0 +1,285 @@
+@page "/modules/audience"
+@using System.Globalization
+@using ErsatzTV.Application.Nounours
+@using ErsatzTV.Infrastructure.Data
+@using ErsatzTV.Nounours.Audience
+@using Microsoft.EntityFrameworkCore
+@implements IDisposable
+@inject AudienceTracker Tracker
+@inject IGuideService GuideService
+@inject IDbContextFactory<TvContext> DbContextFactory
+
+<PageTitle>Audience · ErsatzTV</PageTitle>
+
+<div class="n-page" style="height: 100%; overflow-y: auto">
+    <div class="n-page-header">
+        <div>
+            <h1>Audience</h1>
+            <p>Qui regarde quoi. Relevé anonyme chaque minute (une empreinte par adresse + lecteur, aucune adresse n'est enregistrée).</p>
+        </div>
+        <div class="d-flex gap-2 align-center">
+            <MudSelect T="DateOnly" Value="@_date" ValueChanged="@SelectDay" Label="Jour" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 220px">
+                @foreach (DateOnly d in _days)
+                {
+                    <MudSelectItem Value="@d">@DayLabel(d)</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+    </div>
+
+    @* ------------------------------------------------ en direct *@
+    <div class="n-card mb-4">
+        <div class="n-card-title"><span class="n-live-dot"></span>En direct · @_live.Sum(l => l.Viewers) spectateur(s)</div>
+        @if (_live.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="n-muted">Personne ne regarde en ce moment. Les spectateurs apparaissent ici dès qu'un lecteur ouvre une chaîne (M3U, HDHomeRun, aperçu…).</MudText>
+        }
+        else
+        {
+            <MudSimpleTable Dense="true" Style="background: transparent">
+                <thead><tr><th>Chaîne</th><th>En cours</th><th style="text-align: right">Spectateurs</th></tr></thead>
+                <tbody>
+                @foreach (LiveRow row in _live)
+                {
+                    <tr>
+                        <td><b>@row.Number</b> · @row.Name</td>
+                        <td>@row.NowPlaying</td>
+                        <td style="text-align: right; font-weight: 700">@row.Viewers</td>
+                    </tr>
+                }
+                </tbody>
+            </MudSimpleTable>
+        }
+    </div>
+
+    @if (_day is not null)
+    {
+        double total = _day.Channels.Values.Sum(c => c.TotalMinutes);
+        int unique = _day.Channels.Values.SelectMany(c => c.Viewers).Distinct().Count();
+        int peak = Enumerable.Range(0, 24).Max(h => _day.Channels.Values.Sum(c => c.Peak[h]));
+
+        <MudGrid Spacing="3" Class="mb-1">
+            <MudItem xs="6" md="3"><div class="n-card"><div class="n-stat"><span class="n-stat-value">@AudienceFormat.Hours(total)</span><span class="n-stat-label">temps regardé (cumulé)</span></div></div></MudItem>
+            <MudItem xs="6" md="3"><div class="n-card"><div class="n-stat"><span class="n-stat-value">@unique</span><span class="n-stat-label">spectateurs distincts</span></div></div></MudItem>
+            <MudItem xs="6" md="3"><div class="n-card"><div class="n-stat"><span class="n-stat-value">@peak</span><span class="n-stat-label">pic simultané (somme des chaînes)</span></div></div></MudItem>
+            <MudItem xs="6" md="3"><div class="n-card"><div class="n-stat"><span class="n-stat-value">@(unique == 0 ? "—" : AudienceFormat.Hours(total / unique))</span><span class="n-stat-label">durée moyenne par spectateur</span></div></div></MudItem>
+        </MudGrid>
+
+        @* ------------------------------------------------ heure par heure *@
+        <div class="n-card mb-4">
+            <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+                <div class="n-card-title" style="margin: 0">Spectateurs moyens heure par heure</div>
+                <MudChipSet T="string" @bind-SelectedValue="_channelFilter" SelectionMode="SelectionMode.SingleSelection" Size="Size.Small">
+                    <MudChip T="string" Value="@string.Empty" Default="true">Toutes</MudChip>
+                    @foreach ((string number, AudienceChannelDay channel) in _day.Channels.OrderBy(c => c.Key))
+                    {
+                        <MudChip T="string" Value="@number">@number · @channel.Name</MudChip>
+                    }
+                </MudChipSet>
+            </div>
+            @{
+                double[] perHour = Enumerable.Range(0, 24)
+                    .Select(h => Filtered().Sum(c => c.ViewerMinutes[h]) / 60.0)
+                    .ToArray();
+                double max = Math.Max(1, perHour.Max());
+                bool isToday = _date == DateOnly.FromDateTime(DateTime.Now);
+            }
+            <div class="n-bars">
+                @for (int h = 0; h < 24; h++)
+                {
+                    int hour = h;
+                    <div title="@($"{hour:00}h : {AudienceFormat.Number(perHour[hour], "0.##")} spectateur(s) en moyenne, pic {Filtered().Sum(c => c.Peak[hour])}")">
+                        <div class="n-bar @(isToday && DateTime.Now.Hour == hour ? "is-now" : "")" style="height: @Pct(perHour[hour] / max)"></div>
+                        <div class="n-bar-label">@(hour % 3 == 0 ? $"{hour}h" : "")</div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <MudGrid Spacing="3">
+            @* ------------------------------------------------ par chaîne *@
+            <MudItem xs="12" md="6">
+                <div class="n-card" style="height: 100%">
+                    <div class="n-card-title">Par chaîne</div>
+                    @if (total <= 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="n-muted">Aucune audience relevée ce jour-là.</MudText>
+                    }
+                    else
+                    {
+                        <MudSimpleTable Dense="true" Style="background: transparent">
+                            <thead><tr><th>Chaîne</th><th>Part</th><th style="text-align: right">Temps</th><th style="text-align: right">Distincts</th><th style="text-align: right">Pic</th></tr></thead>
+                            <tbody>
+                            @foreach ((string number, AudienceChannelDay channel) in _day.Channels.OrderByDescending(c => c.Value.TotalMinutes))
+                            {
+                                double share = channel.TotalMinutes / total;
+                                <tr>
+                                    <td><b>@number</b> · @channel.Name</td>
+                                    <td style="min-width: 90px"><div class="n-meter" title="@AudienceFormat.Number(share * 100, "0") %"><div style="width: @Pct(share)"></div></div></td>
+                                    <td style="text-align: right">@AudienceFormat.Hours(channel.TotalMinutes)</td>
+                                    <td style="text-align: right">@channel.Viewers.Count</td>
+                                    <td style="text-align: right">@channel.MaxPeak</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                </div>
+            </MudItem>
+
+            @* ------------------------------------------------ programmes *@
+            <MudItem xs="12" md="6">
+                <div class="n-card" style="height: 100%">
+                    <div class="n-card-title">Programmes les plus regardés</div>
+                    @{
+                        var top = Filtered()
+                            .SelectMany(c => c.Programmes)
+                            .GroupBy(p => p.Key)
+                            .Select(g => (Title: g.Key, Minutes: g.Sum(p => p.Value)))
+                            .OrderByDescending(p => p.Minutes)
+                            .Take(10)
+                            .ToList();
+                    }
+                    @if (top.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="n-muted">Rien pour l'instant.</MudText>
+                    }
+                    else
+                    {
+                        double best = top[0].Minutes;
+                        @foreach ((string title, double minutes) in top)
+                        {
+                            <div class="mb-2">
+                                <div class="d-flex justify-space-between" style="font-size: .9rem"><span>@title</span><span class="n-muted">@AudienceFormat.Hours(minutes)</span></div>
+                                <div class="n-meter"><div style="width: @Pct(minutes / best)"></div></div>
+                            </div>
+                        }
+                    }
+                </div>
+            </MudItem>
+
+            @* ------------------------------------------------ 14 jours *@
+            <MudItem xs="12">
+                <div class="n-card">
+                    <div class="n-card-title">Les 14 derniers jours (temps regardé)</div>
+                    @{
+                        double maxDay = Math.Max(1, _history.Max(h => h.Minutes));
+                    }
+                    <div class="n-bars" style="height: 120px">
+                        @foreach ((DateOnly d, double minutes) in _history)
+                        {
+                            <div title="@($"{DayLabel(d)} : {AudienceFormat.Hours(minutes)}")" style="cursor: pointer" @onclick="@(() => SelectDay(d))">
+                                <div class="n-bar @(d == _date ? "is-now" : "")" style="height: @Pct(minutes / maxDay)"></div>
+                                <div class="n-bar-label">@d.ToString("dd/MM", Fr)</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </MudItem>
+        </MudGrid>
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
+
+    private sealed record LiveRow(string Number, string Name, string NowPlaying, int Viewers);
+
+    private Timer _timer;
+    private List<DateOnly> _days = [];
+    private DateOnly _date = DateOnly.FromDateTime(DateTime.Now);
+    private AudienceDay _day;
+    private List<LiveRow> _live = [];
+    private List<(DateOnly Date, double Minutes)> _history = [];
+    private string _channelFilter = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        LoadDays();
+        await RefreshLive();
+        _timer = new Timer(_ => InvokeAsync(async () =>
+        {
+            await RefreshLive();
+            if (_date == DateOnly.FromDateTime(DateTime.Now))
+            {
+                _day = AudienceSampler.Today;
+            }
+
+            StateHasChanged();
+        }), null, TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(15));
+    }
+
+    private void LoadDays()
+    {
+        DateOnly today = DateOnly.FromDateTime(DateTime.Now);
+        _days = AudienceStore.AvailableDays();
+        if (!_days.Contains(today))
+        {
+            _days.Insert(0, today);
+        }
+
+        _day = _date == today ? AudienceSampler.Today : AudienceStore.Load(_date);
+        _history = Enumerable.Range(0, 14)
+            .Select(i => today.AddDays(i - 13))
+            .Select(d => (d, (d == today ? AudienceSampler.Today : AudienceStore.Load(d)).Channels.Values.Sum(c => c.TotalMinutes)))
+            .ToList();
+    }
+
+    private void SelectDay(DateOnly date)
+    {
+        _date = date;
+        _day = date == DateOnly.FromDateTime(DateTime.Now) ? AudienceSampler.Today : AudienceStore.Load(date);
+    }
+
+    private async Task RefreshLive()
+    {
+        Dictionary<string, List<string>> active = Tracker.Active();
+        if (active.Count == 0)
+        {
+            _live = [];
+            return;
+        }
+
+        await using TvContext dbContext = await DbContextFactory.CreateDbContextAsync();
+        var channels = await dbContext.Channels.AsNoTracking().Select(c => new { c.Id, c.Number, c.Name }).ToListAsync();
+        Dictionary<int, NowNext> nowNext = await GuideService.GetNowNext(CancellationToken.None);
+
+        _live = active
+            .Select(a =>
+            {
+                var channel = channels.Find(c => c.Number == a.Key);
+                string playing = "—";
+                if (channel is not null && nowNext.TryGetValue(channel.Id, out NowNext info))
+                {
+                    foreach (GuideEntry entry in info.Now)
+                    {
+                        playing = entry.IsFiller ? "(intercalaires)" : entry.DisplayTitle;
+                    }
+                }
+
+                return new LiveRow(a.Key, channel?.Name ?? "?", playing, a.Value.Count);
+            })
+            .OrderByDescending(r => r.Viewers)
+            .ToList();
+    }
+
+    private IEnumerable<AudienceChannelDay> Filtered() =>
+        string.IsNullOrEmpty(_channelFilter)
+            ? _day.Channels.Values
+            : _day.Channels.Where(c => c.Key == _channelFilter).Select(c => c.Value);
+
+    private static string Pct(double ratio) => (Math.Clamp(ratio, 0, 1) * 100).ToString("0.##", CultureInfo.InvariantCulture) + "%";
+
+    private static string DayLabel(DateOnly d)
+    {
+        DateOnly today = DateOnly.FromDateTime(DateTime.Now);
+        if (d == today)
+        {
+            return "Aujourd'hui";
+        }
+
+        return d == today.AddDays(-1) ? "Hier" : d.ToString("dddd d MMMM", Fr);
+    }
+
+    public void Dispose() => _timer?.Dispose();
+}

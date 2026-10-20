@@ -59,6 +59,9 @@ public static class FileSystemLayout
     public static readonly string HabillageAssetsFolder;
     public static readonly string ProgrammesFolder;
     public static readonly string PluginsFolder;
+    public static readonly string AudienceFolder;
+    public static readonly string ImportsFolder;
+    public static readonly string RegieFolder;
 
     public static readonly string ScriptsFolder;
 
@@ -196,6 +199,9 @@ public static class FileSystemLayout
         ProgrammesFolder = Path.Combine(TemplatesFolder, "programmes");
 
         PluginsFolder = Path.Combine(AppDataFolder, "plugins");
+        AudienceFolder = Path.Combine(AppDataFolder, "audience");
+        ImportsFolder = Path.Combine(AppDataFolder, "medias-importes");
+        RegieFolder = Path.Combine(AppDataFolder, "regie");
 
         ScriptsFolder = Path.Combine(AppDataFolder, "scripts");
 

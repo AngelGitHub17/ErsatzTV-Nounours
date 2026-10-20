@@ -1,0 +1,200 @@
+@page "/semaine-type"
+@using System.Globalization
+@using ErsatzTV.Application.Nounours
+@inject IWeekTemplateService WeekService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Semaine type · ErsatzTV</PageTitle>
+
+<div class="n-page" style="height: 100%; overflow-y: auto">
+    <div class="n-page-header">
+        <div>
+            <h1>Semaine type</h1>
+            <p>Choisissez un planning différent selon le jour : grille du mercredi pour les enfants, soirée cinéma le samedi, week-end plus calme…</p>
+        </div>
+        @if (_current is not null)
+        {
+            <div class="d-flex gap-2 align-center flex-wrap">
+                <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.CalendarViewWeek" Href="@($"planning?chaine={_current.ChannelId}")">Voir la semaine</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" OnClick="@Save" Disabled="@(_busy || !_dirty)">Enregistrer</MudButton>
+            </div>
+        }
+    </div>
+
+    @if (_templates is null)
+    {
+        <MudProgressLinear Indeterminate="true"/>
+    }
+    else if (_templates.Count == 0)
+    {
+        <div class="n-empty">
+            <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Size="Size.Large"/>
+            <MudText>Aucune chaîne n'utilise un planning classique pour l'instant.</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="chaines/nouvelle">Créer une chaîne</MudButton>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex gap-2 flex-wrap mb-4">
+            @foreach (WeekTemplate t in _templates)
+            {
+                <MudChip T="int" Color="@(t.PlayoutId == _current?.PlayoutId ? Color.Primary : Color.Default)" Variant="@(t.PlayoutId == _current?.PlayoutId ? Variant.Filled : Variant.Outlined)"
+                         OnClick="@(() => Select(t))">@t.ChannelNumber · @t.ChannelName</MudChip>
+            }
+        </div>
+
+        @if (_current is not null)
+        {
+            @if (_current.HasAdvancedRules)
+            {
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                    Cette chaîne a aussi des règles par date ou par mois (réglées dans le playout, mode expert). Elles sont conservées et restent prioritaires.
+                </MudAlert>
+            }
+
+            <div class="n-card mb-4">
+                <div class="d-flex gap-2 flex-wrap align-center">
+                    <span class="n-muted" style="font-size: .9rem">Raccourcis :</span>
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@SameAllWeek">Même planning toute la semaine</MudButton>
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => SplitDays("week-end", [DayOfWeek.Saturday, DayOfWeek.Sunday]))">Week-end différent</MudButton>
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => SplitDays("mercredi", [DayOfWeek.Wednesday]))">Mercredi différent</MudButton>
+                </div>
+            </div>
+
+            <div class="n-weekplan">
+                @foreach (DayOfWeek day in WeekTemplateService.Week)
+                {
+                    int scheduleId = _days[day];
+                    WeekScheduleOption schedule = _schedules.Find(s => s.Id == scheduleId);
+                    bool today = DateTime.Now.DayOfWeek == day;
+                    <div class="n-card n-weekplan-day @(today ? "is-today" : "")" style="--n-day: @DayColor(scheduleId)">
+                        <div class="n-weekplan-name">@Fr.DateTimeFormat.GetDayName(day)@(today ? " · aujourd'hui" : "")</div>
+                        <MudSelect T="int" Value="@scheduleId" ValueChanged="@(v => SetDay(day, v))" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Label="Planning">
+                            @foreach (WeekScheduleOption option in _schedules)
+                            {
+                                <MudSelectItem Value="@option.Id">@option.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <div class="n-muted mt-2" style="font-size: .8rem">@(schedule is null ? "?" : $"{schedule.Name} · {schedule.Items} créneau(x)")</div>
+                        <div class="d-flex flex-column mt-2">
+                            <MudButton Size="Size.Small" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Edit" Href="@($"schedules/{scheduleId}/items")">Modifier ce planning</MudButton>
+                            <MudButton Size="Size.Small" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ContentCopy" OnClick="@(() => SplitDays(Fr.DateTimeFormat.GetDayName(day), [day]))" Disabled="@_busy">Version propre à ce jour</MudButton>
+                        </div>
+                    </div>
+                }
+            </div>
+            <MudText Typo="Typo.body2" Class="n-muted mt-3">
+                « Version propre à ce jour » copie le planning actuel sous un nouveau nom : modifiez ensuite la copie sans toucher aux autres jours.
+                À l'enregistrement, la grille de la chaîne est reconstruite.
+            </MudText>
+        }
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
+    private static readonly string[] Palette = ["#4f8cff", "#22c55e", "#f5b83d", "#e879f9", "#38bdf8", "#ff7a45", "#a78bfa", "#f43f5e"];
+
+    [SupplyParameterFromQuery(Name = "chaine")]
+    public int? ChannelId { get; set; }
+
+    private List<WeekTemplate> _templates;
+    private List<WeekScheduleOption> _schedules = [];
+    private WeekTemplate _current;
+    private Dictionary<DayOfWeek, int> _days = [];
+    private bool _dirty;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync() => await Load(ChannelId);
+
+    private async Task Load(int? channelId)
+    {
+        _templates = await WeekService.GetAll(CancellationToken.None);
+        _schedules = await WeekService.GetSchedules(CancellationToken.None);
+        WeekTemplate pick = _templates.Find(t => t.ChannelId == channelId) ?? _templates.FirstOrDefault();
+        if (pick is not null)
+        {
+            Select(pick);
+        }
+    }
+
+    private void Select(WeekTemplate template)
+    {
+        _current = template;
+        _days = new Dictionary<DayOfWeek, int>(template.Days);
+        _dirty = false;
+    }
+
+    private void SetDay(DayOfWeek day, int scheduleId)
+    {
+        _days[day] = scheduleId;
+        _dirty = true;
+    }
+
+    private void SameAllWeek()
+    {
+        int main = _days.Values.GroupBy(v => v).OrderByDescending(g => g.Count()).First().Key;
+        foreach (DayOfWeek day in WeekTemplateService.Week)
+        {
+            _days[day] = main;
+        }
+
+        _dirty = true;
+    }
+
+    private async Task SplitDays(string label, DayOfWeek[] days)
+    {
+        _busy = true;
+        try
+        {
+            int source = _days[days[0]];
+            WeekScheduleOption original = _schedules.Find(s => s.Id == source);
+            string name = $"{original?.Name ?? "Planning"} · {label}";
+            foreach (WeekScheduleOption copy in (await WeekService.Duplicate(source, name, CancellationToken.None)).RightToSeq())
+            {
+                _schedules = await WeekService.GetSchedules(CancellationToken.None);
+                foreach (DayOfWeek day in days)
+                {
+                    _days[day] = copy.Id;
+                }
+
+                _dirty = true;
+                Snackbar.Add($"Planning « {copy.Name} » créé. Pensez à enregistrer, puis modifiez-le.", Severity.Success);
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task Save()
+    {
+        _busy = true;
+        try
+        {
+            Either<BaseError, Unit> result = await WeekService.Save(_current.PlayoutId, _days, CancellationToken.None);
+            result.Match(
+                _ =>
+                {
+                    Snackbar.Add("Semaine type enregistrée, la grille est en cours de reconstruction.", Severity.Success);
+                    _dirty = false;
+                },
+                error => Snackbar.Add($"Impossible d'enregistrer : {error}", Severity.Error));
+
+            int channelId = _current.ChannelId;
+            await Load(channelId);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private string DayColor(int scheduleId)
+    {
+        int index = _schedules.FindIndex(s => s.Id == scheduleId);
+        return Palette[Math.Max(0, index) % Palette.Length];
+    }
+}

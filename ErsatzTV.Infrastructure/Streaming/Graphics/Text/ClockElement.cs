@@ -26,6 +26,7 @@ public class ClockElement(
     private TextElement _current;
     private Option<NCalc.Expression> _maybeOpacityExpression;
     private float _opacity;
+    private List<DateTimeOffset> _countdownTargets = [];
 
     public override int ZIndex { get; } = clockElement.ZIndex ?? 0;
 
@@ -76,6 +77,16 @@ public class ClockElement(
             _opacity = (clockElement.OpacityPercent ?? 100) / 100.0f;
         }
 
+        foreach (string part in (clockElement.CountdownTo ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (DateTimeOffset.TryParse(part, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTimeOffset target))
+            {
+                _countdownTargets.Add(target);
+            }
+        }
+
+        _countdownTargets = _countdownTargets.Order().ToList();
+
         if (string.IsNullOrWhiteSpace(clockElement.Text))
         {
             clockElement.Text = "{clock}";
@@ -114,7 +125,29 @@ public class ClockElement(
 
         DateTimeOffset frameTime = _context.ContentStartTime + contentTime;
         DateTimeOffset local = TimeZoneInfo.ConvertTime(frameTime, _timeZone);
-        string text = clockElement.Text.Replace("{clock}", local.ToString(clockElement.Format, _culture));
+        string text = clockElement.Text.Replace("{clock}", local.ToString(clockElement.Format, _culture), StringComparison.Ordinal);
+
+        if (text.Contains("{countdown}", StringComparison.Ordinal))
+        {
+            int index = _countdownTargets.FindIndex(t => t > frameTime.AddSeconds(1));
+            if (index < 0)
+            {
+                return Option<PreparedElementImage>.None;
+            }
+
+            TimeSpan left = _countdownTargets[index] - frameTime;
+            if (clockElement.CountdownMaxMinutes > 0 && left.TotalMinutes > clockElement.CountdownMaxMinutes)
+            {
+                return Option<PreparedElementImage>.None;
+            }
+
+            text = text.Replace("{countdown}", FormatSpan(left), StringComparison.Ordinal);
+        }
+
+        if (text.Contains("{restant}", StringComparison.Ordinal))
+        {
+            text = text.Replace("{restant}", FormatSpan(contentTotalTime - contentTime), StringComparison.Ordinal);
+        }
 
         if (text != _lastText || _current is null)
         {
@@ -136,6 +169,20 @@ public class ClockElement(
         }
 
         return new PreparedElementImage(image, _current.RenderedLocation, opacity, ZIndex, false);
+    }
+
+    private static string FormatSpan(TimeSpan span)
+    {
+        if (span < TimeSpan.Zero)
+        {
+            span = TimeSpan.Zero;
+        }
+
+        // arrondi à la seconde supérieure : « 0:01 » reste affiché jusqu'au top
+        span = TimeSpan.FromSeconds(Math.Ceiling(span.TotalSeconds));
+        return span.TotalHours >= 1
+            ? span.ToString(@"h\:mm\:ss", CultureInfo.InvariantCulture)
+            : span.ToString(@"m\:ss", CultureInfo.InvariantCulture);
     }
 
     private TextGraphicsElement CloneWithText(string text) =>

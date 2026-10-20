@@ -1,0 +1,241 @@
+@page "/regie"
+@using System.Globalization
+@using ErsatzTV.Application.Nounours
+@implements IDisposable
+@inject IRegieService RegieService
+@inject IGuideService GuideService
+@inject ISnackbar Snackbar
+@inject IDialogService Dialog
+@inject NavigationManager NavigationManager
+
+<PageTitle>Régie · ErsatzTV</PageTitle>
+
+<div class="n-page" style="height: 100%; overflow-y: auto">
+    <div class="n-page-header">
+        <div>
+            <h1>Régie</h1>
+            <p>Prenez l'antenne d'une chaîne tout de suite (flash spécial, écran de secours, direct…), puis rendez-la : la grille reprend exactement là où elle en serait.</p>
+        </div>
+    </div>
+
+    @if (_channels is null)
+    {
+        <MudProgressLinear Indeterminate="true"/>
+    }
+    else
+    {
+        <div class="n-regie">
+            <div class="d-flex flex-column gap-2">
+                @foreach (RegieChannel channel in _channels)
+                {
+                    <div class="n-card n-regie-channel @(channel.PlayoutId == _selected?.PlayoutId ? "is-selected" : "") @(channel.OnAir ? "is-onair" : "")"
+                         @onclick="@(() => _selected = channel)">
+                        <div class="d-flex align-center gap-2">
+                            <b>@channel.Number</b><span style="flex: 1">@channel.Name</span>
+                            @if (channel.OnAir)
+                            {
+                                <span class="n-regie-badge"><span class="n-live-dot" style="background: #fff"></span>RÉGIE</span>
+                            }
+                        </div>
+                        <div class="n-muted mt-1" style="font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">
+                            @if (channel.OnAir)
+                            {
+                                @($"{channel.Title} · jusqu'à {channel.Until?.ToString("HH:mm", Fr)}")
+                            }
+                            else
+                            {
+                                @Playing(channel)
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div>
+                @if (_selected is null)
+                {
+                    <div class="n-empty">Choisissez une chaîne à gauche.</div>
+                }
+                else
+                {
+                    RegieChannel ch = _channels.Find(c => c.PlayoutId == _selected.PlayoutId) ?? _selected;
+                    <div class="n-card mb-3 @(ch.OnAir ? "n-regie-live" : "")">
+                        <div class="d-flex align-center gap-3 flex-wrap">
+                            <div style="flex: 1; min-width: 220px">
+                                <div class="n-muted" style="font-size: .8rem">À L'ANTENNE · @ch.Number @ch.Name</div>
+                                <div style="font-size: 1.4rem; font-weight: 700">@(ch.OnAir ? ch.Title : Playing(ch))</div>
+                                @if (ch.OnAir && ch.Until.HasValue)
+                                {
+                                    <div class="n-muted">depuis @ch.Since?.ToString("HH:mm", Fr) · retour à la grille dans <b>@Remaining(ch.Until.Value)</b> (@ch.Until.Value.ToString("HH:mm", Fr))</div>
+                                }
+                            </div>
+                            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.PlayCircle" OnClick="@(() => Preview(ch))">Contrôle</MudButton>
+                            @if (ch.OnAir)
+                            {
+                                <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Large" StartIcon="@Icons.Material.Filled.KeyboardReturn" OnClick="@(() => Release(ch))" Disabled="@_busy">Rendre l'antenne</MudButton>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="n-card">
+                        <div class="n-card-title">Prendre l'antenne</div>
+                        <MudAutocomplete T="RegieSource" @bind-Value="_source" SearchFunc="@Search" ToStringFunc="@(s => s?.Title)" Label="Vidéo ou flux à diffuser"
+                                         Variant="Variant.Outlined" Margin="Margin.Dense" DebounceInterval="300" ResetValueOnEmptyText="true" MinCharacters="2"
+                                         HelperText="Tapez au moins 2 lettres du titre (vidéos, films, clips, flux distants)">
+                            <ItemTemplate Context="item">
+                                <div><b>@item.Title</b> <span class="n-muted">· @item.Detail</span></div>
+                            </ItemTemplate>
+                        </MudAutocomplete>
+                        @if (_suggestions.Count > 0)
+                        {
+                            <div class="d-flex gap-1 flex-wrap mt-2 align-center">
+                                <span class="n-muted" style="font-size: .82rem">Écrans de secours :</span>
+                                @foreach (RegieSource s in _suggestions)
+                                {
+                                    <MudChip T="string" Size="Size.Small" OnClick="@(() => _source = s)" Icon="@Icons.Material.Filled.Warning">@s.Title</MudChip>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2" Class="n-muted mt-2">Astuce : importez vos mires et écrans de secours comme « Habillage vidéo » dans <MudLink Href="importer">Pubs & jingles</MudLink> pour les avoir ici en un clic.</MudText>
+                        }
+
+                        <MudRadioGroup T="RegieMode" @bind-Value="_mode" Class="mt-3">
+                            <MudRadio Value="@RegieMode.Once" Color="Color.Primary">Une fois@(_source is { Duration.TotalSeconds: > 1 } ? $" ({ContentCatalog.Format(_source.Duration)})" : "")</MudRadio>
+                            <MudRadio Value="@RegieMode.Minutes" Color="Color.Primary">En boucle pendant</MudRadio>
+                            <MudRadio Value="@RegieMode.UntilRelease" Color="Color.Primary">Jusqu'à ce que je rende l'antenne</MudRadio>
+                        </MudRadioGroup>
+                        @if (_mode == RegieMode.Minutes)
+                        {
+                            <MudNumericField @bind-Value="_minutes" Label="Minutes" Min="1" Max="360" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 160px"/>
+                        }
+                        <MudTextField @bind-Value="_title" Label="Titre dans le guide" Placeholder="ex. Flash spécial" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"/>
+
+                        <MudButton Variant="Variant.Filled" Color="Color.Error" Size="Size.Large" Class="mt-4" StartIcon="@Icons.Material.Filled.Podcasts"
+                                   Disabled="@(_busy || _source is null)" OnClick="@(() => TakeAir(ch))">
+                            Prendre l'antenne maintenant
+                        </MudButton>
+                        <MudText Typo="Typo.body2" Class="n-muted mt-2">
+                            Les spectateurs basculent en quelques secondes (leur lecteur se reconnecte). Les programmes recouverts sont mis de côté et reviennent au retour.
+                        </MudText>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
+
+    private List<RegieChannel> _channels;
+    private RegieChannel _selected;
+    private Dictionary<int, NowNext> _nowNext = [];
+    private List<RegieSource> _suggestions = [];
+    private RegieSource _source;
+    private RegieMode _mode = RegieMode.UntilRelease;
+    private int _minutes = 15;
+    private string _title;
+    private bool _busy;
+    private Timer _timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Reload();
+        _selected = _channels?.FirstOrDefault();
+        _suggestions = await RegieService.Suggestions(CancellationToken.None);
+        _timer = new Timer(_ => InvokeAsync(async () => { await Reload(); StateHasChanged(); }), null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+    }
+
+    private async Task Reload()
+    {
+        _channels = await RegieService.GetChannels(CancellationToken.None);
+        _nowNext = await GuideService.GetNowNext(CancellationToken.None);
+    }
+
+    private string Playing(RegieChannel channel)
+    {
+        if (_nowNext.TryGetValue(channel.ChannelId, out NowNext info))
+        {
+            foreach (GuideEntry entry in info.Now)
+            {
+                return entry.IsFiller ? "(intercalaires)" : entry.DisplayTitle;
+            }
+        }
+
+        return "—";
+    }
+
+    private Task<IEnumerable<RegieSource>> Search(string text, CancellationToken token) =>
+        RegieService.Search(text, token).Map(l => (IEnumerable<RegieSource>)l);
+
+    private async Task TakeAir(RegieChannel channel)
+    {
+        bool? confirm = await Dialog.ShowMessageBoxAsync(
+            "Prendre l'antenne ?",
+            $"« {_source.Title} » va remplacer immédiatement ce qui passe sur {channel.Number} · {channel.Name}.",
+            yesText: "Prendre l'antenne", cancelText: "Annuler");
+        if (confirm != true)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            Either<BaseError, Unit> result = await RegieService.TakeAir(channel.PlayoutId, _source.MediaItemId, _mode, _minutes, _title, CancellationToken.None);
+            result.Match(
+                _ => Snackbar.Add($"Vous êtes à l'antenne sur {channel.Name}.", Severity.Success),
+                error => Snackbar.Add(error.ToString(), Severity.Error));
+            await Reload();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task Release(RegieChannel channel)
+    {
+        _busy = true;
+        try
+        {
+            Either<BaseError, Unit> result = await RegieService.Release(channel.PlayoutId, CancellationToken.None);
+            result.Match(
+                _ => Snackbar.Add("Antenne rendue : la grille reprend.", Severity.Success),
+                error => Snackbar.Add(error.ToString(), Severity.Error));
+            await Reload();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task Preview(RegieChannel channel)
+    {
+        string uri = $"{NavigationManager.BaseUri}iptv/channel/{channel.Number}.m3u8?mode=segmenter";
+        if (JwtHelper.IsEnabled)
+        {
+            uri += $"&access_token={JwtHelper.GenerateToken()}";
+        }
+
+        var parameters = new DialogParameters { { "StreamUri", uri } };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraLarge };
+        await Dialog.ShowAsync<ChannelPreviewDialog>($"Contrôle · {channel.Number} · {channel.Name}", parameters, options);
+    }
+
+    private static string Remaining(DateTimeOffset until)
+    {
+        TimeSpan left = until - DateTimeOffset.Now;
+        if (left < TimeSpan.Zero)
+        {
+            return "0 min";
+        }
+
+        return left.TotalHours >= 1 ? $"{(int)left.TotalHours} h {left.Minutes:00}" : $"{Math.Ceiling(left.TotalMinutes)} min";
+    }
+
+    public void Dispose() => _timer?.Dispose();
+}

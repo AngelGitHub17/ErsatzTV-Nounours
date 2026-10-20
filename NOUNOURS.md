@@ -46,6 +46,10 @@ Composez ce qui s'affiche par-dessus les programmes, en glisser-déposer sur une
 - **apparition** : tout le temps, au début / à la fin de chaque programme, ou toutes les X minutes, avec fondu,
 - calques (ordre, visibilité, duplication), magnétisme, flèches du clavier, positions rapides, onglet YAML pour voir le fichier généré.
 
+- **Compte à rebours** (« Début dans 1:30 » avant le programme suivant, affichable seulement les X dernières minutes),
+  **temps restant** du programme en cours (`{restant}`), et **« Prochainement »** : les 3 prochains programmes du guide avec leur heure.
+  Dans un texte d'horloge : `{clock}` = l'heure, `{countdown}` = temps avant le programme suivant, `{restant}` = temps restant.
+
 « Enregistrer » génère les fichiers YAML du moteur graphique d'ErsatzTV et une **déco** « Habillage : nom » (groupe « Habillages ») ;
 « Appliquer aux chaînes » en fait la déco par défaut des chaînes choisies. Visible dès le programme suivant
 (sauf en mode HLS direct, qui ne transcode pas).
@@ -80,9 +84,68 @@ et un préréglage de remplissage « milieu de programme » « Coupure : nom ».
 Les éléments plus courts que le premier point ne sont pas coupés (et le remplissage n'est pas converti en « après »).
 Une expression classique peut suivre après `;`. Utilisable aussi à la main depuis Collections › Préréglages de remplissage.
 
+### Semaine type (`/semaine-type`)
+Un planning différent selon le jour de la semaine : mercredi jeunesse, samedi cinéma, week-end plus calme…
+- Pour chaque jour, choisissez le planning à utiliser ; raccourcis « Week-end différent », « Mercredi différent »,
+  « Même planning toute la semaine ».
+- « Version propre à ce jour » copie le planning sous un nouveau nom pour le modifier sans toucher aux autres jours.
+- Sous le capot : les plannings alternatifs d'ErsatzTV (par jour de semaine). Les règles par date ou par mois réglées en mode expert sont conservées et restent prioritaires.
+
+### Pubs, jingles & bandes-annonces en un clic (`/importer`)
+- Choisissez le type (Pubs, Jingles, Bandes-annonces, Habillage vidéo), indiquez un dossier du serveur (avec un explorateur de dossiers)
+  **ou envoyez directement des vidéos** depuis le navigateur.
+- Le dossier est ajouté à une bibliothèque dédiée (« Habillage · Pubs »…) et analysé ; une **collection intelligente** du même nom
+  (« Pubs »…) est créée et tenue à jour : elle apparaît tout de suite dans les programmes et l'assistant.
+- Une collection « Pubs » créée à la main n'est jamais écrasée (l'import utilise alors « Pubs · import »).
+
+### Régie — prendre l'antenne (`/regie`)
+- Choisissez une chaîne, une vidéo ou un flux distant (recherche par titre, ou les **écrans de secours** importés comme « Habillage vidéo »),
+  puis **« Prendre l'antenne maintenant »** : une fois, en boucle pendant X minutes, ou jusqu'à « Rendre l'antenne » (6 h max).
+- Les spectateurs basculent en quelques secondes (la session HLS est relancée, le lecteur se reconnecte). Le guide affiche le titre choisi (« Flash spécial »).
+- **« Rendre l'antenne »** remet la grille exactement là où elle en serait : rien n'est reconstruit, les programmes recouverts
+  sont mis de côté dans `regie/<playout>.json` et replacés (le programme en cours reprend au bon endroit).
+- Bouton « Contrôle » : aperçu de la chaîne dans le navigateur.
+- Limite : en mode « MPEG-TS » ou « HLS direct », le changement n'est visible qu'au programme suivant ou à la reconnexion du lecteur.
+
+### Audience (module intégré, `/modules/audience`)
+- Spectateurs **en direct** par chaîne avec le programme en cours, carte sur le tableau de bord.
+- Par jour : temps regardé, spectateurs distincts, pic simultané, durée moyenne, courbe heure par heure (filtrable par chaîne),
+  part de chaque chaîne, **programmes les plus regardés**, et l'historique des 14 derniers jours.
+- Comptage : chaque requête de flux IPTV (M3U/HLS, HDHomeRun, `.ts`, aperçu) compte ; un spectateur = empreinte anonyme
+  de l'adresse + du lecteur (aucune adresse IP n'est enregistrée), actif tant qu'il lit ou pendant 40 s après sa dernière requête.
+  Relevé chaque minute dans `audience/AAAA-MM-JJ.json`.
+
+### Guide JSON pour le site NounoursTV (`/iptv/nounours/epg.json`)
+Le même guide que `xmltv.xml`, en JSON prêt à afficher sur un site :
+
+```
+GET /iptv/nounours/epg.json?heures=24&chaines=1,2&passes=false
+```
+
+```json
+{
+  "genereLe": "2026-10-20T19:42:39+02:00",
+  "jusqua": "2026-10-21T19:42:39+02:00",
+  "chaines": [{
+    "id": "C2.146.ersatztv.org", "numero": "2", "nom": "Nounours Ciné", "logo": "http://…/iptv/logos/…",
+    "flux": { "hls": "http://…/iptv/channel/2.m3u8", "ts": "http://…/iptv/channel/2.ts" },
+    "enCours": { … }, "aSuivre": { … },
+    "programmes": [{
+      "debut": "2026-10-20T20:00:00+02:00", "fin": "2026-10-20T20:03:00+02:00", "dureeMinutes": 3,
+      "titre": "Les Nounours", "sousTitre": "…", "description": "…", "categories": ["Series"],
+      "image": "http://…/iptv/artwork/posters/…", "annee": "2024", "classification": "-12",
+      "saison": 1, "episode": 1, "rediffusion": true, "enCours": false
+    }]
+  }]
+}
+```
+- `heures` : durée couverte à partir de maintenant (1 à 336, défaut 24) · `chaines` : numéros séparés par des virgules · `passes=true` : inclut les programmes déjà terminés de la fenêtre.
+- Les champs vides sont omis. Les chaînes masquées du guide le sont aussi ici. CORS ouvert (appel direct depuis le navigateur possible).
+- Si l'accès IPTV est protégé (JWT), ajoutez `?access_token=…` comme pour le M3U ; il est repris dans les liens de flux.
+
 ### Système de modules (`/modules`)
 Voir [MODULES.md](MODULES.md). Un module ajoute des pages, des entrées de menu, des cartes du tableau de bord et des services,
-sans toucher au cœur. Deux exemples sont fournis : « Statistiques de diffusion » (intégré) et « Bloc-notes de la régie » (externe, `plugins-exemple/`).
+sans toucher au cœur. Exemples fournis : « Audience » et « Statistiques de diffusion » (intégrés) et « Bloc-notes de la régie » (externe, `plugins-exemple/`).
 
 ### Corrections
 - Les rendez-vous ajoutés depuis le planning (et les créneaux de l'assistant) sont remis dans l'ordre chronologique :
@@ -109,6 +172,9 @@ et les préférences utilisent la table de configuration existante. Les nouveaux
 | `templates/habillages/assets/` | images importées dans le studio |
 | `templates/programmes/` | programmes composés (`.json`) |
 | `plugins/` | modules externes (un sous-dossier par module) |
+| `audience/` | relevés d'audience (un `.json` par jour) |
+| `regie/` | prises d'antenne en cours (programmes mis de côté) |
+| `medias-importes/` | vidéos envoyées depuis la page d'import |
 
 ## Où sont les changements
 
@@ -118,7 +184,10 @@ et les préférences utilisent la table de configuration existante. Les nouveaux
 | Services de l'édition | `ErsatzTV.Application/Nounours/` (planning, catalogue, habillage) · `ErsatzTV/Nounours/` (assistant, préférences, libellés FR, modules) |
 | Pages nouvelles | `ErsatzTV/Pages/Nounours/` (Accueil, Assistant, Programmes, Planning, Habillages, Studio, Modules), `ErsatzTV/Shared/Nounours/` |
 | Programmes composés | `ErsatzTV.Application/Nounours/Programmes.cs`, `ErsatzTV.Core/Scheduling/MidRollBreaks.cs` (+ `PlayoutModeSchedulerBase.cs`, `FillerExpression.cs`), tests `ErsatzTV.Core.Tests/Scheduling/MidRollBreaksTests.cs` |
-| Modules | `ErsatzTV.Plugins/` (contrat), `ErsatzTV/Nounours/Plugins/` (chargement), `ErsatzTV/Nounours/Modules/` (module intégré), `plugins-exemple/` |
+| Modules | `ErsatzTV.Plugins/` (contrat), `ErsatzTV/Nounours/Plugins/` (chargement), `ErsatzTV/Nounours/Modules/` (modules intégrés), `plugins-exemple/` |
+| Semaine type · import · régie | `ErsatzTV.Application/Nounours/WeekTemplate.cs`, `FolderImport.cs`, `Regie.cs` · pages `WeekTemplatePage.razor`, `ImportPage.razor`, `RegiePage.razor` |
+| Audience | `ErsatzTV/Nounours/Audience/` (comptage, relevés), `ErsatzTV/Nounours/Modules/Audience/` (page, carte) |
+| Guide JSON | `ErsatzTV/Controllers/NounoursEpgController.cs` |
 | Interface | `Shared/MainLayout.razor`, `App.razor`, `Pages/_Host.cshtml`, `wwwroot/css/nounours.css`, `wwwroot/js/nounours.js`, `Controllers/NounoursController.cs` |
 | Traduction | toutes les pages de `Pages/` et `Shared/`, `Locals/**/*.fr.resx`, `Localization.cs`, vérifications de santé (`ErsatzTV.Infrastructure/Health/Checks/`) |
 

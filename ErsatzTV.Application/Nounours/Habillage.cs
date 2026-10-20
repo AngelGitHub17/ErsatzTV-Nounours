@@ -65,6 +65,9 @@ public sealed class HabillageItem
     public string Align { get; set; } = "Left";
     public int EpgEntries { get; set; }
 
+    /// <summary>Compte à rebours : n'afficher que pendant les X dernières minutes avant le programme suivant (0 = toujours).</summary>
+    public double CountdownMaxMinutes { get; set; }
+
     // image
     public string ImagePath { get; set; } = string.Empty;
 
@@ -457,9 +460,21 @@ public sealed partial class HabillageService(
                     sb.AppendLine("culture: \"fr-FR\"");
                 }
 
-                if (item.EpgEntries > 0)
+                int epgEntries = item.EpgEntries;
+                if (item.Kind == HabillageItemKind.Clock && (item.Text ?? string.Empty).Contains("{countdown}", StringComparison.Ordinal))
                 {
-                    sb.AppendLine(CultureInfo.InvariantCulture, $"epg_entries: {item.EpgEntries}");
+                    // débuts des prochains programmes du guide ; l'horloge choisit le premier dans le futur
+                    epgEntries = Math.Max(epgEntries, 4);
+                    sb.AppendLine("countdown_to: \"{{ for e in Epg }}{{ format_datetime e.Start 'UTC' 'o' }};{{ end }}\"");
+                    if (item.CountdownMaxMinutes > 0)
+                    {
+                        sb.AppendLine(CultureInfo.InvariantCulture, $"countdown_max_minutes: {Num(item.CountdownMaxMinutes)}");
+                    }
+                }
+
+                if (epgEntries > 0)
+                {
+                    sb.AppendLine(CultureInfo.InvariantCulture, $"epg_entries: {epgEntries}");
                 }
 
                 if (item.Width > 0)

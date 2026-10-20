@@ -1,0 +1,250 @@
+@page "/importer"
+@using ErsatzTV.Application.Nounours
+@inject IFolderImportService ImportService
+@inject ISnackbar Snackbar
+
+<PageTitle>Pubs & jingles · ErsatzTV</PageTitle>
+
+<div class="n-page" style="height: 100%; overflow-y: auto">
+    <div class="n-page-header">
+        <div>
+            <h1>Pubs, jingles & bandes-annonces</h1>
+            <p>Indiquez un dossier (ou envoyez des fichiers) : il est analysé et rangé dans une collection prête à l'emploi pour vos programmes et vos coupures.</p>
+        </div>
+    </div>
+
+    <div class="n-card mb-4">
+        <div class="n-card-title">1. Ce que contient le dossier</div>
+        <div class="d-flex gap-2 flex-wrap">
+            @foreach (ImportRole role in Enum.GetValues<ImportRole>())
+            {
+                <MudChip T="ImportRole" Color="@(role == _role ? Color.Primary : Color.Default)" Variant="@(role == _role ? Variant.Filled : Variant.Outlined)"
+                         OnClick="@(() => _role = role)" Icon="@RoleIcon(role)">@FolderImportService.Label(role)</MudChip>
+            }
+        </div>
+        <MudText Typo="Typo.body2" Class="n-muted mt-2">@FolderImportService.Describe(_role)</MudText>
+
+        <div class="n-card-title mt-5">2. Le dossier</div>
+        <MudTabs Elevation="0" Rounded="true" TabPanelsClass="pt-3" ApplyEffectsToContainer="true">
+            <MudTabPanel Text="Dossier du serveur" Icon="@Icons.Material.Filled.FolderOpen">
+                <div class="d-flex gap-2 align-start flex-wrap">
+                    <MudTextField @bind-Value="_folder" Label="Chemin du dossier" Placeholder="ex. Y:\Medias\Pubs ou /srv/medias/pubs" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex: 1; min-width: 280px"
+                                  HelperText="Le dossier doit être accessible par la machine où tourne ErsatzTV. Les sous-dossiers sont inclus." Immediate="true"/>
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.ManageSearch" OnClick="@ToggleBrowser" Style="margin-top: 4px">Parcourir</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Download" OnClick="@(() => Import(_folder))" Disabled="@(_busy || string.IsNullOrWhiteSpace(_folder))" Style="margin-top: 4px">Importer</MudButton>
+                </div>
+                @if (_browsing)
+                {
+                    <div class="n-card mt-3" style="padding: 10px; max-height: 360px; overflow-y: auto">
+                        <div class="d-flex align-center gap-2 mb-2 flex-wrap">
+                            <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small" OnClick="@BrowseUp" Disabled="@string.IsNullOrEmpty(_browsePath)" aria-label="Dossier parent"/>
+                            <code style="flex: 1; overflow-wrap: anywhere">@(string.IsNullOrEmpty(_browsePath) ? "Racine" : _browsePath)</code>
+                            @if (!string.IsNullOrEmpty(_browsePath))
+                            {
+                                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => { _folder = _browsePath; _browsing = false; })">Choisir ce dossier</MudButton>
+                            }
+                        </div>
+                        @if (_entries.Count == 0)
+                        {
+                            <MudText Typo="Typo.body2" Class="n-muted pa-2">Aucun sous-dossier.</MudText>
+                        }
+                        @foreach (FolderEntry entry in _entries)
+                        {
+                            <div class="n-folder" @onclick="@(() => Browse(entry.Path))">
+                                <MudIcon Icon="@Icons.Material.Filled.Folder" Size="Size.Small"/>
+                                <span style="flex: 1">@entry.Name</span>
+                                @if (entry.Videos > 0)
+                                {
+                                    <span class="n-muted" style="font-size: .8rem">@entry.Videos vidéo(s)</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </MudTabPanel>
+            <MudTabPanel Text="Envoyer des fichiers" Icon="@Icons.Material.Filled.Upload">
+                <label class="n-dropzone">
+                    <InputFile OnChange="@Upload" multiple accept="@string.Join(',', FolderImportService.VideoExtensions)" style="display: none"/>
+                    <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large"/>
+                    <div><b>Choisir des vidéos</b> depuis cet ordinateur</div>
+                    <div class="n-muted" style="font-size: .85rem">Elles sont copiées dans le dossier de config d'ErsatzTV (medias-importes/@FolderImportService.Label(_role)), puis importées.</div>
+                </label>
+                @if (_uploadProgress is not null)
+                {
+                    <MudProgressLinear Value="@_uploadProgress.Value" Color="Color.Primary" Class="mt-3"/>
+                    <MudText Typo="Typo.caption" Class="n-muted">@_uploadLabel</MudText>
+                }
+            </MudTabPanel>
+        </MudTabs>
+    </div>
+
+    <MudGrid Spacing="3">
+        @foreach (ImportGroup group in _groups)
+        {
+            <MudItem xs="12" md="6" lg="3">
+                <div class="n-card" style="height: 100%">
+                    <div class="d-flex align-center gap-2">
+                        <MudIcon Icon="@RoleIcon(group.Role)"/>
+                        <div class="n-card-title" style="margin: 0; flex: 1">@group.Label</div>
+                        @if (group.LibraryId.HasValue)
+                        {
+                            <MudTooltip Text="Relancer l'analyse"><MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small" OnClick="@(() => Rescan(group.Role))"/></MudTooltip>
+                        }
+                    </div>
+                    <div class="n-stat mt-2">
+                        <span class="n-stat-value">@group.Items</span>
+                        <span class="n-stat-label">vidéo(s) analysée(s)</span>
+                    </div>
+                    @if (group.SmartCollectionId.HasValue)
+                    {
+                        <MudText Typo="Typo.body2" Class="mt-2">Collection : <MudLink Href="@($"media/smart-collections/{group.SmartCollectionId}/edit")"><b>@group.SmartCollectionName</b></MudLink></MudText>
+                    }
+                    @if (group.Folders.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="n-muted mt-2">Aucun dossier importé.</MudText>
+                    }
+                    @foreach (string folder in group.Folders)
+                    {
+                        <div class="d-flex align-center gap-1 mt-1">
+                            <MudIcon Icon="@Icons.Material.Filled.Folder" Size="Size.Small" Class="n-muted"/>
+                            <code style="flex: 1; font-size: .78rem; overflow-wrap: anywhere">@folder</code>
+                            <MudTooltip Text="Retirer ce dossier (les fichiers ne sont pas supprimés)">
+                                <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="@(() => Remove(group.Role, folder))"/>
+                            </MudTooltip>
+                        </div>
+                    }
+                </div>
+            </MudItem>
+        }
+    </MudGrid>
+    <MudText Typo="Typo.body2" Class="n-muted mt-3">
+        Les collections apparaissent dans les choix de contenu des <MudLink Href="programmes">programmes</MudLink> (segments Pubs, Jingle…)
+        et de l'<MudLink Href="chaines/nouvelle">assistant de chaîne</MudLink>. L'analyse peut prendre quelques minutes selon le nombre de fichiers.
+    </MudText>
+</div>
+
+@code {
+    private const long MaxUpload = 4L * 1024 * 1024 * 1024;
+
+    private List<ImportGroup> _groups = [];
+    private ImportRole _role = ImportRole.Pubs;
+    private string _folder;
+    private bool _busy;
+    private bool _browsing;
+    private string _browsePath = string.Empty;
+    private List<FolderEntry> _entries = [];
+    private double? _uploadProgress;
+    private string _uploadLabel;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload() => _groups = await ImportService.GetGroups(CancellationToken.None);
+
+    private void ToggleBrowser()
+    {
+        _browsing = !_browsing;
+        if (_browsing)
+        {
+            Browse(string.IsNullOrWhiteSpace(_folder) ? string.Empty : _folder);
+        }
+    }
+
+    private void Browse(string path)
+    {
+        _browsePath = path ?? string.Empty;
+        _entries = ImportService.Browse(_browsePath);
+    }
+
+    private void BrowseUp()
+    {
+        string parent = Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(_browsePath));
+        Browse(parent ?? string.Empty);
+    }
+
+    private async Task Import(string folder)
+    {
+        _busy = true;
+        try
+        {
+            Either<BaseError, ImportResult> result = await ImportService.Import(folder, _role, CancellationToken.None);
+            result.Match(
+                r => Snackbar.Add(
+                    $"{r.FilesFound} vidéo(s) trouvée(s) : analyse lancée. Elles seront dans la collection « {r.SmartCollectionName} ».",
+                    Severity.Success),
+                error => Snackbar.Add(error.ToString(), Severity.Error));
+            if (result.IsRight)
+            {
+                _folder = null;
+            }
+
+            await Reload();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task Upload(InputFileChangeEventArgs e)
+    {
+        string target = ImportService.UploadFolder(_role);
+        IReadOnlyList<IBrowserFile> files = e.GetMultipleFiles(500);
+        long total = Math.Max(1, files.Sum(f => f.Size));
+        long done = 0;
+        _uploadProgress = 0;
+        try
+        {
+            foreach (IBrowserFile file in files)
+            {
+                string name = Path.GetFileName(file.Name);
+                _uploadLabel = $"Envoi de {name}…";
+                StateHasChanged();
+                string path = Path.Combine(target, name);
+                await using (FileStream output = File.Create(path))
+                await using (Stream input = file.OpenReadStream(MaxUpload))
+                {
+                    var buffer = new byte[1024 * 1024];
+                    int read;
+                    while ((read = await input.ReadAsync(buffer)) > 0)
+                    {
+                        await output.WriteAsync(buffer.AsMemory(0, read));
+                        done += read;
+                        _uploadProgress = done * 100.0 / total;
+                        StateHasChanged();
+                    }
+                }
+            }
+
+            _uploadLabel = $"{files.Count} fichier(s) envoyé(s).";
+            await Import(target);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Envoi interrompu : {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task Remove(ImportRole role, string folder)
+    {
+        Either<BaseError, Unit> result = await ImportService.RemoveFolder(role, folder, CancellationToken.None);
+        result.Match(
+            _ => Snackbar.Add("Dossier retiré.", Severity.Success),
+            error => Snackbar.Add(error.ToString(), Severity.Error));
+        await Reload();
+    }
+
+    private async Task Rescan(ImportRole role)
+    {
+        await ImportService.Rescan(role, CancellationToken.None);
+        Snackbar.Add("Analyse relancée.", Severity.Info);
+    }
+
+    private static string RoleIcon(ImportRole role) =>
+        role switch
+        {
+            ImportRole.Pubs => Icons.Material.Filled.Campaign,
+            ImportRole.Jingles => Icons.Material.Filled.MusicNote,
+            ImportRole.BandesAnnonces => Icons.Material.Filled.Movie,
+            _ => Icons.Material.Filled.Layers
+        };
+}

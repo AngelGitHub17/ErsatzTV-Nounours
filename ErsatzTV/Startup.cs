@@ -363,6 +363,9 @@ public class Startup
             FileSystemLayout.HabillageAssetsFolder,
             FileSystemLayout.ProgrammesFolder,
             FileSystemLayout.PluginsFolder,
+            FileSystemLayout.AudienceFolder,
+            FileSystemLayout.ImportsFolder,
+            FileSystemLayout.RegieFolder,
             FileSystemLayout.ScriptsFolder,
             FileSystemLayout.MultiEpisodeShuffleTemplatesFolder,
             FileSystemLayout.AudioStreamSelectorScriptsFolder,
@@ -532,6 +535,7 @@ public class Startup
         }
 
         app.UseCors("AllowAll");
+        app.Use(ErsatzTV.Nounours.Audience.AudienceTracker.Middleware);
         app.Use(async (context, next) =>
         {
             context.Response.OnStarting(() =>
@@ -712,6 +716,9 @@ public class Startup
         services.AddScoped<ErsatzTV.Application.Nounours.IContentCatalog, ErsatzTV.Application.Nounours.ContentCatalog>();
         services.AddScoped<ErsatzTV.Application.Nounours.IHabillageService, ErsatzTV.Application.Nounours.HabillageService>();
         services.AddScoped<ErsatzTV.Application.Nounours.IProgrammeService, ErsatzTV.Application.Nounours.ProgrammeService>();
+        services.AddScoped<ErsatzTV.Application.Nounours.IWeekTemplateService, ErsatzTV.Application.Nounours.WeekTemplateService>();
+        services.AddScoped<ErsatzTV.Application.Nounours.IFolderImportService, ErsatzTV.Application.Nounours.FolderImportService>();
+        services.AddScoped<ErsatzTV.Application.Nounours.IRegieService, ErsatzTV.Application.Nounours.RegieService>();
         services.AddScoped<ErsatzTV.Nounours.ChannelWizardService>();
         services.AddScoped<ErsatzTV.Nounours.UiPreferences>();
 
@@ -739,6 +746,8 @@ public class Startup
         }
 
         services.AddHostedService<ErsatzTV.Nounours.Plugins.PluginStartupService>();
+        services.AddSingleton<ErsatzTV.Nounours.Audience.AudienceTracker>();
+        services.AddHostedService<ErsatzTV.Nounours.Audience.AudienceSampler>();
     }
 
     private static void CustomServices(IServiceCollection services)

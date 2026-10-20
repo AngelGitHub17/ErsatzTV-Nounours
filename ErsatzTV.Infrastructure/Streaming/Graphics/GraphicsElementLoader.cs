@@ -221,7 +221,7 @@ public partial class GraphicsElementLoader(
         var epgEntries = 0;
 
         IEnumerable<PlayoutItemGraphicsElement> elementsWithEpg = elements.Where(e =>
-            e.GraphicsElement.Kind is GraphicsElementKind.Text or GraphicsElementKind.Subtitle
+            e.GraphicsElement.Kind is GraphicsElementKind.Text or GraphicsElementKind.Clock or GraphicsElementKind.Subtitle
                 or GraphicsElementKind.Motion or GraphicsElementKind.Script);
 
         foreach (var reference in elementsWithEpg)
