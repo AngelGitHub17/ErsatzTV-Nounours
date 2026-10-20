@@ -2,15 +2,15 @@
     <DialogContent>
         <MudContainer Class="mb-6">
             <MudText>
-                Edit the playout's external json file
+                Modifier le fichier JSON externe du playout
             </MudText>
         </MudContainer>
-        <MudTextField Label="External Json File" @bind-Value="_externalJsonFile"/>
+        <MudTextField Label="Fichier JSON externe" @bind-Value="_externalJsonFile"/>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="@Cancel" ButtonType="ButtonType.Reset">Cancel</MudButton>
+        <MudButton OnClick="@Cancel" ButtonType="ButtonType.Reset">Annuler</MudButton>
         <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(string.IsNullOrWhiteSpace(_externalJsonFile))" OnClick="@Submit">
-            Save Changes
+            Enregistrer les modifications
         </MudButton>
     </DialogActions>
 </MudDialog>

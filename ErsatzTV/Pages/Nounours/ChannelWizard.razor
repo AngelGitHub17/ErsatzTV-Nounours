@@ -1,0 +1,514 @@
+@page "/chaines/nouvelle"
+@using ErsatzTV.Application.FFmpegProfiles
+@using ErsatzTV.Application.Nounours
+@using ErsatzTV.Application.Watermarks
+@using ErsatzTV.Nounours
+@implements IDisposable
+@inject IMediator Mediator
+@inject ChannelWizardService WizardService
+@inject IContentCatalog ContentCatalog
+@inject IHabillageService HabillageService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>Nouvelle chaîne · ErsatzTV</PageTitle>
+
+<div class="n-page" style="height: 100%; overflow-y: auto; max-width: 1100px">
+    <div class="n-page-header">
+        <div>
+            <h1>Nouvelle chaîne</h1>
+            <p>Quatre étapes et c'est à l'antenne. Tout reste modifiable ensuite.</p>
+        </div>
+        <MudButton Href="channels/add" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Tune">Formulaire complet (avancé)</MudButton>
+    </div>
+
+    @if (_model is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary"/>
+    }
+    else if (_result is not null)
+    {
+        <div class="n-card" style="text-align: center; padding: 40px 24px">
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Style="font-size: 4rem"/>
+            <MudText Typo="Typo.h5" Class="mt-3">« @_model.Name » est créée !</MudText>
+            <MudText Class="n-muted mt-1">La grille se construit en arrière-plan ; elle sera visible dans le planning d'ici quelques secondes.</MudText>
+            <div class="mt-4 mb-4" style="display: inline-block; text-align: left">
+                @foreach (string step in _result.Steps)
+                {
+                    <div class="d-flex align-center gap-2 n-muted"><MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Color="Color.Success"/>@step</div>
+                }
+            </div>
+            <div class="d-flex gap-2 justify-center flex-wrap">
+                <MudButton Href="@($"planning?chaine={_result.ChannelId}")" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ViewTimeline">Voir le planning</MudButton>
+                <MudButton Href="" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.SpaceDashboard">Tableau de bord</MudButton>
+                <MudButton Href="@($"channels/{_result.ChannelId}")" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Edit">Réglages avancés</MudButton>
+                <MudButton OnClick="@Restart" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Add">Créer une autre chaîne</MudButton>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="n-wizard-steps">
+            @for (var i = 0; i < Steps.Length; i++)
+            {
+                int index = i;
+                <div class="n-step @(index == _step ? "is-active" : index < _step ? "is-done" : "")" @onclick="@(() => GoTo(index))">
+                    <b>@(index < _step ? "✓" : (index + 1).ToString(System.Globalization.CultureInfo.InvariantCulture))</b>@Steps[index]
+                </div>
+            }
+        </div>
+
+        <div class="n-card">
+            @switch (_step)
+            {
+                case 0:
+                    <MudText Typo="Typo.h6" Class="mb-4">Comment s'appelle votre chaîne ?</MudText>
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="8">
+                            <MudTextField @bind-Value="_model.Name" Label="Nom de la chaîne" Placeholder="ex. Nounours Ciné" Variant="Variant.Outlined" Required="true" AutoFocus="true"/>
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudTextField @bind-Value="_model.Number" Label="Numéro" Variant="Variant.Outlined" HelperText="ex. 12 ou 12.1"/>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_model.Group" Label="Groupe (bouquet)" Variant="Variant.Outlined" HelperText="Regroupe les chaînes dans les lecteurs IPTV"/>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_model.Categories" Label="Catégories" Variant="Variant.Outlined" HelperText="Séparées par des virgules (facultatif)"/>
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_model.LogoUrl" Label="Logo (adresse d'une image)" Variant="Variant.Outlined"
+                                          HelperText="Facultatif. Sans logo, un logo texte est généré automatiquement." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Image"/>
+                        </MudItem>
+                    </MudGrid>
+                    break;
+
+                case 1:
+                    <div class="d-flex justify-space-between align-center flex-wrap gap-2 mb-2">
+                        <MudText Typo="Typo.h6">Que diffuse-t-elle, et quand ?</MudText>
+                        <MudMenu Label="Partir d'un modèle" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.AutoAwesome" Dense="true">
+                            <MudMenuItem OnClick="@(() => ApplyTemplate("films"))">100 % films, en continu</MudMenuItem>
+                            <MudMenuItem OnClick="@(() => ApplyTemplate("series"))">Séries en continu (dans l'ordre)</MudMenuItem>
+                            <MudMenuItem OnClick="@(() => ApplyTemplate("soiree"))">Séries la journée, film à 21 h</MudMenuItem>
+                            <MudMenuItem OnClick="@(() => ApplyTemplate("clips"))">Clips musicaux aléatoires</MudMenuItem>
+                        </MudMenu>
+                    </div>
+                    <MudText Class="n-muted mb-4" Typo="Typo.body2">
+                        Chaque créneau dit <b>quoi</b> passer, <b>quand</b> (à la suite ou à heure fixe) et <b>combien</b>.
+                        Les créneaux à heure fixe se répètent tous les jours ; entre eux, le créneau précédent continue.
+                    </MudText>
+
+                    @for (var i = 0; i < _model.Slots.Count; i++)
+                    {
+                        WizardSlot slot = _model.Slots[i];
+                        int slotIndex = i;
+                        <div class="n-slot" @key="slot">
+                            <div class="d-flex align-center justify-space-between mb-2">
+                                <MudText Typo="Typo.subtitle2">Créneau @(slotIndex + 1)</MudText>
+                                <div>
+                                    <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small" Disabled="@(slotIndex == 0)" OnClick="@(() => Move(slotIndex, -1))"/>
+                                    <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small" Disabled="@(slotIndex == _model.Slots.Count - 1)" OnClick="@(() => Move(slotIndex, 1))"/>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" Disabled="@(_model.Slots.Count == 1)" OnClick="@(() => _model.Slots.RemoveAt(slotIndex))"/>
+                                </div>
+                            </div>
+                            <MudGrid Spacing="2">
+                                <MudItem xs="12" md="6">
+                                    <MudAutocomplete T="ContentChoice"
+                                                     Value="@ChoiceFor(slot)"
+                                                     ValueChanged="@(c => SetContent(slot, c))"
+                                                     SearchFunc="@SearchContent"
+                                                     ToStringFunc="@(c => c?.Label)"
+                                                     Label="Contenu"
+                                                     Variant="Variant.Outlined"
+                                                     ResetValueOnEmptyText="false"
+                                                     MaxItems="60"
+                                                     Strict="false"
+                                                     HelperText="Une série, une collection, une playlist… ou un préréglage">
+                                        <ItemTemplate Context="c">
+                                            <div>
+                                                <div>@c.Label</div>
+                                                <div class="n-muted" style="font-size: .75rem">@c.Detail</div>
+                                            </div>
+                                        </ItemTemplate>
+                                    </MudAutocomplete>
+                                    @if (slot.Kind == ContentSourceKind.Search && slot.Query is not ("type:movie" or "type:episode" or "type:music_video" or "type:other_video"))
+                                    {
+                                        <MudTextField @bind-Value="slot.Query" Label="Recherche (syntaxe ErsatzTV)" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"
+                                                      HelperText="ex. genre:comedy AND type:movie — une collection intelligente sera créée"/>
+                                    }
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <div class="d-flex gap-2 align-start">
+                                        <MudSelect T="bool" @bind-Value="slot.FixedStart" Label="Début" Variant="Variant.Outlined" Style="min-width: 150px">
+                                            <MudSelectItem T="bool" Value="false">À la suite</MudSelectItem>
+                                            <MudSelectItem T="bool" Value="true">À heure fixe</MudSelectItem>
+                                        </MudSelect>
+                                        @if (slot.FixedStart)
+                                        {
+                                            <MudTimePicker @bind-Time="slot.StartTime" Label="Heure" Variant="Variant.Outlined" AmPm="false" Style="max-width: 130px"/>
+                                        }
+                                    </div>
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <div class="d-flex gap-2 align-start">
+                                        <MudSelect T="WizardSlotMode" @bind-Value="slot.Mode" Label="Quantité" Variant="Variant.Outlined">
+                                            <MudSelectItem Value="WizardSlotMode.Flood">En continu (jusqu'au créneau suivant)</MudSelectItem>
+                                            <MudSelectItem Value="WizardSlotMode.One">Un seul programme</MudSelectItem>
+                                            <MudSelectItem Value="WizardSlotMode.Multiple">Plusieurs programmes</MudSelectItem>
+                                            <MudSelectItem Value="WizardSlotMode.Duration">Pendant une durée</MudSelectItem>
+                                        </MudSelect>
+                                        @if (slot.Mode == WizardSlotMode.Multiple)
+                                        {
+                                            <MudNumericField @bind-Value="slot.Count" Label="Nombre" Min="1" Max="50" Variant="Variant.Outlined" Style="max-width: 110px"/>
+                                        }
+                                        @if (slot.Mode == WizardSlotMode.Duration)
+                                        {
+                                            <MudNumericField @bind-Value="slot.DurationMinutes" Label="Minutes" Min="1" Max="1440" Variant="Variant.Outlined" Style="max-width: 110px"/>
+                                        }
+                                    </div>
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudSelect T="PlaybackOrder" @bind-Value="slot.Order" Label="Ordre de lecture" Variant="Variant.Outlined" Disabled="@(slot.Kind is ContentSourceKind.Playlist or ContentSourceKind.Programme)">
+                                        <MudSelectItem Value="PlaybackOrder.Shuffle">Mélangé (sans répétition)</MudSelectItem>
+                                        <MudSelectItem Value="PlaybackOrder.Chronological">Chronologique</MudSelectItem>
+                                        <MudSelectItem Value="PlaybackOrder.SeasonEpisode">Saison puis épisode</MudSelectItem>
+                                        <MudSelectItem Value="PlaybackOrder.Random">Totalement aléatoire</MudSelectItem>
+                                        <MudSelectItem Value="PlaybackOrder.ShuffleInOrder">Mélangé, mais chaque série dans l'ordre</MudSelectItem>
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12">
+                                    <MudTextField @bind-Value="slot.CustomTitle" Label="Titre dans le guide (facultatif)" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                                  HelperText="Remplace le titre des programmes de ce créneau dans l'EPG, ex. « Le film du soir »"/>
+                                </MudItem>
+                            </MudGrid>
+                        </div>
+                    }
+                    <MudButton OnClick="@AddSlot" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add">Ajouter un créneau</MudButton>
+                    break;
+
+                case 2:
+                    <MudText Typo="Typo.h6" Class="mb-4">Diffusion & habillage</MudText>
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="int" @bind-Value="_model.FFmpegProfileId" Label="Profil de diffusion" Variant="Variant.Outlined"
+                                       HelperText="Résolution, codec, accélération matérielle">
+                                @foreach (FFmpegProfileViewModel profile in _profiles)
+                                {
+                                    <MudSelectItem Value="@profile.Id">@profile.Name</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="StreamingMode" @bind-Value="_model.StreamingMode" Label="Format du flux" Variant="Variant.Outlined">
+                                <MudSelectItem Value="StreamingMode.TransportStreamHybrid">MPEG-TS (recommandé, compatible partout)</MudSelectItem>
+                                <MudSelectItem Value="StreamingMode.HttpLiveStreamingSegmenter">HLS (navigateurs, apps mobiles)</MudSelectItem>
+                                <MudSelectItem Value="StreamingMode.HttpLiveStreamingDirect">HLS direct (sans transcodage, sans habillage)</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" @bind-Value="_model.HabillageSlug" Label="Habillage (horloge, logo, bandeaux…)" Variant="Variant.Outlined"
+                                       HelperText="Créé dans le studio d'habillage">
+                                <MudSelectItem Value="@string.Empty">Aucun</MudSelectItem>
+                                @foreach (HabillageSummary scene in _scenes)
+                                {
+                                    <MudSelectItem Value="@scene.Slug">@scene.Name (@scene.Items calque(s))</MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudLink Href="habillage/nouveau" Target="_blank" Typo="Typo.body2" Class="mt-1 d-inline-block">+ Créer un habillage dans un nouvel onglet</MudLink>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="int?" @bind-Value="_model.WatermarkId" Label="Filigrane classique (logo d'angle)" Variant="Variant.Outlined">
+                                <MudSelectItem T="int?" Value="@((int?)null)">Aucun</MudSelectItem>
+                                @foreach (WatermarkViewModel watermark in _watermarks)
+                                {
+                                    <MudSelectItem T="int?" Value="@watermark.Id">@watermark.Name</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudSwitch T="bool" @bind-Value="_model.ShowInEpg" Color="Color.Primary" Label="Afficher dans le guide des programmes (XMLTV)"/>
+                            <MudSwitch T="bool" @bind-Value="_model.KeepMultiPartEpisodesTogether" Color="Color.Primary" Label="Garder ensemble les épisodes en plusieurs parties"/>
+                        </MudItem>
+                    </MudGrid>
+                    @if (_model.StreamingMode == StreamingMode.HttpLiveStreamingDirect && (!string.IsNullOrEmpty(_model.HabillageSlug) || _model.WatermarkId.HasValue))
+                    {
+                        <MudAlert Severity="Severity.Warning" Class="mt-3" Dense="true">Le mode HLS direct ne transcode pas : l'habillage et le filigrane ne seront pas affichés.</MudAlert>
+                    }
+                    break;
+
+                case 3:
+                    <MudText Typo="Typo.h6" Class="mb-4">Récapitulatif</MudText>
+                    <MudSimpleTable Dense="true" Style="background: transparent">
+                        <tbody>
+                        <tr><td class="n-muted" style="width: 220px">Chaîne</td><td><b>@_model.Number · @_model.Name</b> <span class="n-muted">(@_model.Group)</span></td></tr>
+                        <tr><td class="n-muted">Profil</td><td>@(_profiles.Find(p => p.Id == _model.FFmpegProfileId)?.Name)</td></tr>
+                        <tr><td class="n-muted">Habillage</td><td>@(string.IsNullOrEmpty(_model.HabillageSlug) ? "Aucun" : _scenes.Find(s => s.Slug == _model.HabillageSlug)?.Name)</td></tr>
+                        @for (var i = 0; i < _model.Slots.Count; i++)
+                        {
+                            WizardSlot slot = _model.Slots[i];
+                            <tr>
+                                <td class="n-muted">Créneau @(i + 1)</td>
+                                <td>
+                                    @(slot.FixedStart ? $"À {slot.StartTime:hh\\:mm}" : "À la suite") ·
+                                    <b>@(ChoiceFor(slot)?.Label ?? "contenu non choisi")</b> ·
+                                    @DescribeMode(slot)
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </MudSimpleTable>
+                    @if (_errors.Count > 0)
+                    {
+                        <MudAlert Severity="Severity.Error" Class="mt-4">
+                            @foreach (string error in _errors)
+                            {
+                                <div>@error</div>
+                            }
+                        </MudAlert>
+                    }
+                    @if (_busy)
+                    {
+                        <div class="mt-4">
+                            <MudProgressLinear Indeterminate="true" Color="Color.Primary"/>
+                            <MudText Class="n-muted mt-2" Typo="Typo.body2">@_progress</MudText>
+                        </div>
+                    }
+                    break;
+            }
+
+            <div class="d-flex justify-space-between mt-6">
+                <MudButton OnClick="@(() => GoTo(_step - 1))" Disabled="@(_step == 0 || _busy)" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">Retour</MudButton>
+                @if (_step < Steps.Length - 1)
+                {
+                    <MudButton OnClick="@(() => GoTo(_step + 1))" Variant="Variant.Filled" Color="Color.Primary" EndIcon="@Icons.Material.Filled.ArrowForward">Continuer</MudButton>
+                }
+                else
+                {
+                    <MudButton OnClick="@Create" Disabled="@_busy" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.RocketLaunch">Créer la chaîne</MudButton>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly string[] Steps = ["La chaîne", "Contenu & horaires", "Diffusion & habillage", "Récapitulatif"];
+
+    private readonly CancellationTokenSource _cts = new();
+    private ChannelWizardModel _model;
+    private ChannelWizardResult _result;
+    private int _step;
+    private bool _busy;
+    private string _progress;
+    private List<string> _errors = [];
+    private List<ContentChoice> _choices = [];
+    private List<FFmpegProfileViewModel> _profiles = [];
+    private List<WatermarkViewModel> _watermarks = [];
+    private List<HabillageSummary> _scenes = [];
+
+    private sealed record ContentChoice(ContentSourceKind Kind, int? Id, string Query, string Label, string Detail);
+
+    private static readonly ContentChoice[] Presets =
+    [
+        new(ContentSourceKind.Search, null, "type:movie", "Tous les films", "Préréglage · toute la médiathèque"),
+        new(ContentSourceKind.Search, null, "type:episode", "Tous les épisodes de séries", "Préréglage · toute la médiathèque"),
+        new(ContentSourceKind.Search, null, "type:music_video", "Tous les clips musicaux", "Préréglage · toute la médiathèque"),
+        new(ContentSourceKind.Search, null, "type:other_video", "Toutes les autres vidéos", "Préréglage · toute la médiathèque"),
+        new(ContentSourceKind.Search, null, "", "Recherche personnalisée…", "Crée une collection intelligente à partir d'une recherche")
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        CancellationToken token = _cts.Token;
+        _model = await WizardService.CreateDefaults(token);
+        _profiles = await Mediator.Send(new GetAllFFmpegProfiles(), token);
+        _watermarks = await Mediator.Send(new GetAllWatermarks(), token);
+        _scenes = await HabillageService.GetAll(token);
+
+        List<ContentOption> options = await ContentCatalog.GetAll(token);
+        _choices = Presets
+            .Concat(options.Select(o => new ContentChoice(o.Kind, o.Id, null, o.Name, o.Detail)))
+            .ToList();
+    }
+
+    private Task<IEnumerable<ContentChoice>> SearchContent(string text, CancellationToken token)
+    {
+        IEnumerable<ContentChoice> result = string.IsNullOrWhiteSpace(text)
+            ? _choices
+            : _choices.Where(c => c.Label.Contains(text, StringComparison.CurrentCultureIgnoreCase) ||
+                                  c.Detail.Contains(text, StringComparison.CurrentCultureIgnoreCase));
+        return Task.FromResult(result);
+    }
+
+    private ContentChoice ChoiceFor(WizardSlot slot)
+    {
+        if (slot.Kind == ContentSourceKind.Search)
+        {
+            return Presets.FirstOrDefault(p => p.Query == slot.Query) ??
+                   new ContentChoice(ContentSourceKind.Search, null, slot.Query, $"Recherche : {slot.Query}", "Collection intelligente");
+        }
+
+        return _choices.Find(c => c.Kind == slot.Kind && c.Id == slot.ContentId);
+    }
+
+    private static void SetContent(WizardSlot slot, ContentChoice choice)
+    {
+        if (choice is null)
+        {
+            return;
+        }
+
+        slot.Kind = choice.Kind;
+        slot.ContentId = choice.Id;
+        slot.ContentName = choice.Kind == ContentSourceKind.Search ? string.Empty : choice.Label;
+        slot.Query = choice.Kind == ContentSourceKind.Search ? choice.Query ?? string.Empty : null;
+
+        if (choice.Kind == ContentSourceKind.Show)
+        {
+            slot.Order = PlaybackOrder.SeasonEpisode;
+        }
+    }
+
+    private void AddSlot() =>
+        _model.Slots.Add(new WizardSlot { FixedStart = _model.Slots.Any(s => s.FixedStart) });
+
+    private void Move(int index, int delta)
+    {
+        WizardSlot slot = _model.Slots[index];
+        _model.Slots.RemoveAt(index);
+        _model.Slots.Insert(index + delta, slot);
+    }
+
+    private void ApplyTemplate(string name)
+    {
+        _model.Slots = name switch
+        {
+            "series" => [new WizardSlot { Query = "type:episode", Order = PlaybackOrder.ShuffleInOrder }],
+            "soiree" =>
+            [
+                new WizardSlot { Query = "type:episode", FixedStart = true, StartTime = new TimeSpan(6, 0, 0), Order = PlaybackOrder.ShuffleInOrder },
+                new WizardSlot { Query = "type:movie", FixedStart = true, StartTime = new TimeSpan(21, 0, 0), Mode = WizardSlotMode.One, CustomTitle = "Le film du soir" },
+                new WizardSlot { Query = "type:episode", Mode = WizardSlotMode.Flood, Order = PlaybackOrder.Shuffle }
+            ],
+            "clips" => [new WizardSlot { Query = "type:music_video", Order = PlaybackOrder.Random }],
+            _ => [new WizardSlot { Query = "type:movie", Order = PlaybackOrder.Shuffle }]
+        };
+    }
+
+    private static string DescribeMode(WizardSlot slot) =>
+        slot.Mode switch
+        {
+            WizardSlotMode.One => "1 programme",
+            WizardSlotMode.Multiple => $"{slot.Count} programmes",
+            WizardSlotMode.Duration => $"pendant {slot.DurationMinutes} min",
+            _ => "en continu"
+        };
+
+    private void GoTo(int step)
+    {
+        if (step < 0 || step >= Steps.Length || _busy)
+        {
+            return;
+        }
+
+        if (step > _step)
+        {
+            List<string> errors = Validate(_step);
+            if (errors.Count > 0)
+            {
+                foreach (string error in errors)
+                {
+                    Snackbar.Add(error, Severity.Warning);
+                }
+
+                return;
+            }
+        }
+
+        _errors.Clear();
+        _step = step;
+    }
+
+    private List<string> Validate(int step)
+    {
+        var errors = new List<string>();
+        if (step == 0)
+        {
+            if (string.IsNullOrWhiteSpace(_model.Name))
+            {
+                errors.Add("Donnez un nom à la chaîne.");
+            }
+
+            if (!System.Text.RegularExpressions.Regex.IsMatch(_model.Number ?? string.Empty, ErsatzTV.Core.Domain.Channel.NumberValidator))
+            {
+                errors.Add("Le numéro doit ressembler à 12 ou 12.1");
+            }
+        }
+
+        if (step == 1)
+        {
+            for (var i = 0; i < _model.Slots.Count; i++)
+            {
+                WizardSlot slot = _model.Slots[i];
+                if (slot.Kind == ContentSourceKind.Search ? string.IsNullOrWhiteSpace(slot.Query) : !slot.ContentId.HasValue)
+                {
+                    errors.Add($"Créneau {i + 1} : choisissez un contenu.");
+                }
+
+                if (slot.FixedStart && !slot.StartTime.HasValue)
+                {
+                    errors.Add($"Créneau {i + 1} : indiquez l'heure de début.");
+                }
+            }
+
+            var fixedTimes = _model.Slots.Where(s => s.FixedStart).Select(s => s.StartTime).ToList();
+            if (fixedTimes.Count != fixedTimes.Distinct().Count())
+            {
+                errors.Add("Deux créneaux commencent à la même heure.");
+            }
+        }
+
+        return errors;
+    }
+
+    private async Task Create()
+    {
+        _errors = Enumerable.Range(0, 3).SelectMany(Validate).ToList();
+        if (_errors.Count > 0)
+        {
+            return;
+        }
+
+        _busy = true;
+        var progress = new Progress<string>(message =>
+        {
+            _progress = message;
+            InvokeAsync(StateHasChanged);
+        });
+
+        Either<BaseError, ChannelWizardResult> result = await WizardService.Create(_model, progress, _cts.Token);
+        _busy = false;
+
+        result.Match(
+            ok =>
+            {
+                _result = ok;
+                Snackbar.Add($"Chaîne « {_model.Name} » créée", Severity.Success);
+            },
+            error => _errors = [$"La création a échoué : {error.Value}. Rien n'a été conservé, vous pouvez corriger et réessayer."]);
+    }
+
+    private async Task Restart()
+    {
+        _result = null;
+        _step = 0;
+        _model = await WizardService.CreateDefaults(_cts.Token);
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+
+}

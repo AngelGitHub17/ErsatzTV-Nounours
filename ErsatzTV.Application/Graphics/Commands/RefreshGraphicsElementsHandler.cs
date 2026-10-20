@@ -123,6 +123,26 @@ public class RefreshGraphicsElementsHandler(
             await dbContext.AddAsync(graphicsElement, cancellationToken);
         }
 
+        // add new clock elements
+        var newClockPaths = localFileSystem.ListFiles(FileSystemLayout.GraphicsElementsClockTemplatesFolder, "*.yml", "*.yaml")
+            .Where(f => allExisting.All(e => e.Path != f))
+            .ToList();
+
+        foreach (string path in newClockPaths)
+        {
+            logger.LogDebug("Adding new graphics element from file {File}", path);
+
+            var graphicsElement = new GraphicsElement
+            {
+                Path = path,
+                Kind = GraphicsElementKind.Clock
+            };
+
+            await TryRefreshName(graphicsElement, cancellationToken);
+
+            await dbContext.AddAsync(graphicsElement, cancellationToken);
+        }
+
         // add new script elements
         var newScriptPaths = localFileSystem.ListFiles(FileSystemLayout.GraphicsElementsScriptTemplatesFolder, "*.yml", "*.yaml")
             .Where(f => allExisting.All(e => e.Path != f))

@@ -1,4 +1,4 @@
-@page "/system/troubleshooting/sequential-schedule"
+﻿@page "/system/troubleshooting/sequential-schedule"
 @using ErsatzTV.Core.Interfaces.Scheduling
 @implements IDisposable
 @inject ISequentialScheduleValidator SequentialScheduleValidator
@@ -6,24 +6,24 @@
 <MudForm Style="max-height: 100%">
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
-            <MudText Typo="Typo.h5" Class="mb-2">Sequential Schedule Validation</MudText>
+            <MudText Typo="Typo.h5" Class="mb-2">Validation de planning séquentiel</MudText>
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>YAML File</MudText>
+                    <MudText>Fichier YAML</MudText>
                 </div>
                 <MudTextField T="string" Value="_yamlFile" ValueChanged="@(async x => await OnYamlFileChanged(x))"/>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Schema</MudText>
+                    <MudText>Schéma</MudText>
                 </div>
                 <MudSelect @bind-Value="_isImport">
-                    <MudSelectItem Value="@false">Full</MudSelectItem>
-                    <MudSelectItem Value="@true">Import</MudSelectItem>
+                    <MudSelectItem Value="@false">Complet</MudSelectItem>
+                    <MudSelectItem Value="@true">Importer</MudSelectItem>
                 </MudSelect>
             </MudStack>
-            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Validate</MudText>
+            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Valider</MudText>
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex"></div>
@@ -32,7 +32,7 @@
                            StartIcon="@Icons.Material.Filled.Checklist"
                            OnClick="@ValidateYaml"
                            Disabled="@(!_exists)">
-                    Validate
+                    Valider
                 </MudButton>
             </MudStack>
             <MudTabs Class="mb-6">

@@ -1,4 +1,4 @@
-@page "/playouts"
+﻿@page "/playouts"
 @using System.Globalization
 @using ErsatzTV.Application.Configuration
 @using ErsatzTV.Application.Playouts
@@ -20,29 +20,29 @@
             <div style="margin-left: auto" class="d-none d-md-flex">
                 <MudMenu>
                     <ActivatorContent>
-                        <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" OnClick="@context.ToggleAsync">Add Playout</MudButton>
+                        <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" OnClick="@context.ToggleAsync">Ajouter un playout</MudButton>
                     </ActivatorContent>
                     <ChildContent>
-                        <MudMenuItem Icon="@Icons.Material.Filled.Add" Label="Classic Schedule" Href="playouts/add"/>
-                        <MudMenuItem Icon="@Icons.Material.Filled.Add" Label="Block Schedule" Href="@($"playouts/add/{PlayoutKind.Block}")"/>
-                        <MudMenuItem Icon="@Icons.Material.Filled.Add" Label="Sequential Schedule" Href="@($"playouts/add/{PlayoutKind.Sequential}")"/>
-                        <MudMenuItem Icon="@Icons.Material.Filled.Add" Label="Scripted Schedule" Href="@($"playouts/add/{PlayoutKind.Scripted}")"/>
-                        <MudMenuItem Icon="@Icons.Material.Filled.Warning" Label="JSON (dizqueTV) Schedule" Href="@($"playouts/add/{PlayoutKind.ExternalJson}")"/>
+                        <MudMenuItem Icon="@Icons.Material.Filled.Add" Label="Planning classique" Href="playouts/add"/>
+                        <MudMenuItem Icon="@Icons.Material.Filled.Add" Label="Planning par blocs" Href="@($"playouts/add/{PlayoutKind.Block}")"/>
+                        <MudMenuItem Icon="@Icons.Material.Filled.Add" Label="Planning séquentiel" Href="@($"playouts/add/{PlayoutKind.Sequential}")"/>
+                        <MudMenuItem Icon="@Icons.Material.Filled.Add" Label="Planning scripté" Href="@($"playouts/add/{PlayoutKind.Scripted}")"/>
+                        <MudMenuItem Icon="@Icons.Material.Filled.Warning" Label="Planning JSON (dizqueTV)" Href="@($"playouts/add/{PlayoutKind.ExternalJson}")"/>
                     </ChildContent>
                 </MudMenu>
                 <MudButton Class="ml-3" Variant="Variant.Filled" Color="Color.Warning" StartIcon="@Icons.Material.Filled.Refresh" OnClick="@ResetAllPlayouts">
-                    Reset All Playouts
+                    Réinitialiser tous les playouts
                 </MudButton>
             </div>
             <div style="align-items: center; display: flex; margin-left: auto;" class="d-md-none">
                 <div class="flex-grow-1"></div>
                 <MudMenu Icon="@Icons.Material.Filled.MoreVert">
-                    <MudMenuItem Icon="@Icons.Material.Filled.Add" Label="Add Classic Playout" Href="playouts/add"/>
-                    <MudMenuItem Icon="@Icons.Material.Filled.Add" Label="Add Block Playout" Href="@($"playouts/add/{PlayoutKind.Block}")"/>
-                    <MudMenuItem Icon="@Icons.Material.Filled.Add" Label="Add Sequential Playout" Href="@($"playouts/add/{PlayoutKind.Sequential}")"/>
-                    <MudMenuItem Icon="@Icons.Material.Filled.Add" Label="Add Scripted Playout" Href="@($"playouts/add/{PlayoutKind.Scripted}")"/>
-                    <MudMenuItem Icon="@Icons.Material.Filled.Warning" Label="Add JSON (dizqueTV) Playout" Href="@($"playouts/add/{PlayoutKind.ExternalJson}")"/>
-                    <MudMenuItem Icon="@Icons.Material.Filled.Refresh" Label="Reset All Playouts" OnClick="@ResetAllPlayouts"/>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Add" Label="Ajouter un playout classique" Href="playouts/add"/>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Add" Label="Ajouter un playout par blocs" Href="@($"playouts/add/{PlayoutKind.Block}")"/>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Add" Label="Ajouter un playout séquentiel" Href="@($"playouts/add/{PlayoutKind.Sequential}")"/>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Add" Label="Ajouter un playout scripté" Href="@($"playouts/add/{PlayoutKind.Scripted}")"/>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Warning" Label="Ajouter un playout JSON (dizqueTV)" Href="@($"playouts/add/{PlayoutKind.ExternalJson}")"/>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Refresh" Label="Réinitialiser tous les playouts" OnClick="@ResetAllPlayouts"/>
                 </MudMenu>
             </div>
         </div>
@@ -69,7 +69,7 @@
                 <ToolBarContent>
                     <MudTextField T="string"
                                   ValueChanged="@(s => OnSearch(s))"
-                                  Placeholder="Search for playouts"
+                                  Placeholder="Rechercher des playouts"
                                   Adornment="Adornment.Start"
                                   AdornmentIcon="@Icons.Material.Filled.FilterList"
                                   Clearable="true">
@@ -77,12 +77,12 @@
                 </ToolBarContent>
                 <HeaderContent>
                     <MudTh>
-                        Channel
+                        Chaîne
                     </MudTh>
                     <MudTh Class="d-none d-md-table-cell">
-                        Default Schedule
+                        Planning par défaut
                     </MudTh>
-                    <MudTh Class="d-none d-md-table-cell">Schedule Kind</MudTh>
+                    <MudTh Class="d-none d-md-table-cell">Type de planning</MudTh>
                     <MudTh/>
                 </HeaderContent>
                 <RowTemplate>
@@ -103,13 +103,13 @@
                         @switch (context.ScheduleKind)
                         {
                             case PlayoutScheduleKind.Block:
-                                <span>Block</span>
+                                <span>Bloc</span>
                                 break;
                             case PlayoutScheduleKind.Sequential:
-                                <span>Sequential</span>
+                                <span>Séquentiel</span>
                                 break;
                             case PlayoutScheduleKind.Scripted:
-                                <span>Scripted</span>
+                                <span>Scripté</span>
                                 break;
                             case PlayoutScheduleKind.ExternalJson:
                                 <span>JSON (dizqueTV)</span>
@@ -129,19 +129,19 @@
                             </div>
                             @if (context.ScheduleKind == PlayoutScheduleKind.Classic)
                             {
-                                <MudTooltip Text="Edit Playout">
+                                <MudTooltip Text="Modifier le playout">
                                     <MudIconButton Icon="@Icons.Material.Filled.Edit"
                                                    Disabled="@EntityLocker.IsPlayoutLocked(context.PlayoutId)"
                                                    Href="@($"playouts/classic/{context.PlayoutId}")">
                                     </MudIconButton>
                                 </MudTooltip>
-                                <MudTooltip Text="Refresh Playout">
+                                <MudTooltip Text="Actualiser le playout">
                                     <MudIconButton Icon="@Icons.Material.Filled.Refresh"
                                                    Disabled="@EntityLocker.IsPlayoutLocked(context.PlayoutId)"
                                                    OnClick="@(_ => ResetPlayout(context))">
                                     </MudIconButton>
                                 </MudTooltip>
-                                <MudTooltip Text="Schedule Reset">
+                                <MudTooltip Text="Programmer la réinitialisation">
                                     <MudIconButton Icon="@Icons.Material.Filled.Update"
                                                    Disabled="@EntityLocker.IsPlayoutLocked(context.PlayoutId)"
                                                    OnClick="@(_ => ScheduleReset(context))">
@@ -150,7 +150,7 @@
                             }
                             else if (context.ScheduleKind == PlayoutScheduleKind.ExternalJson)
                             {
-                                <MudTooltip Text="Edit External Json File">
+                                <MudTooltip Text="Modifier le fichier JSON externe">
                                     <MudIconButton Icon="@Icons.Material.Filled.Edit"
                                                    Disabled="@EntityLocker.IsPlayoutLocked(context.PlayoutId)"
                                                    OnClick="@(_ => EditExternalJsonFile(context))">
@@ -161,13 +161,13 @@
                             }
                             else if (context.ScheduleKind == PlayoutScheduleKind.Sequential)
                             {
-                                <MudTooltip Text="Edit Playout">
+                                <MudTooltip Text="Modifier le playout">
                                     <MudIconButton Icon="@Icons.Material.Filled.Edit"
                                                    Disabled="@EntityLocker.IsPlayoutLocked(context.PlayoutId)"
                                                    Href="@($"playouts/sequential/{context.PlayoutId}")">
                                     </MudIconButton>
                                 </MudTooltip>
-                                <MudTooltip Text="Reset Playout">
+                                <MudTooltip Text="Réinitialiser le playout">
                                     <MudIconButton Icon="@Icons.Material.Filled.Refresh"
                                                    Disabled="@EntityLocker.IsPlayoutLocked(context.PlayoutId)"
                                                    OnClick="@(_ => ResetPlayout(context))">
@@ -177,13 +177,13 @@
                             }
                             else if (context.ScheduleKind == PlayoutScheduleKind.Scripted)
                             {
-                                <MudTooltip Text="Edit Playout">
+                                <MudTooltip Text="Modifier le playout">
                                     <MudIconButton Icon="@Icons.Material.Filled.Edit"
                                                    Disabled="@EntityLocker.IsPlayoutLocked(context.PlayoutId)"
                                                    Href="@($"playouts/scripted/{context.PlayoutId}")">
                                     </MudIconButton>
                                 </MudTooltip>
-                                <MudTooltip Text="Reset Playout">
+                                <MudTooltip Text="Réinitialiser le playout">
                                     <MudIconButton Icon="@Icons.Material.Filled.Refresh"
                                                    Disabled="@EntityLocker.IsPlayoutLocked(context.PlayoutId)"
                                                    OnClick="@(_ => ResetPlayout(context))">
@@ -193,13 +193,13 @@
                             }
                             else if (context.ScheduleKind == PlayoutScheduleKind.Block)
                             {
-                                <MudTooltip Text="Edit Playout">
+                                <MudTooltip Text="Modifier le playout">
                                     <MudIconButton Icon="@Icons.Material.Filled.Edit"
                                                    Disabled="@EntityLocker.IsPlayoutLocked(context.PlayoutId)"
                                                    Href="@($"playouts/block/{context.PlayoutId}")">
                                     </MudIconButton>
                                 </MudTooltip>
-                                <MudTooltip Text="Refresh Playout">
+                                <MudTooltip Text="Actualiser le playout">
                                     <MudIconButton Icon="@Icons.Material.Filled.Refresh"
                                                    Disabled="@EntityLocker.IsPlayoutLocked(context.PlayoutId)"
                                                    OnClick="@(_ => ResetPlayout(context))">
@@ -207,7 +207,7 @@
                                 </MudTooltip>
                                 <div style="width: 48px"></div>
                             }
-                            <MudTooltip Text="Delete Playout">
+                            <MudTooltip Text="Supprimer le playout">
                                 <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                                Disabled="@EntityLocker.IsPlayoutLocked(context.PlayoutId)"
                                                OnClick="@(_ => DeletePlayout(context))">
@@ -217,12 +217,12 @@
                     </MudTd>
                 </RowTemplate>
                 <PagerContent>
-                    <MudTablePager/>
+                    <MudTablePager InfoFormat="{first_item}-{last_item} sur {all_items}"/>
                 </PagerContent>
             </MudTable>
             @if (_selectedPlayoutId != null)
             {
-                <MudText Typo="Typo.h5" Class="mt-10 mb-2">Playout Detail</MudText>
+                <MudText Typo="Typo.h5" Class="mt-10 mb-2">Détail du playout</MudText>
                 <MudDivider Class="mb-6"/>
                 @if (!string.IsNullOrWhiteSpace(_buildMessage))
                 {
@@ -237,25 +237,25 @@
                               @ref="_detailTable"
                               RowClassFunc="PlayoutItemViewRowClassFunc">
                         <ToolBarContent>
-                            <MudSwitch T="bool" Class="ml-6" @bind-Value="@ShowFiller" Color="Color.Secondary" Label="Show Filler"/>
+                            <MudSwitch T="bool" Class="ml-6" @bind-Value="@ShowFiller" Color="Color.Secondary" Label="Afficher le remplissage"/>
                         </ToolBarContent>
                         <HeaderContent>
-                            <MudTh>Start</MudTh>
-                            <MudTh>Finish</MudTh>
-                            <MudTh>Media Item</MudTh>
-                            <MudTh>Duration</MudTh>
+                            <MudTh>Début</MudTh>
+                            <MudTh>Fin</MudTh>
+                            <MudTh>Élément de médiathèque</MudTh>
+                            <MudTh>Durée</MudTh>
                             <MudTh />
                         </HeaderContent>
                         <RowTemplate>
-                            <MudTd DataLabel="Start">@context.Start.ToString("G", _dtf)</MudTd>
-                            <MudTd DataLabel="Finish">@context.Finish.ToString("G", _dtf)</MudTd>
-                            <MudTd DataLabel="Media Item">@context.Title</MudTd>
-                            <MudTd DataLabel="Duration">@context.Duration</MudTd>
+                            <MudTd DataLabel="Début">@context.Start.ToString("G", _dtf)</MudTd>
+                            <MudTd DataLabel="Fin">@context.Finish.ToString("G", _dtf)</MudTd>
+                            <MudTd DataLabel="Élément de médiathèque">@context.Title</MudTd>
+                            <MudTd DataLabel="Durée">@context.Duration</MudTd>
                             <MudTd>
                                 @if (!string.IsNullOrWhiteSpace(context.SchedulingContext))
                                 {
                                     <div style="align-items: center; display: flex;">
-                                        <MudTooltip Text="Troubleshoot">
+                                        <MudTooltip Text="Dépanner">
                                             <MudIconButton Icon="@Icons.Material.Filled.Info"
                                                            OnClick="@(_ => ShowSchedulingContext(context))">
                                             </MudIconButton>
@@ -265,7 +265,7 @@
                             </MudTd>
                         </RowTemplate>
                         <PagerContent>
-                            <MudTablePager/>
+                            <MudTablePager InfoFormat="{first_item}-{last_item} sur {all_items}"/>
                         </PagerContent>
                     </MudTable>
                 }
@@ -383,7 +383,7 @@
         var parameters = new DialogParameters { { "ScheduleFile", $"{playout.ScheduleFile}" } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraLarge };
 
-        IDialogReference dialog = await Dialog.ShowAsync<EditExternalJsonFileDialog>("Edit External Json File", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<EditExternalJsonFileDialog>("Modifier le fichier JSON externe", parameters, options);
         DialogResult result = await dialog.Result;
         if (result is { Canceled: false })
         {
@@ -402,7 +402,7 @@
         var parameters = new DialogParameters { { "EntityType", "playout" }, { "EntityName", $"{playout.ScheduleName} on {playout.ChannelNumber} - {playout.ChannelName}" } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        IDialogReference dialog = await Dialog.ShowAsync<DeleteDialog>("Delete Playout", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<DeleteDialog>("Supprimer le playout", parameters, options);
         DialogResult result = await dialog.Result;
         if (result is { Canceled: false })
         {
@@ -447,7 +447,7 @@
         };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        IDialogReference dialog = await Dialog.ShowAsync<SchedulePlayoutReset>("Schedule Playout Reset", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<SchedulePlayoutReset>("Programmer la réinitialisation", parameters, options);
         await dialog.Result;
 
         if (_table != null)

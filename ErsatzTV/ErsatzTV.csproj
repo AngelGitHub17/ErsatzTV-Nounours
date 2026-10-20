@@ -70,6 +70,7 @@
         <ProjectReference Include="..\ErsatzTV.Infrastructure\ErsatzTV.Infrastructure.csproj" />
         <ProjectReference Include="..\ErsatzTV.Core.Nullable\ErsatzTV.Core.Nullable.csproj" />
         <ProjectReference Include="..\ErsatzTV.Scanner\ErsatzTV.Scanner.csproj" />
+        <ProjectReference Include="..\ErsatzTV.Plugins\ErsatzTV.Plugins.csproj" />
     </ItemGroup>
 
     <ItemGroup>

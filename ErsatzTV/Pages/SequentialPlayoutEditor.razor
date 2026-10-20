@@ -12,7 +12,7 @@
 <MudForm Style="max-height: 100%">
     <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
         <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-6" OnClick="@(_ => SaveChanges())" StartIcon="@Icons.Material.Filled.Save">
-            Save Sequential Schedule
+            Enregistrer le planning séquentiel
         </MudButton>
     </MudPaper>
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
@@ -21,7 +21,7 @@
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Sequential Schedule</MudText>
+                    <MudText>Planning séquentiel</MudText>
                 </div>
                 @if (_playout is not null)
                 {
@@ -32,10 +32,10 @@
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Playout Items and History</MudText>
+                    <MudText>Éléments et historique du playout</MudText>
                 </div>
                 <MudButton Disabled="@EntityLocker.IsPlayoutLocked(Id)" Variant="Variant.Filled" Color="Color.Error" OnClick="@(_ => EraseItems(eraseHistory: true))" StartIcon="@Icons.Material.Filled.Delete">
-                    Erase Items and History
+                    Effacer les éléments et l'historique
                 </MudButton>
             </MudStack>
         </MudContainer>
@@ -95,7 +95,7 @@
         IRequest request = eraseHistory ? new ErasePlayoutHistory(Id) : new ErasePlayoutItems(Id);
         await Mediator.Send(request, _cts.Token);
 
-        string message = eraseHistory ? "Erased playout items and history" : "Erased playout items";
+        string message = eraseHistory ? "Éléments et historique du playout effacés" : "Éléments du playout effacés";
         Snackbar.Add(message, Severity.Info);
     }
 
@@ -110,10 +110,10 @@
             await Mediator.Send(new UpdateSequentialPlayout(_playout.PlayoutId, _playout.ScheduleFile), _cts.Token);
 
         result.Match(
-            _ => { Snackbar.Add($"Saved sequential schedule for playout {_channelName}", Severity.Success); },
+            _ => { Snackbar.Add($"Planning séquentiel enregistré pour {_channelName}", Severity.Success); },
             error =>
             {
-                Snackbar.Add($"Unexpected error saving sequential schedule: {error.Value}", Severity.Error);
+                Snackbar.Add($"Erreur à l'enregistrement du planning séquentiel : {error.Value}", Severity.Error);
                 Logger.LogError("Unexpected error saving sequential schedule: {Error}", error.Value);
             });
     }

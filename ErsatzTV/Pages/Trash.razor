@@ -21,21 +21,21 @@
                            Color="Color.Error"
                            StartIcon="@Icons.Material.Filled.Delete"
                            OnClick="@(_ => DeleteFromDatabase())">
-                    Delete From Database
+                    Supprimer de la base de données
                 </MudButton>
                 <MudButton Class="ml-3"
                            Variant="Variant.Filled"
                            Color="Color.Secondary"
                            StartIcon="@Icons.Material.Filled.Check"
                            OnClick="@(_ => ClearSelection())">
-                    Clear Selection
+                    Effacer la sélection
                 </MudButton>
             </div>
             <div style="align-items: center; display: flex; margin-left: auto;" class="d-md-none">
                 <div class="flex-grow-1"></div>
                 <MudMenu Icon="@Icons.Material.Filled.MoreVert">
-                    <MudMenuItem Icon="@Icons.Material.Filled.Delete" Label="Delete From Database" OnClick="DeleteFromDatabase"/>
-                    <MudMenuItem Icon="@Icons.Material.Filled.Check" Label="Clear Selection" OnClick="ClearSelection"/>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Delete" Label="Supprimer de la base de données" OnClick="DeleteFromDatabase"/>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Check" Label="Effacer la sélection" OnClick="ClearSelection"/>
                 </MudMenu>
             </div>
         }
@@ -97,14 +97,14 @@
                            StartIcon="@Icons.Material.Filled.SelectAll"
                            Disabled="@(!IsNotEmpty)"
                            OnClick="@(_ => SelectAllPageItems(AllCardsOnPage()))">
-                    Select All
+                    Tout sélectionner
                 </MudButton>
                 <MudButton Class="ml-3"
                            Variant="@Variant.Filled"
                            Color="@Color.Error"
                            StartIcon="@Icons.Material.Filled.DeleteForever"
                            OnClick="@(_ => EmptyTrash())">
-                    Empty Trash
+                    Vider la corbeille
                 </MudButton>
             </div>
             <div style="align-items: center; display: flex; width: 100%" class="d-md-none">
@@ -114,20 +114,20 @@
                            StartIcon="@Icons.Material.Filled.SelectAll"
                            Disabled="@(!IsNotEmpty)"
                            OnClick="@(_ => SelectAllPageItems(AllCardsOnPage()))">
-                    Select All
+                    Tout sélectionner
                 </MudButton>
                 <MudButton Class="ml-2"
                            Variant="@Variant.Filled"
                            Color="@Color.Error"
                            StartIcon="@Icons.Material.Filled.DeleteForever"
                            OnClick="@(_ => EmptyTrash())">
-                    Empty Trash
+                    Vider la corbeille
                 </MudButton>
             </div>
         }
         else
         {
-            <MudText>Nothing to see here...</MudText>
+            <MudText>Rien à voir ici…</MudText>
         }
     </div>
 </MudPaper>
@@ -191,7 +191,7 @@
         {
             <div class="mb-4" style="align-items: baseline; display: flex; flex-direction: row;">
                 <MudText Typo="Typo.h4" UserAttributes="@(new Dictionary<string, object> { { "id", "seasons" } })">
-                    Seasons
+                    Saisons
                 </MudText>
                 @if (_seasons.Count > 50)
                 {
@@ -274,7 +274,7 @@
         {
             <div class="mb-4" style="align-items: baseline; display: flex; flex-direction: row;">
                 <MudText Typo="Typo.h4" UserAttributes="@(new Dictionary<string, object> { { "id", "music_videos" } })">
-                    Music Videos
+                    Clips
                 </MudText>
                 @if (_musicVideos.Count > 50)
                 {
@@ -302,7 +302,7 @@
         {
             <div class="mb-4" style="align-items: baseline; display: flex; flex-direction: row;">
                 <MudText Typo="Typo.h4" UserAttributes="@(new Dictionary<string, object> { { "id", "other_videos" } })">
-                    Other Videos
+                    Autres vidéos
                 </MudText>
                 @if (_otherVideos.Count > 50)
                 {
@@ -386,7 +386,7 @@
         {
             <div class="mb-4" style="align-items: baseline; display: flex; flex-direction: row;">
                 <MudText Typo="Typo.h4" UserAttributes="@(new Dictionary<string, object> { { "id", "remote_streams" } })">
-                    Remote Streams
+                    Flux distants
                 </MudText>
                 @if (_remoteStreams.Count > 50)
                 {
@@ -708,7 +708,7 @@
             { { "EntityType", count.ToString() }, { "EntityName", entityName } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        IDialogReference dialog = await Dialog.ShowAsync<DeleteFromDatabaseDialog>("Delete From Database", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<DeleteFromDatabaseDialog>("Supprimer de la base de données", parameters, options);
         DialogResult result = await dialog.Result;
         if (result is { Canceled: false })
         {
@@ -730,13 +730,13 @@
             await addResult.Match(
                 Left: error =>
                 {
-                    Snackbar.Add($"Unexpected error deleting items from database: {error.Value}");
+                    Snackbar.Add($"Erreur lors de la suppression en base : {error.Value}");
                     Logger.LogError("Unexpected error deleting items from database: {Error}", error.Value);
                     return Task.CompletedTask;
                 },
                 Right: async _ =>
                 {
-                    Snackbar.Add($"Deleted {count} items from the database", Severity.Success);
+                    Snackbar.Add($"{count} élément(s) supprimé(s) de la base", Severity.Success);
                     ClearSelection();
                     await RefreshData(cts.Token);
                 });
@@ -800,7 +800,7 @@
         var parameters = new DialogParameters { { "EntityType", entityType }, { "EntityName", entityName } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        IDialogReference dialog = await Dialog.ShowAsync<DeleteFromDatabaseDialog>("Delete From Database", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<DeleteFromDatabaseDialog>("Supprimer de la base de données", parameters, options);
         DialogResult result = await dialog.Result;
         if (result is not null && !result.Canceled)
         {
@@ -819,7 +819,7 @@
         var parameters = new DialogParameters { { "EntityType", count.ToString() }, { "EntityName", "missing items" } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        IDialogReference dialog = await Dialog.ShowAsync<DeleteFromDatabaseDialog>("Delete From Database", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<DeleteFromDatabaseDialog>("Supprimer de la base de données", parameters, options);
         DialogResult result = await dialog.Result;
         if (result is not null && !result.Canceled)
         {

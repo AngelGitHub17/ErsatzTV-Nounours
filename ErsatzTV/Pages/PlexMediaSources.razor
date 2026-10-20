@@ -20,7 +20,7 @@
                        OnClick="@(_ => SignOutOfPlex())"
                        Disabled="@Locker.IsPlexLocked()"
                        Class="ml-8">
-                Sign out of plex
+                Se déconnecter de Plex
             </MudButton>
         }
         else
@@ -30,7 +30,7 @@
                        OnClick="@(_ => AddPlexMediaSource())"
                        Disabled="@Locker.IsPlexLocked()"
                        Class="ml-8">
-                Sign in to plex
+                Se connecter à Plex
             </MudButton>
         }
 
@@ -41,13 +41,13 @@
                        OnClick="@(_ => AddPlexMediaSource())"
                        Disabled="@Locker.IsPlexLocked()"
                        Class="ml-4">
-                Fix Plex Credentials
+                Réparer les identifiants Plex
             </MudButton>
         }
     </MudPaper>
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
-            <MudText Typo="Typo.h5" Class="mb-2">Plex Media Sources</MudText>
+            <MudText Typo="Typo.h5" Class="mb-2">Sources Plex</MudText>
             <MudDivider Class="mb-6"/>
             <MudTable T="PlexMediaSourceViewModel" Hover="true" Dense="true" Items="_mediaSources">
                 <ColGroup>
@@ -58,8 +58,8 @@
                     </MudHidden>
                 </ColGroup>
                 <HeaderContent>
-                    <MudTh>Name</MudTh>
-                    <MudTh>Address</MudTh>
+                    <MudTh>Nom</MudTh>
+                    <MudTh>Adresse</MudTh>
                     <MudTh/>
                 </HeaderContent>
                 <RowTemplate>
@@ -67,18 +67,18 @@
                     <MudTd Style="overflow-wrap: anywhere;">@context.Address</MudTd>
                     <MudTd>
                         <div style="align-items: center; display: flex;">
-                            <MudTooltip Text="Refresh Libraries">
+                            <MudTooltip Text="Actualiser les bibliothèques">
                                 <MudIconButton Icon="@Icons.Material.Filled.Refresh"
                                                Disabled="@(Locker.IsPlexLocked())"
                                                OnClick="@(_ => RefreshLibraries(context.Id))">
                                 </MudIconButton>
                             </MudTooltip>
-                            <MudTooltip Text="Edit Libraries">
+                            <MudTooltip Text="Modifier les bibliothèques">
                                 <MudIconButton Icon="@Icons.Material.Filled.VideoLibrary"
                                                Href="@($"media/sources/plex/{context.Id}/libraries")">
                                 </MudIconButton>
                             </MudTooltip>
-                            <MudTooltip Text="Edit Path Replacements">
+                            <MudTooltip Text="Modifier les remplacements de chemin">
                                 <MudIconButton Icon="@Icons.Material.Filled.Folder"
                                                Href="@($"media/sources/plex/{context.Id}/paths")">
                                 </MudIconButton>
@@ -110,7 +110,7 @@
     private async Task SignOutOfPlex()
     {
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small };
-        IDialogReference dialog = await Dialog.ShowAsync<SignOutOfPlexDialog>("Sign out of Plex", options);
+        IDialogReference dialog = await Dialog.ShowAsync<SignOutOfPlexDialog>("Se déconnecter de Plex", options);
         DialogResult result = await dialog.Result;
         if (result is { Canceled: false })
         {

@@ -321,6 +321,28 @@ public abstract class PlayoutModeSchedulerBase<T>(ILogger logger) : IPlayoutMode
             return [playoutItem];
         }
 
+        // édition Nounours : coupures « toutes les X minutes » sans chapitres (directive @coupures)
+        foreach (FillerPreset breaksFiller in allFiller
+                     .Filter(f => f.FillerKind is FillerKind.MidRoll)
+                     .Take(1)
+                     .ToList())
+        {
+            if (MidRollBreaks.TryParse(breaksFiller.Expression, out MidRollBreaks.Settings settings, out _))
+            {
+                List<MediaChapter> virtualChapters =
+                    MidRollBreaks.BuildChapters(settings, playoutItem.InPoint, playoutItem.OutPoint);
+                if (virtualChapters.Count <= 1)
+                {
+                    // contenu trop court (pub, jingle…) : pas de coupure, et surtout pas de conversion en « après »
+                    allFiller.RemoveAll(f => f.FillerKind is FillerKind.MidRoll);
+                }
+                else
+                {
+                    chapters = virtualChapters;
+                }
+            }
+        }
+
         List<MediaChapter> effectiveChapters = chapters;
         if (allFiller.All(fp => fp.FillerKind != FillerKind.MidRoll) || effectiveChapters.Count <= 1)
         {

@@ -28,6 +28,8 @@ public record TextElementDataContext(TextGraphicsElement TextElement) : Graphics
     public int EpgEntries => TextElement.EpgEntries;
 }
 
+public record ClockElementDataContext(ClockGraphicsElement ClockElement) : GraphicsElementContext;
+
 public record ImageElementContext(ImageGraphicsElement ImageElement) : GraphicsElementContext;
 
 public record MotionElementDataContext(MotionGraphicsElement MotionElement)

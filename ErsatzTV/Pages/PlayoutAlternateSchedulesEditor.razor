@@ -16,17 +16,17 @@
         <div style="display: flex; flex-direction: row; margin-bottom: auto; margin-top: auto; width: 100%; align-items: center" class="ml-6 mr-6">
             <div class="d-none d-md-flex">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(_ => SaveChanges())" StartIcon="@Icons.Material.Filled.Save">
-                    Save Alternate Schedules
+                    Enregistrer les plannings alternatifs
                 </MudButton>
                 <MudButton Class="ml-3" Variant="Variant.Filled" Color="Color.Default" OnClick="@(_ => AddAlternateSchedule())" StartIcon="@Icons.Material.Filled.PlaylistAdd">
-                    Add Alternate Schedule
+                    Ajouter un planning alternatif
                 </MudButton>
             </div>
             <div style="align-items: center; display: flex; margin-left: auto;" class="d-md-none">
                 <div class="flex-grow-1"></div>
                 <MudMenu Icon="@Icons.Material.Filled.MoreVert">
-                    <MudMenuItem Icon="@Icons.Material.Filled.Save" Label="Save Alternate Schedules" OnClick="@SaveChanges"/>
-                    <MudMenuItem Icon="@Icons.Material.Filled.PlaylistAdd" Label="Add Alternate Schedule" OnClick="AddAlternateSchedule"/>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Save" Label="Enregistrer les plannings alternatifs" OnClick="@SaveChanges"/>
+                    <MudMenuItem Icon="@Icons.Material.Filled.PlaylistAdd" Label="Ajouter un planning alternatif" OnClick="AddAlternateSchedule"/>
                 </MudMenu>
             </div>
         </div>
@@ -35,7 +35,7 @@
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
             <MudText Typo="Typo.h5" Class="mb-2">@_channelName - Content</MudText>
             <MudDivider Class="mb-6"/>
-            <MudText Typo="Typo.body2" Class="mb-6">In priority order from top to bottom. The bottom entry will *always* match all days and all months, as a catch-all.</MudText>
+            <MudText Typo="Typo.body2" Class="mb-6">Par ordre de priorité, de haut en bas. La dernière ligne s'applique *toujours* à tous les jours et tous les mois, par défaut.</MudText>
             <MudTable Hover="true" Items="_items.OrderBy(i => i.Index)" Dense="true" @bind-SelectedItem="_selectedItem" RowClassFunc="@SelectedRowClassFunc">
                 <ColGroup>
                     <MudHidden Breakpoint="Breakpoint.Xs">
@@ -47,10 +47,10 @@
                     </MudHidden>
                 </ColGroup>
                 <HeaderContent>
-                    <MudTh>Schedule</MudTh>
-                    <MudTh>Days of the Week</MudTh>
-                    <MudTh>Days of the Month</MudTh>
-                    <MudTh>Months</MudTh>
+                    <MudTh>Planning</MudTh>
+                    <MudTh>Jours de la semaine</MudTh>
+                    <MudTh>Jours du mois</MudTh>
+                    <MudTh>Mois</MudTh>
                     <MudTh/>
                 </HeaderContent>
                 <RowTemplate>
@@ -94,11 +94,11 @@
             </MudTable>
             @if (_selectedItem is not null)
             {
-                <MudText Typo="Typo.h5" Class="mt-10 mb-2">Edit Content</MudText>
+                <MudText Typo="Typo.h5" Class="mt-10 mb-2">Modifier le contenu</MudText>
                 <MudDivider Class="mb-6"/>
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Schedule</MudText>
+                        <MudText>Planning</MudText>
                     </div>
                     <MudSelect @bind-Value="_selectedItem.ProgramSchedule" For="@(() => _selectedItem.ProgramSchedule)">
                         @foreach (ProgramScheduleViewModel schedule in _schedules)
@@ -109,13 +109,13 @@
                 </MudStack>
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Limit to Date Range</MudText>
+                        <MudText>Limiter à une période</MudText>
                     </div>
                     <MudCheckBox T="bool" @bind-Value="_selectedItem.LimitToDateRange" Dense="true"/>
                 </MudStack>
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Start Day</MudText>
+                        <MudText>Jour de début</MudText>
                     </div>
                     <MudSelect T="int" @bind-Value="_selectedItem.StartMonth" Disabled="@(!_selectedItem.LimitToDateRange)">
                         @foreach (int month in Enumerable.Range(1, 12))
@@ -144,7 +144,7 @@
                 </MudStack>
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>End Day</MudText>
+                        <MudText>Jour de fin</MudText>
                     </div>
                     <MudSelect T="int" @bind-Value="_selectedItem.EndMonth" Disabled="@(!_selectedItem.LimitToDateRange)">
                         @foreach (int month in Enumerable.Range(1, 12))
@@ -173,9 +173,9 @@
                 </MudStack>
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Days of the Week</MudText>
+                        <MudText>Jours de la semaine</MudText>
                     </div>
-                    <MudSelect T="DayOfWeek" SelectedValues="@_selectedItem.DaysOfWeek" SelectedValuesChanged="OnSelectedDaysChanged" MultiSelection="true" Clearable="true" SelectAll="true" SelectAllText="Select All Days">
+                    <MudSelect T="DayOfWeek" SelectedValues="@_selectedItem.DaysOfWeek" SelectedValuesChanged="OnSelectedDaysChanged" MultiSelection="true" Clearable="true" SelectAll="true" SelectAllText="Tous les jours">
                         <MudSelectItem Value="@DayOfWeek.Monday">@_dtf.GetDayName(DayOfWeek.Monday)</MudSelectItem>
                         <MudSelectItem Value="@DayOfWeek.Tuesday">@_dtf.GetDayName(DayOfWeek.Tuesday)</MudSelectItem>
                         <MudSelectItem Value="@DayOfWeek.Wednesday">@_dtf.GetDayName(DayOfWeek.Wednesday)</MudSelectItem>
@@ -196,9 +196,9 @@
                 </MudStack>
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Days of the Month</MudText>
+                        <MudText>Jours du mois</MudText>
                     </div>
-                    <MudSelect T="int" SelectedValues="@_selectedItem.DaysOfMonth" SelectedValuesChanged="OnSelectedDaysChanged" MultiSelection="true" Clearable="true" SelectAll="true" SelectAllText="Select All Days">
+                    <MudSelect T="int" SelectedValues="@_selectedItem.DaysOfMonth" SelectedValuesChanged="OnSelectedDaysChanged" MultiSelection="true" Clearable="true" SelectAll="true" SelectAllText="Tous les jours">
                         @foreach (int day in Enumerable.Range(1, 31))
                         {
                             <MudSelectItem Value="@day">@day</MudSelectItem>
@@ -207,9 +207,9 @@
                 </MudStack>
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Months</MudText>
+                        <MudText>Mois</MudText>
                     </div>
-                    <MudSelect T="int" SelectedValues="@_selectedItem.MonthsOfYear" SelectedValuesChanged="OnSelectedMonthsChanged" MultiSelection="true" Clearable="true" SelectAll="true" SelectAllText="Select All Months">
+                    <MudSelect T="int" SelectedValues="@_selectedItem.MonthsOfYear" SelectedValuesChanged="OnSelectedMonthsChanged" MultiSelection="true" Clearable="true" SelectAll="true" SelectAllText="Tous les mois">
                         @foreach (int month in Enumerable.Range(1, 12))
                         {
                             <MudSelectItem Value="@month">@_dtf.GetMonthName(month)</MudSelectItem>
@@ -374,7 +374,7 @@
         errorMessages.HeadOrNone().Match(
             error =>
             {
-                Snackbar.Add($"Unexpected error saving alternate schedules: {error.Value}", Severity.Error);
+                Snackbar.Add($"Erreur à l'enregistrement des plannings alternatifs : {error.Value}", Severity.Error);
                 Logger.LogError("Unexpected error saving alternate schedules: {Error}", error.Value);
             },
             () => NavigationManager.NavigateTo("playouts"));

@@ -1,0 +1,491 @@
+@page "/programmes/nouveau"
+@page "/programmes/{Slug}"
+@using System.Globalization
+@using System.Threading.Channels
+@using ErsatzTV.Application
+@using ErsatzTV.Application.Channels
+@using ErsatzTV.Application.Nounours
+@using ErsatzTV.Nounours
+@using ErsatzTV.Shared.Nounours
+@inject IProgrammeService ProgrammeService
+@inject IContentCatalog ContentCatalog
+@inject IGuideService GuideService
+@inject ChannelWizardService WizardService
+@inject ChannelWriter<IBackgroundServiceRequest> WorkerChannel
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+
+<PageTitle>@(_programme?.Name ?? "Programme") · ErsatzTV</PageTitle>
+
+<div class="n-page" style="height: 100%; overflow-y: auto; max-width: 1300px">
+    @if (_programme is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary"/>
+    }
+    else
+    {
+        <div class="n-page-header" style="align-items: center">
+            <div class="d-flex align-center gap-3" style="flex: 1; min-width: 300px">
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Href="programmes" aria-label="Retour"/>
+                <input type="color" value="@_programme.Color" @onchange="@(e => { _programme.Color = e.Value?.ToString() ?? "#4F8CFF"; _dirty = true; })"
+                       title="Couleur du programme" style="width: 30px; height: 30px; border: none; background: none; cursor: pointer"/>
+                <MudTextField @bind-Value="_programme.Name" @bind-Value:after="@MarkDirty" Variant="Variant.Text" Immediate="true"
+                              Style="font-size: 1.5rem; font-weight: 700" Placeholder="Nom du programme"/>
+                @if (_dirty)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined">Non enregistré</MudChip>
+                }
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <MudMenu Label="Modèle" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.AutoAwesome" Dense="true">
+                    <MudMenuItem OnClick="@(() => ApplyTemplate("film"))">Film du soir (pubs, jingle, film coupé, pubs)</MudMenuItem>
+                    <MudMenuItem OnClick="@(() => ApplyTemplate("serie"))">Série (générique, 2 épisodes, pubs)</MudMenuItem>
+                    <MudMenuItem OnClick="@(() => ApplyTemplate("bloc"))">Bloc jeunesse (jingle, 3 dessins animés, jingle)</MudMenuItem>
+                </MudMenu>
+                <MudButton OnClick="@Save" Disabled="@_busy" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save">Enregistrer</MudButton>
+                <MudButton OnClick="@OpenSchedule" Disabled="@_busy" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.AddAlarm">Programmer sur une chaîne</MudButton>
+            </div>
+        </div>
+
+        @* ------------------------------------------------ conducteur visuel *@
+        <div class="n-card mb-4">
+            <div class="d-flex justify-space-between align-center mb-2">
+                <div class="n-card-title" style="margin: 0">Conducteur</div>
+                <span class="n-muted" style="font-size: .85rem">
+                    @if (_estimate?.Total is { } total)
+                    {
+                        @($"Durée estimée ≈ {ErsatzTV.Application.Nounours.ContentCatalog.Format(total)}{(_estimate.Partial ? " (partielle)" : "")}")
+                        @if (_estimate.BreakCount > 0)
+                        {
+                            @($" · {_estimate.BreakCount} coupure(s) de ≈ {ErsatzTV.Application.Nounours.ContentCatalog.Format(_estimate.BreakDuration ?? TimeSpan.Zero)}")
+                        }
+                    }
+                    else
+                    {
+                        @("Durée : choisissez des sources pour l'estimer")
+                    }
+                </span>
+            </div>
+            <div class="n-rundown">
+                @foreach (ProgrammeSegment s in _programme.Segments)
+                {
+                    TimeSpan? segTotal = _estimate?.Segments.Find(e => e.SegmentId == s.Id)?.Total;
+                    double grow = Math.Max(1, (segTotal ?? TimeSpan.FromMinutes(s.Role == SegmentRole.Contenu ? 20 : 2)).TotalMinutes);
+                    <div class="n-rundown-block n-seg-@s.Role.ToString().ToLowerInvariant()" style="flex-grow: @grow.ToString("0.##", CultureInfo.InvariantCulture)"
+                         title="@($"{SegmentCard.RoleLabel(s.Role)} · {Title(s)}")">
+                        <div class="n-rundown-role">@SegmentCard.RoleLabel(s.Role)@(s.Count > 1 ? $" ×{s.Count}" : "")</div>
+                        <div class="n-rundown-title">@Title(s)</div>
+                        @if (s.Role == SegmentRole.Contenu && _programme.Breaks.Enabled && _estimate?.BreakCount > 0)
+                        {
+                            <div class="n-rundown-breaks">
+                                @for (var i = 1; i <= _estimate.BreakCount; i++)
+                                {
+                                    <span style="left: @((100.0 * i / (_estimate.BreakCount + 1)).ToString("0.#", CultureInfo.InvariantCulture))%"></span>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+                @if (_programme.Segments.Count == 0)
+                {
+                    <div class="n-muted pa-3">Ajoutez des segments ci-dessous, ou partez d'un modèle.</div>
+                }
+            </div>
+        </div>
+
+        <MudGrid Spacing="4">
+            <MudItem xs="12" lg="8">
+                <div class="n-card">
+                    <div class="n-card-title">Déroulé</div>
+                    @for (var i = 0; i < _programme.Segments.Count; i++)
+                    {
+                        int index = i;
+                        ProgrammeSegment segment = _programme.Segments[i];
+                        <SegmentCard @key="segment.Id" Segment="segment" Index="index" IsFirst="@(index == 0)" IsLast="@(index == _programme.Segments.Count - 1)"
+                                     Choices="_choices" ExcludeProgrammeSlug="@_programme.Slug"
+                                     Estimate="@(_estimate?.Segments.Find(e => e.SegmentId == segment.Id)?.Each)"
+                                     OnChanged="@SegmentsChanged" OnRemove="@(() => Remove(_programme.Segments, index))"
+                                     OnDuplicate="@(() => Duplicate(_programme.Segments, index))" OnMove="@(d => Move(_programme.Segments, index, d))"/>
+                    }
+                    <div class="d-flex gap-2 flex-wrap mt-2">
+                        <MudButton OnClick="@(() => Add(_programme.Segments, SegmentRole.Pub))" Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.Campaign">Pubs</MudButton>
+                        <MudButton OnClick="@(() => Add(_programme.Segments, SegmentRole.Jingle))" Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.MusicNote">Jingle</MudButton>
+                        <MudButton OnClick="@(() => Add(_programme.Segments, SegmentRole.Contenu))" Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.Movie">Programme principal</MudButton>
+                        <MudButton OnClick="@(() => Add(_programme.Segments, SegmentRole.BandeAnnonce))" Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.Theaters">Bande-annonce</MudButton>
+                        <MudButton OnClick="@(() => Add(_programme.Segments, SegmentRole.Programme))" Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.Link">Enchaîner un programme</MudButton>
+                    </div>
+                </div>
+            </MudItem>
+
+            <MudItem xs="12" lg="4">
+                <div class="n-card mb-4">
+                    <div class="d-flex align-center justify-space-between">
+                        <div class="n-card-title" style="margin: 0">Coupures pub pendant le programme</div>
+                        <MudSwitch T="bool" @bind-Value="_programme.Breaks.Enabled" @bind-Value:after="@SegmentsChanged" Color="Color.Secondary"/>
+                    </div>
+                    @if (_programme.Breaks.Enabled)
+                    {
+                        <MudText Typo="Typo.body2" Class="n-muted mt-1 mb-3">Le programme principal est interrompu pour diffuser la coupure ci-dessous. Les pubs et jingles ne sont jamais coupés.</MudText>
+                        <MudSelect T="BreakPlacement" @bind-Value="_programme.Breaks.Placement" @bind-Value:after="@SegmentsChanged" Label="Placement" Variant="Variant.Outlined" Margin="Margin.Dense">
+                            <MudSelectItem Value="BreakPlacement.Every">Toutes les X minutes</MudSelectItem>
+                            <MudSelectItem Value="BreakPlacement.Count">Un nombre fixe de coupures</MudSelectItem>
+                        </MudSelect>
+                        <div class="d-flex gap-2 mt-2">
+                            @if (_programme.Breaks.Placement == BreakPlacement.Every)
+                            {
+                                <MudNumericField T="double" @bind-Value="_programme.Breaks.EveryMinutes" @bind-Value:after="@SegmentsChanged" Min="2" Max="180" Label="Toutes les (min)" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                            }
+                            else
+                            {
+                                <MudNumericField T="int" @bind-Value="_programme.Breaks.Count" @bind-Value:after="@SegmentsChanged" Min="1" Max="10" Label="Coupures" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                            }
+                        </div>
+                        <div class="d-flex gap-2 mt-2">
+                            <MudNumericField T="double" @bind-Value="_programme.Breaks.StartMinutes" @bind-Value:after="@SegmentsChanged" Min="0" Max="180" Label="Pas avant (min)" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                            <MudNumericField T="double" @bind-Value="_programme.Breaks.EndMinutes" @bind-Value:after="@SegmentsChanged" Min="0" Max="180" Label="Pas dans les dernières (min)" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                        </div>
+                        <MudDivider Class="my-3"/>
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Contenu d'une coupure</MudText>
+                        @for (var i = 0; i < _programme.Breaks.Segments.Count; i++)
+                        {
+                            int index = i;
+                            ProgrammeSegment segment = _programme.Breaks.Segments[i];
+                            <SegmentCard @key="segment.Id" Segment="segment" Index="index" IsFirst="@(index == 0)" IsLast="@(index == _programme.Breaks.Segments.Count - 1)"
+                                         Choices="_choices" Roles="BreakRoles" ShowGuideOption="false"
+                                         OnChanged="@SegmentsChanged" OnRemove="@(() => Remove(_programme.Breaks.Segments, index))"
+                                         OnDuplicate="@(() => Duplicate(_programme.Breaks.Segments, index))" OnMove="@(d => Move(_programme.Breaks.Segments, index, d))"/>
+                        }
+                        <div class="d-flex gap-2 flex-wrap">
+                            <MudButton OnClick="@(() => Add(_programme.Breaks.Segments, SegmentRole.Jingle))" Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.MusicNote">Jingle</MudButton>
+                            <MudButton OnClick="@(() => Add(_programme.Breaks.Segments, SegmentRole.Pub))" Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.Campaign">Pubs</MudButton>
+                        </div>
+                    }
+                </div>
+                <div class="n-card">
+                    <div class="n-card-title">Infos</div>
+                    <MudTextField @bind-Value="_programme.Description" @bind-Value:after="@MarkDirty" Label="Description" Variant="Variant.Outlined" Lines="3" Margin="Margin.Dense"/>
+                    <MudText Typo="Typo.body2" Class="n-muted mt-3">
+                        Une fois enregistré, ce programme apparaît comme contenu dans <MudLink Href="chaines/nouvelle">l'assistant de chaîne</MudLink>
+                        et dans le <MudLink Href="planning">planning</MudLink>. Seuls les segments cochés « Guide » apparaissent dans l'EPG.
+                    </MudText>
+                    @if (_programme.PlaylistId.HasValue)
+                    {
+                        <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Généré : playlist « Programme : @_programme.Name »@(_programme.BreakFillerId.HasValue ? " + remplissage « Coupure »" : "").</MudText>
+                    }
+                </div>
+            </MudItem>
+        </MudGrid>
+    }
+</div>
+
+@* ------------------------------------------------ programmer sur une chaîne *@
+@if (_scheduleOpen)
+{
+    <MudOverlay Visible="true" OnClick="@(() => _scheduleOpen = false)" DarkBackground="true" ZIndex="1400"/>
+    <div class="n-card" style="position: fixed; left: 50%; top: 12vh; transform: translateX(-50%); width: 520px; max-width: calc(100vw - 32px); z-index: 1401">
+        <MudText Typo="Typo.h6">Programmer « @_programme.Name »</MudText>
+        <MudText Typo="Typo.body2" Class="n-muted mb-3">Ajouté au planning de la chaîne, tous les jours. La grille est reconstruite.</MudText>
+        <MudSelect T="int" @bind-Value="_scheduleChannelId" Label="Chaîne" Variant="Variant.Outlined" Margin="Margin.Dense">
+            @foreach (ChannelViewModel c in _channels.Where(c => _playouts.TryGetValue(c.Id, out ChannelPlayoutInfo i) && i.ProgramScheduleId.HasValue))
+            {
+                <MudSelectItem Value="@c.Id">@c.Number · @c.Name</MudSelectItem>
+            }
+        </MudSelect>
+        <div class="d-flex gap-2 mt-3">
+            <MudSelect T="bool" @bind-Value="_scheduleSlot.FixedStart" Label="Début" Variant="Variant.Outlined" Margin="Margin.Dense">
+                <MudSelectItem Value="true">À heure fixe</MudSelectItem>
+                <MudSelectItem Value="false">À la suite</MudSelectItem>
+            </MudSelect>
+            @if (_scheduleSlot.FixedStart)
+            {
+                <MudTimePicker @bind-Time="_scheduleSlot.StartTime" Label="Heure" AmPm="false" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 120px"/>
+            }
+            <MudSelect T="WizardSlotMode" @bind-Value="_scheduleSlot.Mode" Label="Fréquence" Variant="Variant.Outlined" Margin="Margin.Dense">
+                <MudSelectItem Value="WizardSlotMode.One">Une fois</MudSelectItem>
+                <MudSelectItem Value="WizardSlotMode.Multiple">Plusieurs fois de suite</MudSelectItem>
+                <MudSelectItem Value="WizardSlotMode.Flood">En boucle jusqu'au créneau suivant</MudSelectItem>
+            </MudSelect>
+            @if (_scheduleSlot.Mode == WizardSlotMode.Multiple)
+            {
+                <MudNumericField @bind-Value="_scheduleSlot.Count" Min="1" Label="Fois" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 90px"/>
+            }
+        </div>
+        @if (_scheduleSlot.Mode != WizardSlotMode.Flood)
+        {
+            <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Après le programme, la chaîne reprend le créneau suivant du planning ; s'il est à heure fixe, le temps restant est « hors antenne ». Astuce : ajoutez ensuite un créneau « à la suite » en continu.</MudText>
+        }
+        @if (!_playouts.Values.Any(p => p.ProgramScheduleId.HasValue))
+        {
+            <MudAlert Severity="Severity.Info" Class="mt-3">Aucune chaîne avec un planning classique. Créez-en une avec <MudLink Href="chaines/nouvelle">l'assistant</MudLink> : vous pourrez y choisir ce programme directement.</MudAlert>
+        }
+        <div class="d-flex justify-end gap-2 mt-4">
+            <MudButton OnClick="@(() => _scheduleOpen = false)">Annuler</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(_busy || _scheduleChannelId == 0)" OnClick="@ScheduleOnChannel">Programmer</MudButton>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string Slug { get; set; }
+
+    [SupplyParameterFromQuery(Name = "modele")]
+    public string Template { get; set; }
+
+    private static readonly SegmentRole[] BreakRoles = [SegmentRole.Jingle, SegmentRole.Pub, SegmentRole.BandeAnnonce, SegmentRole.Autre];
+
+    private Programme _programme;
+    private List<ContentChoice> _choices = [];
+    private ProgrammeEstimate _estimate;
+    private bool _dirty;
+    private bool _busy;
+    private CancellationTokenSource _estimateCts;
+
+    private bool _scheduleOpen;
+    private List<ChannelViewModel> _channels = [];
+    private Dictionary<int, ChannelPlayoutInfo> _playouts = new();
+    private int _scheduleChannelId;
+    private WizardSlot _scheduleSlot = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Slug))
+        {
+            _programme = new Programme();
+            if (!string.IsNullOrWhiteSpace(Template))
+            {
+                ApplyTemplate(Template);
+            }
+        }
+        else
+        {
+            Option<Programme> maybe = await ProgrammeService.GetProgramme(Slug, CancellationToken.None);
+            _programme = maybe.IfNone(() =>
+            {
+                NavigationManager.NavigateTo("programmes");
+                return new Programme();
+            });
+        }
+
+        List<ContentOption> options = await ContentCatalog.GetAll(CancellationToken.None);
+        List<ProgrammeSummary> programmes = await ProgrammeService.GetAll(CancellationToken.None);
+        _choices = options.Where(o => o.Kind != ContentSourceKind.Programme).Select(ContentChoice.From)
+            .Concat(programmes.Select(p => new ContentChoice(ContentSourceKind.Programme, p.PlaylistId, p.Slug, p.Name, $"Programme · {p.Segments} segment(s)")))
+            .ToList();
+
+        await RefreshEstimate();
+    }
+
+    private string Title(ProgrammeSegment s) =>
+        !string.IsNullOrWhiteSpace(s.Label) ? s.Label :
+        !string.IsNullOrWhiteSpace(s.SourceName) ? s.SourceName :
+        s.SourceKind == ContentSourceKind.Search && !string.IsNullOrWhiteSpace(s.Query) ? s.Query : "à choisir";
+
+    private void MarkDirty() => _dirty = true;
+
+    private async Task SegmentsChanged()
+    {
+        _dirty = true;
+        await RefreshEstimate();
+    }
+
+    private async Task RefreshEstimate()
+    {
+        _estimateCts?.Cancel();
+        _estimateCts = new CancellationTokenSource();
+        try
+        {
+            _estimate = await ProgrammeService.Estimate(_programme, _estimateCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // une estimation plus récente est en cours
+        }
+        catch (InvalidOperationException)
+        {
+            // estimation indisponible : sans conséquence pour l'édition
+            _estimate = null;
+        }
+    }
+
+    private async Task Add(List<ProgrammeSegment> list, SegmentRole role)
+    {
+        var segment = new ProgrammeSegment
+        {
+            Role = role,
+            Count = role == SegmentRole.Pub ? 3 : 1,
+            SourceKind = role == SegmentRole.Programme ? ContentSourceKind.Programme : role == SegmentRole.Jingle ? ContentSourceKind.MediaItem : ContentSourceKind.Collection,
+            Order = role == SegmentRole.Pub ? PlaybackOrder.Shuffle : PlaybackOrder.SeasonEpisode
+        };
+        list.Add(segment);
+        await SegmentsChanged();
+    }
+
+    private async Task Remove(List<ProgrammeSegment> list, int index)
+    {
+        list.RemoveAt(index);
+        await SegmentsChanged();
+    }
+
+    private async Task Duplicate(List<ProgrammeSegment> list, int index)
+    {
+        ProgrammeSegment copy = System.Text.Json.JsonSerializer.Deserialize<ProgrammeSegment>(System.Text.Json.JsonSerializer.Serialize(list[index]));
+        copy.Id = Guid.NewGuid().ToString("N")[..8];
+        if (copy.SourceKind == ContentSourceKind.Search)
+        {
+            copy.SourceId = null; // nouvelle collection intelligente
+        }
+
+        list.Insert(index + 1, copy);
+        await SegmentsChanged();
+    }
+
+    private async Task Move(List<ProgrammeSegment> list, int index, int delta)
+    {
+        int target = index + delta;
+        if (target < 0 || target >= list.Count)
+        {
+            return;
+        }
+
+        (list[index], list[target]) = (list[target], list[index]);
+        await SegmentsChanged();
+    }
+
+    private void ApplyTemplate(string name)
+    {
+        ProgrammeSegment Seg(SegmentRole role, string label, int count = 1, ContentSourceKind kind = ContentSourceKind.Collection, string query = "") =>
+            new() { Role = role, Label = label, Count = count, SourceKind = kind, Query = query, Order = role == SegmentRole.Pub || query == "type:movie" ? PlaybackOrder.Shuffle : PlaybackOrder.SeasonEpisode };
+
+        switch (name)
+        {
+            case "serie":
+                if (string.IsNullOrWhiteSpace(_programme.Name) || _programme.Name == "Nouveau programme") _programme.Name = "Ma série";
+                _programme.Segments =
+                [
+                    Seg(SegmentRole.Jingle, "Générique de début", 1, ContentSourceKind.MediaItem),
+                    Seg(SegmentRole.Contenu, "Épisodes", 2, ContentSourceKind.Show),
+                    Seg(SegmentRole.Jingle, "Générique de fin", 1, ContentSourceKind.MediaItem),
+                    Seg(SegmentRole.Pub, "Pubs", 3)
+                ];
+                _programme.Breaks = new ProgrammeBreaks { Enabled = false };
+                break;
+            case "bloc":
+                if (string.IsNullOrWhiteSpace(_programme.Name) || _programme.Name == "Nouveau programme") _programme.Name = "Bloc jeunesse";
+                _programme.Color = "#22C55E";
+                _programme.Segments =
+                [
+                    Seg(SegmentRole.Jingle, "Ouverture du bloc", 1, ContentSourceKind.MediaItem),
+                    Seg(SegmentRole.Contenu, "Dessins animés", 3, ContentSourceKind.Search, "type:episode"),
+                    Seg(SegmentRole.Pub, "Pubs", 2),
+                    Seg(SegmentRole.Jingle, "Fermeture du bloc", 1, ContentSourceKind.MediaItem)
+                ];
+                _programme.Breaks = new ProgrammeBreaks { Enabled = false };
+                break;
+            default:
+                if (string.IsNullOrWhiteSpace(_programme.Name) || _programme.Name == "Nouveau programme") _programme.Name = "Le film du soir";
+                _programme.Color = "#FF7A45";
+                _programme.Segments =
+                [
+                    Seg(SegmentRole.Pub, "Pubs avant le film", 3),
+                    Seg(SegmentRole.Jingle, "Jingle « Le film du soir »", 1, ContentSourceKind.MediaItem),
+                    Seg(SegmentRole.Contenu, "Le film", 1, ContentSourceKind.Search, "type:movie"),
+                    Seg(SegmentRole.Pub, "Pubs après le film", 3)
+                ];
+                _programme.Breaks = new ProgrammeBreaks
+                {
+                    Enabled = true,
+                    EveryMinutes = 20,
+                    StartMinutes = 20,
+                    EndMinutes = 10,
+                    Segments =
+                    [
+                        Seg(SegmentRole.Jingle, "Jingle début de pub", 1, ContentSourceKind.MediaItem),
+                        Seg(SegmentRole.Pub, "Pubs", 4),
+                        Seg(SegmentRole.Jingle, "Jingle fin de pub", 1, ContentSourceKind.MediaItem)
+                    ]
+                };
+                break;
+        }
+
+        _ = SegmentsChanged();
+    }
+
+    private async Task<bool> Save()
+    {
+        _busy = true;
+        try
+        {
+            bool isNew = string.IsNullOrWhiteSpace(_programme.Slug);
+            Either<BaseError, Programme> result = await ProgrammeService.Save(_programme, CancellationToken.None);
+            foreach (BaseError error in result.LeftToSeq())
+            {
+                Snackbar.Add(error.Value, Severity.Warning);
+                return false;
+            }
+
+            _programme = result.RightToSeq().Head();
+            _dirty = false;
+            Snackbar.Add("Programme enregistré. Les chaînes qui l'utilisent sont mises à jour.", Severity.Success);
+            if (isNew)
+            {
+                NavigationManager.NavigateTo($"programmes/{_programme.Slug}", replace: true);
+            }
+
+            return true;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task OpenSchedule()
+    {
+        if ((_dirty || _programme.PlaylistId is null) && !await Save())
+        {
+            return;
+        }
+
+        _channels = (await Mediator.Send(new GetAllChannels()))
+            .OrderBy(c => double.TryParse(c.Number, NumberStyles.Number, CultureInfo.InvariantCulture, out double n) ? n : 0)
+            .ToList();
+        _playouts = await GuideService.GetChannelPlayouts(CancellationToken.None);
+        _scheduleChannelId = _channels.FirstOrDefault(c => _playouts.TryGetValue(c.Id, out ChannelPlayoutInfo i) && i.ProgramScheduleId.HasValue)?.Id ?? 0;
+        _scheduleSlot = new WizardSlot
+        {
+            Kind = ContentSourceKind.Programme,
+            ContentId = _programme.PlaylistId,
+            ContentName = _programme.Name,
+            FixedStart = true,
+            StartTime = new TimeSpan(21, 0, 0),
+            Mode = WizardSlotMode.One,
+            Order = PlaybackOrder.None,
+            CustomTitle = string.Empty
+        };
+        _scheduleOpen = true;
+    }
+
+    private async Task ScheduleOnChannel()
+    {
+        if (!_playouts.TryGetValue(_scheduleChannelId, out ChannelPlayoutInfo info) || info.ProgramScheduleId is null)
+        {
+            return;
+        }
+
+        _busy = true;
+        Option<BaseError> error = await WizardService.AddSlotToChannel(info.PlayoutId, info.ProgramScheduleId.Value, _scheduleSlot, WorkerChannel, CancellationToken.None);
+        _busy = false;
+        foreach (BaseError e in error)
+        {
+            Snackbar.Add($"Impossible de programmer : {e.Value}", Severity.Error);
+            return;
+        }
+
+        _scheduleOpen = false;
+        Snackbar.Add("Programmé ! La grille se reconstruit.", Severity.Success);
+        NavigationManager.NavigateTo($"planning?chaine={_scheduleChannelId}");
+    }
+
+}

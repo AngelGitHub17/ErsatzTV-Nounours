@@ -63,8 +63,8 @@
                     </MudHidden>
                 </ColGroup>
                 <HeaderContent>
-                    <MudTh>Name</MudTh>
-                    <MudTh>Address</MudTh>
+                    <MudTh>Nom</MudTh>
+                    <MudTh>Adresse</MudTh>
                     <MudTh/>
                 </HeaderContent>
                 <RowTemplate>
@@ -72,18 +72,18 @@
                     <MudTd Style="overflow-wrap: anywhere;">@context.Address</MudTd>
                     <MudTd>
                         <div style="align-items: center; display: flex;">
-                            <MudTooltip Text="Refresh Libraries">
+                            <MudTooltip Text="Actualiser les bibliothèques">
                                 <MudIconButton Icon="@Icons.Material.Filled.Refresh"
                                                Disabled="@(Locker.IsRemoteMediaSourceLocked<TMediaSource>())"
                                                OnClick="@(_ => RefreshLibraries(context.Id, _cts?.Token ?? CancellationToken.None))">
                                 </MudIconButton>
                             </MudTooltip>
-                            <MudTooltip Text="Edit Libraries">
+                            <MudTooltip Text="Modifier les bibliothèques">
                                 <MudIconButton Icon="@Icons.Material.Filled.VideoLibrary"
                                                Href="@($"media/sources/{Name.ToLowerInvariant()}/{context.Id}/libraries")">
                                 </MudIconButton>
                             </MudTooltip>
-                            <MudTooltip Text="Edit Path Replacements">
+                            <MudTooltip Text="Modifier les remplacements de chemin">
                                 <MudIconButton Icon="@Icons.Material.Filled.Folder"
                                                Href="@($"media/sources/{Name.ToLowerInvariant()}/{context.Id}/paths")">
                                 </MudIconButton>
@@ -155,7 +155,7 @@
     {
         var parameters = new DialogParameters { { "Name", Name } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small };
-        IDialogReference dialog = await Dialog.ShowAsync<DisconnectRemoteMediaSourceDialog>($"Disconnect {Name}", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<DisconnectRemoteMediaSourceDialog>($"Déconnecter {Name}", parameters, options);
         DialogResult result = await dialog.Result;
         if (result is { Canceled: false })
         {

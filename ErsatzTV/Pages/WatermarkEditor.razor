@@ -14,15 +14,15 @@
 
 <MudForm Model="@_model" @ref="@_form" Validation="@(_validator.ValidateValue)" ValidationDelay="0" Style="max-height: 100%">
     <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-6" OnClick="@HandleSubmitAsync" StartIcon="@(IsEdit ? Icons.Material.Filled.Save : Icons.Material.Filled.Add)">@(IsEdit ? "Save Watermark" : "Add Watermark")</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-6" OnClick="@HandleSubmitAsync" StartIcon="@(IsEdit ? Icons.Material.Filled.Save : Icons.Material.Filled.Add)">@(IsEdit ? "Enregistrer le filigrane" : "Ajouter le filigrane")</MudButton>
     </MudPaper>
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
-            <MudText Typo="Typo.h5" Class="mb-2">Watermark</MudText>
+            <MudText Typo="Typo.h5" Class="mb-2">Filigrane</MudText>
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Name</MudText>
+                    <MudText>Nom</MudText>
                 </div>
                 <MudTextField @bind-Value="_model.Name" For="@(() => _model.Name)"/>
             </MudStack>
@@ -31,21 +31,21 @@
                     <MudText>Mode</MudText>
                 </div>
                 <MudSelect @bind-Value="_model.Mode" For="@(() => _model.Mode)">
-                    <MudSelectItem Value="@(ChannelWatermarkMode.None)">None</MudSelectItem>
+                    <MudSelectItem Value="@(ChannelWatermarkMode.None)">Aucun</MudSelectItem>
                     <MudSelectItem Value="@(ChannelWatermarkMode.Permanent)">Permanent</MudSelectItem>
                     <MudSelectItem Value="@(ChannelWatermarkMode.Intermittent)">Intermittent</MudSelectItem>
-                    <MudSelectItem Value="@(ChannelWatermarkMode.OpacityExpression)">Opacity Expression</MudSelectItem>
+                    <MudSelectItem Value="@(ChannelWatermarkMode.OpacityExpression)">Expression d'opacité</MudSelectItem>
                 </MudSelect>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Image Source</MudText>
+                    <MudText>Source de l'image</MudText>
                 </div>
                 <MudSelect @bind-Value="_model.ImageSource"
                            For="@(() => _model.ImageSource)"
                            Disabled="@(_model.Mode == ChannelWatermarkMode.None)">
-                    <MudSelectItem Value="@(ChannelWatermarkImageSource.Custom)">Custom</MudSelectItem>
-                    <MudSelectItem Value="@(ChannelWatermarkImageSource.ChannelLogo)">Channel Logo</MudSelectItem>
+                    <MudSelectItem Value="@(ChannelWatermarkImageSource.Custom)">Personnalisé</MudSelectItem>
+                    <MudSelectItem Value="@(ChannelWatermarkImageSource.ChannelLogo)">Logo de la chaîne</MudSelectItem>
                 </MudSelect>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
@@ -59,12 +59,12 @@
                            StartIcon="@Icons.Material.Filled.CloudUpload"
                            Disabled="@(_model.ImageSource != ChannelWatermarkImageSource.Custom)"
                            for="watermarkFileInput">
-                    Upload Image
+                    Importer une image
                 </MudButton>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Image Preview</MudText>
+                    <MudText>Aperçu de l'image</MudText>
                 </div>
                 @if (!string.IsNullOrWhiteSpace(_model.Image?.Path) && _model.ImageSource == ChannelWatermarkImageSource.Custom)
                 {
@@ -79,24 +79,24 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Location</MudText>
+                    <MudText>Position</MudText>
                 </div>
                 <MudSelect @bind-Value="_model.Location"
                            For="@(() => _model.Location)"
                            Disabled="@(_model.Mode == ChannelWatermarkMode.None)">
-                    <MudSelectItem Value="@(WatermarkLocation.BottomRight)">Bottom Right</MudSelectItem>
-                    <MudSelectItem Value="@(WatermarkLocation.BottomMiddle)">Bottom Middle</MudSelectItem>
-                    <MudSelectItem Value="@(WatermarkLocation.BottomLeft)">Bottom Left</MudSelectItem>
-                    <MudSelectItem Value="@(WatermarkLocation.LeftMiddle)">Left Middle</MudSelectItem>
-                    <MudSelectItem Value="@(WatermarkLocation.TopLeft)">Top Left</MudSelectItem>
-                    <MudSelectItem Value="@(WatermarkLocation.TopMiddle)">Top Middle</MudSelectItem>
-                    <MudSelectItem Value="@(WatermarkLocation.TopRight)">Top Right</MudSelectItem>
-                    <MudSelectItem Value="@(WatermarkLocation.RightMiddle)">Right Middle</MudSelectItem>
+                    <MudSelectItem Value="@(WatermarkLocation.BottomRight)">En bas à droite</MudSelectItem>
+                    <MudSelectItem Value="@(WatermarkLocation.BottomMiddle)">En bas au centre</MudSelectItem>
+                    <MudSelectItem Value="@(WatermarkLocation.BottomLeft)">En bas à gauche</MudSelectItem>
+                    <MudSelectItem Value="@(WatermarkLocation.LeftMiddle)">Au milieu à gauche</MudSelectItem>
+                    <MudSelectItem Value="@(WatermarkLocation.TopLeft)">En haut à gauche</MudSelectItem>
+                    <MudSelectItem Value="@(WatermarkLocation.TopMiddle)">En haut au centre</MudSelectItem>
+                    <MudSelectItem Value="@(WatermarkLocation.TopRight)">En haut à droite</MudSelectItem>
+                    <MudSelectItem Value="@(WatermarkLocation.RightMiddle)">Au milieu à droite</MudSelectItem>
                 </MudSelect>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Place Within Source Content</MudText>
+                    <MudText>Placer dans l'image source</MudText>
                 </div>
                 <MudCheckBox @bind-Value="_model.PlaceWithinSourceContent"
                              For="@(() => _model.PlaceWithinSourceContent)"
@@ -105,18 +105,18 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Size</MudText>
+                    <MudText>Taille</MudText>
                 </div>
                 <MudSelect @bind-Value="_model.Size"
                            For="@(() => _model.Size)"
                            Disabled="@(_model.Mode == ChannelWatermarkMode.None)">
-                    <MudSelectItem Value="@(WatermarkSize.Scaled)">Scaled</MudSelectItem>
-                    <MudSelectItem Value="@(WatermarkSize.ActualSize)">Actual Size</MudSelectItem>
+                    <MudSelectItem Value="@(WatermarkSize.Scaled)">Mis à l'échelle</MudSelectItem>
+                    <MudSelectItem Value="@(WatermarkSize.ActualSize)">Taille réelle</MudSelectItem>
                 </MudSelect>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Width</MudText>
+                    <MudText>Largeur</MudText>
                 </div>
                 <MudTextField @bind-Value="_model.Width"
                               For="@(() => _model.Width)"
@@ -127,7 +127,7 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Horizontal Margin</MudText>
+                    <MudText>Marge horizontale</MudText>
                 </div>
                 <MudTextField @bind-Value="_model.HorizontalMargin"
                               For="@(() => _model.HorizontalMargin)"
@@ -138,7 +138,7 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Vertical Margin</MudText>
+                    <MudText>Marge verticale</MudText>
                 </div>
                 <MudTextField @bind-Value="_model.VerticalMargin"
                               For="@(() => _model.VerticalMargin)"
@@ -149,7 +149,7 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Frequency</MudText>
+                    <MudText>Fréquence</MudText>
                 </div>
                 <MudSelect @bind-Value="_model.FrequencyMinutes"
                            For="@(() => _model.FrequencyMinutes)"
@@ -164,7 +164,7 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Duration</MudText>
+                    <MudText>Durée</MudText>
                 </div>
                 <MudTextField @bind-Value="_model.DurationSeconds"
                               For="@(() => _model.DurationSeconds)"
@@ -175,7 +175,7 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Opacity</MudText>
+                    <MudText>Opacité</MudText>
                 </div>
                 <MudTextField @bind-Value="_model.Opacity"
                               For="@(() => _model.Opacity)"
@@ -186,7 +186,7 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Opacity Expression</MudText>
+                    <MudText>Expression d'opacité</MudText>
                 </div>
                 <MudTextField @bind-Value="_model.OpacityExpression"
                               For="@(() => _model.OpacityExpression)"
@@ -194,7 +194,7 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Z-Index</MudText>
+                    <MudText>Ordre (Z)</MudText>
                 </div>
                 <MudTextField @bind-Value="_model.ZIndex" For="@(() => _model.ZIndex)"/>
             </MudStack>
@@ -285,7 +285,7 @@
                 errorMessage.HeadOrNone().Match(
                     error =>
                     {
-                        Snackbar.Add("Unexpected error saving watermark");
+                        Snackbar.Add("Erreur inattendue à l'enregistrement du filigrane");
                         Logger.LogError("Unexpected error saving watermark: {Error}", error.Value);
                     },
                     () => NavigationManager.NavigateTo("watermarks"));
@@ -314,7 +314,7 @@
                 },
                 error =>
                 {
-                    Snackbar.Add($"Unexpected error saving watermark: {error.Value}", Severity.Error);
+                    Snackbar.Add($"Erreur à l'enregistrement du filigrane : {error.Value}", Severity.Error);
                     Logger.LogError("Unexpected error saving watermark: {Error}", error.Value);
                 });
         }
@@ -324,12 +324,12 @@
         }
         catch (IOException)
         {
-            Snackbar.Add($"Watermark exceeds maximum allowed file size of {SystemEnvironment.MaximumUploadMb} MB", Severity.Error);
+            Snackbar.Add($"Le filigrane dépasse la taille maximale de {SystemEnvironment.MaximumUploadMb} Mo", Severity.Error);
             Logger.LogError("Watermark exceeds maximum allowed file size of {MaximumUploadMb} MB", SystemEnvironment.MaximumUploadMb);
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Unexpected error saving watermark: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Erreur à l'enregistrement du filigrane : {ex.Message}", Severity.Error);
             Logger.LogError("Unexpected error saving watermark: {Error}", ex.Message);
         }
     }

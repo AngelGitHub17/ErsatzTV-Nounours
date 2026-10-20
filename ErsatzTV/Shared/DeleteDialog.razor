@@ -18,8 +18,8 @@
             }
         </DialogContent>
         <DialogActions>
-            <MudButton OnClick="Cancel">Cancel</MudButton>
-            <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="Submit">Delete</MudButton>
+            <MudButton OnClick="Cancel">Annuler</MudButton>
+            <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="Submit">Supprimer</MudButton>
         </DialogActions>
     </MudDialog>
 </div>
@@ -41,7 +41,21 @@
     [Parameter]
     public string DetailHighlight { get; set; }
 
-    private string FormatText() => $"Do you really want to delete the {EntityType} {EntityName}? This process cannot be undone.";
+    private static readonly Dictionary<string, string> Types = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Trakt List"] = "la liste Trakt", ["artist"] = "l'artiste", ["block group"] = "le groupe de blocs", ["block"] = "le bloc",
+        ["channel"] = "la chaîne", ["collection"] = "la collection", ["deco group"] = "le groupe de décos", ["deco"] = "la déco",
+        ["decoTemplate group"] = "le groupe de modèles de déco", ["decoTemplate"] = "le modèle de déco", ["episode"] = "l'épisode",
+        ["ffmpeg profile"] = "le profil FFmpeg", ["filler preset"] = "le préréglage de remplissage", ["image"] = "l'image",
+        ["library path"] = "le dossier", ["library"] = "la bibliothèque", ["movie"] = "le film", ["multi collection"] = "la multi-collection",
+        ["music video"] = "le clip", ["other video"] = "la vidéo", ["playlist group"] = "le groupe de playlists", ["playlist"] = "la playlist",
+        ["playout"] = "le playout", ["remote stream"] = "le flux distant", ["rerun collection"] = "la collection de rediffusion",
+        ["schedule"] = "le planning", ["season"] = "la saison", ["show"] = "la série", ["smart collection"] = "la collection intelligente",
+        ["song"] = "le morceau", ["template group"] = "le groupe de modèles", ["template"] = "le modèle", ["watermark"] = "le filigrane"
+    };
+
+    private string FormatText() =>
+        $"Voulez-vous vraiment supprimer {(Types.TryGetValue(EntityType ?? string.Empty, out string label) ? label : EntityType)} {EntityName} ? Cette action est irréversible.";
 
     private void Submit() => MudDialog.Close(DialogResult.Ok(true));
 

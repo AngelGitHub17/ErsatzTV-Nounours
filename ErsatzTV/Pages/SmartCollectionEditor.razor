@@ -9,18 +9,18 @@
 <MudForm @ref="_form" @bind-IsValid="@_success" Style="max-height: 100%">
     <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
         <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-6" OnClick="@HandleSubmitAsync" StartIcon="@Icons.Material.Filled.Save">
-            Save Smart Collection
+            Enregistrer la collection intelligente
         </MudButton>
     </MudPaper>
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
-            <MudText Typo="Typo.h5" Class="mb-2">Smart Collection</MudText>
+            <MudText Typo="Typo.h5" Class="mb-2">Collection intelligente</MudText>
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Name</MudText>
+                    <MudText>Nom</MudText>
                 </div>
-                <MudTextField @bind-Value="_model.Name" For="@(() => _model.Name)" Required="true" RequiredError="Smart collection name is required!"/>
+                <MudTextField @bind-Value="_model.Name" For="@(() => _model.Name)" Required="true" RequiredError="Le nom de la collection intelligente est obligatoire !"/>
             </MudStack>
         </MudContainer>
     </div>

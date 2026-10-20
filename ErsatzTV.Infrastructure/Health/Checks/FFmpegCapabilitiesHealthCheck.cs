@@ -1,4 +1,4 @@
-using ErsatzTV.Core.Domain;
+﻿using ErsatzTV.Core.Domain;
 using ErsatzTV.Core.Health;
 using ErsatzTV.Core.Health.Checks;
 using ErsatzTV.Core.Interfaces.Repositories;
@@ -9,7 +9,7 @@ namespace ErsatzTV.Infrastructure.Health.Checks;
 public class FFmpegCapabilitiesHealthCheck(IConfigElementRepository configElementRepository, IHardwareCapabilitiesFactory hardwareCapabilitiesFactory)
     : BaseHealthCheck, IFFmpegCapabilitiesHealthCheck
 {
-    public override string Title => "FFmpeg Capabilities";
+    public override string Title => "Capacités de FFmpeg";
 
     public async Task<HealthCheckResult> Check(CancellationToken cancellationToken)
     {
@@ -40,7 +40,7 @@ public class FFmpegCapabilitiesHealthCheck(IConfigElementRepository configElemen
             {
                 return FailResult(
                     $"FFmpeg is missing required filters and will NOT work correctly: [{string.Join(", ", missingFilters)}]",
-                    "FFmpeg is missing required filters and will NOT work correctly");
+                    "Il manque des filtres à FFmpeg : il ne fonctionnera PAS correctement");
             }
         }
 

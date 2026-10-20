@@ -1,0 +1,38 @@
+@page "/modules/bloc-notes"
+@inject NotesStore Store
+
+<PageTitle>Bloc-notes</PageTitle>
+
+<div class="n-page">
+    <div class="n-page-header">
+        <div>
+            <h1>Bloc-notes de la régie</h1>
+            <p>Un module externe d'exemple. Les notes sont enregistrées dans le dossier du module.</p>
+        </div>
+    </div>
+    <div class="n-card mb-4">
+        <MudTextField @bind-Value="_text" Label="Nouvelle note" Variant="Variant.Outlined" Lines="2"/>
+        <MudButton Class="mt-2" Variant="Variant.Filled" Color="Color.Primary" OnClick="Add" Disabled="@string.IsNullOrWhiteSpace(_text)">Ajouter</MudButton>
+    </div>
+    @foreach (Note note in _notes)
+    {
+        <div class="n-card mb-2">
+            <MudText Typo="Typo.caption" Class="n-muted">@note.When.ToString("dd/MM/yyyy HH:mm")</MudText>
+            <MudText>@note.Text</MudText>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Note> _notes = [];
+    private string _text = string.Empty;
+
+    protected override async Task OnInitializedAsync() => _notes = await Store.GetAll();
+
+    private async Task Add()
+    {
+        await Store.Add(_text);
+        _text = string.Empty;
+        _notes = await Store.GetAll();
+    }
+}

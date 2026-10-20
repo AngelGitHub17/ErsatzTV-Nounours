@@ -64,6 +64,25 @@ public partial class GraphicsElementLoader(
 
                         break;
                     }
+                    case GraphicsElementKind.Clock:
+                    {
+                        Option<ClockGraphicsElement> maybeElement = await LoadClock(
+                            reference.GraphicsElement.Path,
+                            templateVariables);
+                        if (maybeElement.IsNone)
+                        {
+                            logger.LogWarning(
+                                "Failed to load clock graphics element from file {Path}; ignoring",
+                                reference.GraphicsElement.Path);
+                        }
+
+                        foreach (ClockGraphicsElement element in maybeElement)
+                        {
+                            context.Elements.Add(new ClockElementDataContext(element));
+                        }
+
+                        break;
+                    }
                     case GraphicsElementKind.Image:
                     {
                         Option<ImageGraphicsElement> maybeElement = await LoadImage(
@@ -227,6 +246,9 @@ public partial class GraphicsElementLoader(
 
     private Task<Option<TextGraphicsElement>> LoadText(string fileName, Dictionary<string, object> variables) =>
         GetTemplatedYaml(fileName, variables).BindT(FromYaml<TextGraphicsElement>);
+
+    private Task<Option<ClockGraphicsElement>> LoadClock(string fileName, Dictionary<string, object> variables) =>
+        GetTemplatedYaml(fileName, variables).BindT(FromYaml<ClockGraphicsElement>);
 
     private Task<Option<MotionGraphicsElement>> LoadMotion(string fileName, Dictionary<string, object> variables) =>
         GetTemplatedYaml(fileName, variables).BindT(FromYaml<MotionGraphicsElement>);

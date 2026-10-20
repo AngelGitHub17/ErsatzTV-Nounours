@@ -1,0 +1,98 @@
+@page "/habillage"
+@using System.Globalization
+@using ErsatzTV.Application.Nounours
+@inject IHabillageService HabillageService
+@inject IDialogService Dialog
+@inject ISnackbar Snackbar
+
+<PageTitle>Studio d'habillage · ErsatzTV</PageTitle>
+
+<div class="n-page" style="height: 100%; overflow-y: auto">
+    <div class="n-page-header">
+        <div>
+            <h1>Studio d'habillage</h1>
+            <p>Composez ce qui s'affiche par-dessus vos programmes — horloge, logo, bandeau, « à suivre »… — comme dans OBS, puis appliquez-le à vos chaînes.</p>
+        </div>
+        <MudButton Href="habillage/nouveau" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">Nouvel habillage</MudButton>
+    </div>
+
+    @if (_scenes is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary"/>
+    }
+    else if (_scenes.Count == 0)
+    {
+        <div class="n-empty">
+            <MudIcon Icon="@Icons.Material.Filled.Layers" Style="font-size: 3.5rem" Color="Color.Primary"/>
+            <MudText Typo="Typo.h6">Aucun habillage pour l'instant</MudText>
+            <MudText Class="n-muted" Style="max-width: 520px">
+                Un habillage regroupe des calques : une horloge en direct, votre logo, le titre du programme, un bandeau « À suivre »…
+                Ils sont incrustés en temps réel dans le flux de la chaîne.
+            </MudText>
+            <MudButton Href="habillage/nouveau?modele=classique" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2" StartIcon="@Icons.Material.Filled.AutoAwesome">Partir d'un modèle prêt à l'emploi</MudButton>
+        </div>
+    }
+    else
+    {
+        <div class="n-modules">
+            @foreach (HabillageSummary scene in _scenes)
+            {
+                <div class="n-card d-flex flex-column" @key="scene.Slug">
+                    <div class="d-flex align-center gap-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Layers" Color="Color.Primary"/>
+                        <MudText Typo="Typo.h6" Style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">@scene.Name</MudText>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(scene.Description))
+                    {
+                        <MudText Typo="Typo.body2" Class="n-muted mt-1">@scene.Description</MudText>
+                    }
+                    <MudText Typo="Typo.body2" Class="n-muted mt-2">
+                        @scene.Items calque(s) · modifié le @scene.UpdatedAt.ToString("d MMM à HH:mm", CultureInfo.GetCultureInfo("fr-FR"))
+                    </MudText>
+                    <div class="mt-2" style="flex: 1">
+                        @if (scene.Channels.Count == 0)
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">Appliqué à aucune chaîne</MudChip>
+                        }
+                        else
+                        {
+                            @foreach (string channel in scene.Channels)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text">@channel</MudChip>
+                            }
+                        }
+                    </div>
+                    <div class="d-flex gap-1 mt-3">
+                        <MudButton Href="@($"habillage/{scene.Slug}")" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Edit">Ouvrir</MudButton>
+                        <MudSpacer/>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => Delete(scene))" aria-label="Supprimer"/>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<HabillageSummary> _scenes;
+
+    protected override async Task OnInitializedAsync() => _scenes = await HabillageService.GetAll(CancellationToken.None);
+
+    private async Task Delete(HabillageSummary scene)
+    {
+        bool? confirm = await Dialog.ShowMessageBoxAsync(
+            "Supprimer l'habillage ?",
+            $"« {scene.Name} » sera retiré des chaînes qui l'utilisent. Cette action est définitive.",
+            yesText: "Supprimer",
+            cancelText: "Annuler");
+        if (confirm != true)
+        {
+            return;
+        }
+
+        await HabillageService.Delete(scene.Slug, CancellationToken.None);
+        Snackbar.Add("Habillage supprimé", Severity.Success);
+        _scenes = await HabillageService.GetAll(CancellationToken.None);
+    }
+
+}

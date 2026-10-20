@@ -9,12 +9,12 @@
 <MudForm Style="max-height: 100%">
     <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
         <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-6" StartIcon="@Icons.Material.Filled.Add" Href="media/filler/presets/add">
-            Add Filler Preset
+            Ajouter un préréglage de remplissage
         </MudButton>
     </MudPaper>
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
-            <MudText Typo="Typo.h5" Class="mb-2">Filler Presets</MudText>
+            <MudText Typo="Typo.h5" Class="mb-2">Préréglages de remplissage</MudText>
             <MudDivider Class="mb-6"/>
             <MudTable Hover="true"
                       @bind-RowsPerPage="@_fillerPresetsRowsPerPage"
@@ -29,13 +29,13 @@
                     </MudHidden>
                 </ColGroup>
                 <HeaderContent>
-                    <MudTh>Name</MudTh>
-                    <MudTh>Filler Kind</MudTh>
+                    <MudTh>Nom</MudTh>
+                    <MudTh>Type de remplissage</MudTh>
                     <MudTh/>
                 </HeaderContent>
                 <RowTemplate>
-                    <MudTd DataLabel="Name">@context.Name</MudTd>
-                    <MudTd DataLabel="Filler Kind">
+                    <MudTd DataLabel="Nom">@context.Name</MudTd>
+                    <MudTd DataLabel="Type de remplissage">
                         @(
                         context.FillerKind switch
                         {
@@ -50,12 +50,12 @@
                     </MudTd>
                     <MudTd>
                         <div style="align-items: center; display: flex;">
-                            <MudTooltip Text="Edit Filler Preset">
+                            <MudTooltip Text="Modifier le préréglage de remplissage">
                                 <MudIconButton Icon="@Icons.Material.Filled.Edit"
                                                Href="@($"media/filler/presets/{context.Id}/edit")">
                                 </MudIconButton>
                             </MudTooltip>
-                            <MudTooltip Text="Delete Filler Preset">
+                            <MudTooltip Text="Supprimer le préréglage de remplissage">
                                 <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                                OnClick="@(_ => DeleteFillerPreset(context))">
                                 </MudIconButton>
@@ -64,7 +64,7 @@
                     </MudTd>
                 </RowTemplate>
                 <PagerContent>
-                    <MudTablePager/>
+                    <MudTablePager InfoFormat="{first_item}-{last_item} sur {all_items}"/>
                 </PagerContent>
             </MudTable>
         </MudContainer>
@@ -107,7 +107,7 @@
         var parameters = new DialogParameters { { "EntityType", "filler preset" }, { "EntityName", fillerPreset.Name } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        IDialogReference dialog = await Dialog.ShowAsync<DeleteDialog>("Delete Filler Preset", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<DeleteDialog>("Supprimer le préréglage de remplissage", parameters, options);
         DialogResult result = await dialog.Result;
         if (result is { Canceled: false })
         {

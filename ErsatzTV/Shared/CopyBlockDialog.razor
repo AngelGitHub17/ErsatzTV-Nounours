@@ -8,27 +8,27 @@
     <DialogContent>
         <EditForm Model="@_dummyModel" OnSubmit="@(_ => Submit())">
             <div class="d-flex mb-6">
-                <MudText>Select a group for the new block</MudText>
+                <MudText>Choisissez un groupe pour le nouveau bloc</MudText>
             </div>
-            <MudSelect @bind-Value="_selectedBlockGroup" Class="mb-6 mx-4" Label="New Block Group">
+            <MudSelect @bind-Value="_selectedBlockGroup" Class="mb-6 mx-4" Label="Nouveau groupe de blocs">
                 @foreach (BlockGroupViewModel blockGroup in _blockGroups)
                 {
                     <MudSelectItem Value="@blockGroup">@blockGroup.Name</MudSelectItem>
                 }
             </MudSelect>
             <div class="d-flex mb-6">
-                <MudText>Enter a name for the new block</MudText>
+                <MudText>Nom du nouveau bloc</MudText>
             </div>
-            <MudTextField T="string" Label="New Block Name"
+            <MudTextField T="string" Label="Nom du nouveau bloc"
                           @bind-Text="@_newName"
                           Class="mb-6 mx-4">
             </MudTextField>
         </EditForm>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="@Cancel" ButtonType="ButtonType.Reset">Cancel</MudButton>
+        <MudButton OnClick="@Cancel" ButtonType="ButtonType.Reset">Annuler</MudButton>
         <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@Submit">
-            Copy Block
+            Copier le bloc
         </MudButton>
     </DialogActions>
 </MudDialog>

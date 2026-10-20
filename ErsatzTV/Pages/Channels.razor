@@ -1,4 +1,4 @@
-@page "/channels"
+﻿@page "/channels"
 @using System.Globalization
 @using ErsatzTV.Application.Channels
 @using ErsatzTV.Application.Configuration
@@ -176,7 +176,7 @@
                     </MudTd>
                 </RowTemplate>
                 <PagerContent>
-                    <MudTablePager RowsPerPageString="@CommonLoc["LabelRowsPerPage"]" />
+                    <MudTablePager InfoFormat="{first_item}-{last_item} sur {all_items}" RowsPerPageString="@CommonLoc["LabelRowsPerPage"]" />
                 </PagerContent>
             </MudTable>
         </MudContainer>
@@ -327,7 +327,7 @@
 
         var parameters = new DialogParameters { { "StreamUri", uri.ToString() } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraLarge };
-        await Dialog.ShowAsync<ChannelPreviewDialog>("Channel Preview", parameters, options);
+        await Dialog.ShowAsync<ChannelPreviewDialog>("Aperçu de la chaîne", parameters, options);
     }
 
     private async Task DeleteChannelAsync(ChannelViewModel channel)
@@ -335,7 +335,7 @@
         var parameters = new DialogParameters { { "EntityType", "channel" }, { "EntityName", channel.Name } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        IDialogReference dialog = await Dialog.ShowAsync<DeleteDialog>("Delete Channel", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<DeleteDialog>("Supprimer la chaîne", parameters, options);
         DialogResult result = await dialog.Result;
         if (result is { Canceled: false })
         {

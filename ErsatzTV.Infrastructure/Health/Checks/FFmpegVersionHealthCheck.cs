@@ -15,7 +15,7 @@ public class FFmpegVersionHealthCheck(
     private const string BundledVersionVaapi = "7.1.1";
     private const string WindowsVersionPrefix = "n7.1.1";
 
-    public override string Title => "FFmpeg Version";
+    public override string Title => "Version de FFmpeg";
 
     public async Task<HealthCheckResult> Check(CancellationToken cancellationToken)
     {
@@ -25,14 +25,14 @@ public class FFmpegVersionHealthCheck(
             await configElementRepository.GetConfigElement(ConfigElementKey.FFmpegPath, cancellationToken);
         if (maybeFFmpegPath.IsNone)
         {
-            return FailResult("Unable to locate ffmpeg", "Unable to locate ffmpeg", link);
+            return FailResult("ffmpeg introuvable", "ffmpeg introuvable", link);
         }
 
         Option<ConfigElement> maybeFFprobePath =
             await configElementRepository.GetConfigElement(ConfigElementKey.FFprobePath, cancellationToken);
         if (maybeFFprobePath.IsNone)
         {
-            return FailResult("Unable to locate ffprobe", "Unable to locate ffprobe", link);
+            return FailResult("ffprobe introuvable", "ffprobe introuvable", link);
         }
 
         foreach (ConfigElement ffmpegPath in maybeFFmpegPath)
@@ -41,7 +41,7 @@ public class FFmpegVersionHealthCheck(
                 await hardwareCapabilitiesFactory.GetFFmpegVersion(ffmpegPath.Value, cancellationToken);
             if (maybeVersion.IsNone || maybeVersion.Exists(string.IsNullOrWhiteSpace))
             {
-                return WarningResult("Unable to determine ffmpeg version", "Unable to determine ffmpeg version", link);
+                return WarningResult("Impossible de déterminer la version de ffmpeg", "Impossible de déterminer la version de ffmpeg", link);
             }
 
             foreach (string version in maybeVersion)
@@ -60,8 +60,8 @@ public class FFmpegVersionHealthCheck(
             if (maybeVersion.IsNone || maybeVersion.Exists(string.IsNullOrWhiteSpace))
             {
                 return WarningResult(
-                    "Unable to determine ffprobe version",
-                    "Unable to determine ffprobe version",
+                    "Impossible de déterminer la version de ffprobe",
+                    "Impossible de déterminer la version de ffprobe",
                     link);
             }
 
@@ -74,7 +74,7 @@ public class FFmpegVersionHealthCheck(
             }
         }
 
-        return new HealthCheckResult("FFmpeg Version", HealthCheckStatus.Pass, string.Empty, string.Empty, None);
+        return new HealthCheckResult("Version de FFmpeg", HealthCheckStatus.Pass, string.Empty, string.Empty, None);
     }
 
     private Option<HealthCheckResult> ValidateVersion(string version, string app, HealthCheckLink link)
@@ -85,8 +85,8 @@ public class FFmpegVersionHealthCheck(
             version.StartsWith("6.", StringComparison.OrdinalIgnoreCase))
         {
             return FailResult(
-                $"{app} version {version} is too old; please install 7.1.1!",
-                $"{app} version is too old",
+                $"{app} {version} est trop ancien ; installez la version 7.1.1 !",
+                $"Version de {app} trop ancienne",
                 link);
         }
 
@@ -96,8 +96,8 @@ public class FFmpegVersionHealthCheck(
             version != BundledVersionVaapi)
         {
             return WarningResult(
-                $"{app} version {version} is unexpected and may have problems; please install 7.1.1!",
-                $"{app} version is unexpected",
+                $"{app} {version} est une version inattendue qui peut poser problème ; installez la version 7.1.1 !",
+                $"Version de {app} inattendue",
                 link);
         }
 

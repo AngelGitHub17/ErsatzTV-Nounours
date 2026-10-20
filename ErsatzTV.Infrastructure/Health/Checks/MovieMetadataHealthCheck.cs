@@ -13,7 +13,7 @@ public class MovieMetadataHealthCheck : BaseHealthCheck, IMovieMetadataHealthChe
     public MovieMetadataHealthCheck(IDbContextFactory<TvContext> dbContextFactory) =>
         _dbContextFactory = dbContextFactory;
 
-    public override string Title => "Movie Metadata";
+    public override string Title => "Métadonnées des films";
 
     public async Task<HealthCheckResult> Check(CancellationToken cancellationToken)
     {
@@ -38,8 +38,8 @@ public class MovieMetadataHealthCheck : BaseHealthCheck, IMovieMetadataHealthChe
             var folders = string.Join(", ", paths);
 
             return WarningResult(
-                $"There are {movies.Count} movies with missing metadata, including in the following folders: {folders}",
-                $"There are {movies.Count} movies with missing metadata");
+                $"{movies.Count} film(s) sans métadonnées, notamment dans : {folders}",
+                $"{movies.Count} film(s) sans métadonnées");
         }
 
         return OkResult();

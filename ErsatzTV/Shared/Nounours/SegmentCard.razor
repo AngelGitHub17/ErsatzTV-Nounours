@@ -1,0 +1,232 @@
+@using ErsatzTV.Application.Nounours
+@inject IContentCatalog ContentCatalog
+
+<div class="n-seg n-seg-@Segment.Role.ToString().ToLowerInvariant()">
+    <div class="n-seg-head">
+        <span class="n-seg-index">@(Index + 1)</span>
+        <MudSelect T="SegmentRole" Value="@Segment.Role" ValueChanged="@SetRole" Variant="Variant.Text" Dense="true" Style="max-width: 190px" Margin="Margin.Dense">
+            @foreach (SegmentRole role in Roles)
+            {
+                <MudSelectItem Value="@role">@RoleLabel(role)</MudSelectItem>
+            }
+        </MudSelect>
+        <MudTextField T="string" Value="@Segment.Label" ValueChanged="@(v => { Segment.Label = v; Changed(); })" Placeholder="Nom du segment (facultatif)"
+                      Variant="Variant.Text" Margin="Margin.Dense" Style="flex: 1"/>
+        @if (Estimate is { } e)
+        {
+            <span class="n-muted" style="font-size: .8rem; white-space: nowrap">≈ @ErsatzTV.Application.Nounours.ContentCatalog.Format(e)</span>
+        }
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small" Disabled="@IsFirst" OnClick="@(() => OnMove.InvokeAsync(-1))" aria-label="Monter"/>
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small" Disabled="@IsLast" OnClick="@(() => OnMove.InvokeAsync(1))" aria-label="Descendre"/>
+        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" OnClick="@(() => OnDuplicate.InvokeAsync())" aria-label="Dupliquer"/>
+        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => OnRemove.InvokeAsync())" aria-label="Supprimer"/>
+    </div>
+    <div class="n-seg-body">
+        <MudAutocomplete T="ContentChoice"
+                         Value="@CurrentChoice"
+                         ValueChanged="@SetChoice"
+                         SearchFunc="@Search"
+                         ToStringFunc="@(c => c?.Label)"
+                         Label="@SourceLabel"
+                         Variant="Variant.Outlined"
+                         Margin="Margin.Dense"
+                         MaxItems="80"
+                         Strict="false"
+                         DebounceInterval="250"
+                         HelperText="@SourceHelp"
+                         Style="flex: 2; min-width: 260px">
+            <ItemTemplate Context="c">
+                <div>@c.Label</div>
+                <div class="n-muted" style="font-size: .75rem">@c.Detail</div>
+            </ItemTemplate>
+        </MudAutocomplete>
+        @if (Segment.SourceKind == ContentSourceKind.Search && !IsPresetQuery)
+        {
+            <MudTextField T="string" Value="@Segment.Query" ValueChanged="@(v => { Segment.Query = v; Segment.SourceId = null; Changed(); })" Label="Recherche"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="ex. genre:pub, title:jingle" Style="flex: 1; min-width: 180px"/>
+        }
+        <MudNumericField T="int" Value="@Segment.Count" ValueChanged="@(v => { Segment.Count = Math.Max(1, v); Changed(); })" Min="1" Max="50"
+                         Label="@(Segment.Role == SegmentRole.Programme ? "Fois" : "Nombre")" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 100px"/>
+        @if (Segment.SourceKind is not (ContentSourceKind.MediaItem or ContentSourceKind.Programme or ContentSourceKind.Playlist))
+        {
+            <MudSelect T="PlaybackOrder" Value="@Segment.Order" ValueChanged="@(v => { Segment.Order = v; Changed(); })" Label="Ordre" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 190px">
+                <MudSelectItem Value="PlaybackOrder.Shuffle">Mélangé</MudSelectItem>
+                <MudSelectItem Value="PlaybackOrder.Random">Aléatoire</MudSelectItem>
+                <MudSelectItem Value="PlaybackOrder.Chronological">Chronologique</MudSelectItem>
+                <MudSelectItem Value="PlaybackOrder.SeasonEpisode">Saison puis épisode</MudSelectItem>
+            </MudSelect>
+        }
+        @if (ShowGuideOption)
+        {
+            <MudTooltip Text="Afficher ce segment comme un programme dans le guide (EPG)">
+                <MudCheckBox T="bool" Value="@Segment.IsInGuide" ValueChanged="@(v => { Segment.ShowInGuide = v; Changed(); })" Color="Color.Primary" Label="Guide" Dense="true"/>
+            </MudTooltip>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public ProgrammeSegment Segment { get; set; }
+
+    [Parameter]
+    public int Index { get; set; }
+
+    [Parameter]
+    public bool IsFirst { get; set; }
+
+    [Parameter]
+    public bool IsLast { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<ContentChoice> Choices { get; set; } = [];
+
+    [Parameter]
+    public IReadOnlyList<SegmentRole> Roles { get; set; } = Enum.GetValues<SegmentRole>();
+
+    [Parameter]
+    public bool ShowGuideOption { get; set; } = true;
+
+    [Parameter]
+    public TimeSpan? Estimate { get; set; }
+
+    [Parameter]
+    public string ExcludeProgrammeSlug { get; set; }
+
+    [Parameter]
+    public EventCallback OnChanged { get; set; }
+
+    [Parameter]
+    public EventCallback OnRemove { get; set; }
+
+    [Parameter]
+    public EventCallback OnDuplicate { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnMove { get; set; }
+
+    private bool IsPresetQuery => Segment.Query is "type:movie" or "type:episode" or "type:music_video" or "type:other_video";
+
+    private string SourceLabel => Segment.Role switch
+    {
+        SegmentRole.Pub => "Pubs (collection, dossier, recherche…)",
+        SegmentRole.Jingle => "Jingle (fichier précis ou collection)",
+        SegmentRole.Programme => "Programme à enchaîner",
+        SegmentRole.BandeAnnonce => "Bandes-annonces",
+        _ => "Contenu"
+    };
+
+    private string SourceHelp => Segment.Role switch
+    {
+        SegmentRole.Jingle => "Tapez le titre d'un fichier pour le trouver directement",
+        SegmentRole.Programme => "Les segments de ce programme sont insérés ici",
+        _ => null
+    };
+
+    private ContentChoice CurrentChoice
+    {
+        get
+        {
+            if (Segment.SourceKind == ContentSourceKind.Search)
+            {
+                return ContentChoice.Presets.FirstOrDefault(p => p.Query == Segment.Query && p.Query.Length > 0)
+                       ?? new ContentChoice(ContentSourceKind.Search, Segment.SourceId, Segment.Query, string.IsNullOrEmpty(Segment.Query) ? "Recherche personnalisée…" : $"Recherche : {Segment.Query}", "Collection intelligente");
+            }
+
+            if (!Segment.SourceId.HasValue)
+            {
+                return null;
+            }
+
+            return Choices.FirstOrDefault(c => c.Kind == Segment.SourceKind && c.Id == Segment.SourceId)
+                   ?? new ContentChoice(Segment.SourceKind, Segment.SourceId, null, Segment.SourceName, string.Empty, Segment.ItemType);
+        }
+    }
+
+    private async Task<IEnumerable<ContentChoice>> Search(string text, CancellationToken token)
+    {
+        IEnumerable<ContentChoice> pool = Segment.Role == SegmentRole.Programme
+            ? Choices.Where(c => c.Kind == ContentSourceKind.Programme)
+            : ContentChoice.Presets.Concat(Choices.Where(c => c.Kind != ContentSourceKind.Programme || Segment.Role == SegmentRole.Contenu));
+
+        if (!string.IsNullOrWhiteSpace(ExcludeProgrammeSlug))
+        {
+            pool = pool.Where(c => c.Kind != ContentSourceKind.Programme || c.Query != ExcludeProgrammeSlug);
+        }
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return pool;
+        }
+
+        var matches = pool.Where(c => c.Label.Contains(text, StringComparison.CurrentCultureIgnoreCase) ||
+                                      c.Detail.Contains(text, StringComparison.CurrentCultureIgnoreCase)).ToList();
+        if (Segment.Role != SegmentRole.Programme && text.Trim().Length >= 2)
+        {
+            List<ContentOption> items = await ContentCatalog.SearchItems(text, token);
+            matches.AddRange(items.Select(ContentChoice.From));
+        }
+
+        return matches;
+    }
+
+    private async Task SetChoice(ContentChoice choice)
+    {
+        if (choice is null)
+        {
+            return;
+        }
+
+        Segment.SourceKind = choice.Kind;
+        Segment.SourceName = choice.Label;
+        Segment.ItemType = choice.ItemType;
+        if (choice.Kind == ContentSourceKind.Search)
+        {
+            Segment.Query = choice.Query ?? string.Empty;
+            Segment.SourceId = null;
+        }
+        else
+        {
+            Segment.SourceId = choice.Id;
+            Segment.Query = choice.Kind == ContentSourceKind.Programme ? choice.Query : string.Empty;
+        }
+
+        if (choice.Kind == ContentSourceKind.Show)
+        {
+            Segment.Order = PlaybackOrder.SeasonEpisode;
+        }
+
+        if (string.IsNullOrWhiteSpace(Segment.Label))
+        {
+            Segment.Label = choice.Label;
+        }
+
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task SetRole(SegmentRole role)
+    {
+        Segment.Role = role;
+        if (role == SegmentRole.Programme && Segment.SourceKind != ContentSourceKind.Programme)
+        {
+            Segment.SourceKind = ContentSourceKind.Programme;
+            Segment.SourceId = null;
+            Segment.SourceName = string.Empty;
+        }
+
+        await OnChanged.InvokeAsync();
+    }
+
+    private void Changed() => OnChanged.InvokeAsync();
+
+    public static string RoleLabel(SegmentRole role) =>
+        role switch
+        {
+            SegmentRole.Pub => "Pubs",
+            SegmentRole.Jingle => "Jingle",
+            SegmentRole.Contenu => "Programme principal",
+            SegmentRole.BandeAnnonce => "Bande-annonce",
+            SegmentRole.Programme => "Programme lié",
+            _ => "Autre"
+        };
+}

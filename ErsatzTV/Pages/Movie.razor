@@ -66,25 +66,25 @@
                 </MudCard>
             }
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="mb-6">
-                <MudMenu Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Label="Add To ...">
+                <MudMenu Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Label="Ajouter à…">
                     <MudMenuItem OnClick="@AddToCollection" Icon="@Icons.Material.Filled.Add">
-                        Add To Collection
+                        Ajouter à une collection
                     </MudMenuItem>
                     <MudMenuItem OnClick="@AddToPlaylist" Icon="@Icons.Material.Filled.PlaylistAdd">
-                        Add To Playlist
+                        Ajouter à une playlist
                     </MudMenuItem>
                 </MudMenu>
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Secondary"
                            StartIcon="@Icons.Material.Filled.Info"
                            OnClick="@ShowInfo">
-                    Show Media Info
+                    Infos du média
                 </MudButton>
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Secondary"
                            StartIcon="@Icons.Material.Filled.Troubleshoot"
                            Href="@($"system/troubleshooting/playback?mediaItem={MovieId}")">
-                    Troubleshoot Playback
+                    Dépanner la lecture
                 </MudButton>
             </MudStack>
         </div>
@@ -95,7 +95,7 @@
             <MudCardContent>
                 <div style="display: flex; flex-direction: row; flex-wrap: wrap">
                     <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" Class="mr-2"/>
-                    <MudText>File Not Found:&nbsp;</MudText>
+                    <MudText>Fichier introuvable :&nbsp;</MudText>
                     <MudText>@_movie.Path</MudText>
                 </div>
             </MudCardContent>
@@ -107,7 +107,7 @@
             <MudCardContent>
                 <div style="display: flex; flex-direction: row; flex-wrap: wrap">
                     <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Class="mr-2"/>
-                    <MudText>Unavailable:&nbsp;</MudText>
+                    <MudText>Indisponible :&nbsp;</MudText>
                     <MudText>@_movie.LocalPath</MudText>
                 </div>
             </MudCardContent>
@@ -118,7 +118,7 @@
             @if (_sortedContentRatings.Any())
             {
                 <div style="display: flex; flex-direction: row; flex-wrap: wrap">
-                    <MudText GutterBottom="true">Content Ratings:&nbsp;</MudText>
+                    <MudText GutterBottom="true">Classifications :&nbsp;</MudText>
                     <MudLink Href="@(@$"content_rating:""{_sortedContentRatings.Head()}""".GetRelativeSearchQuery())">@_sortedContentRatings.Head()</MudLink>
                     @foreach (string contentRating in _sortedContentRatings.Skip(1))
                     {
@@ -130,7 +130,7 @@
             @if (_sortedLanguages.Any())
             {
                 <div style="display: flex; flex-direction: row; flex-wrap: wrap">
-                    <MudText GutterBottom="true">Languages:&nbsp;</MudText>
+                    <MudText GutterBottom="true">Langues :&nbsp;</MudText>
                     <MudLink Href="@(@$"language:""{_sortedLanguages.Head().ToLowerInvariant()}""".GetRelativeSearchQuery())">@_sortedLanguages.Head()</MudLink>
                     @foreach (string language in _sortedLanguages.Skip(1))
                     {
@@ -142,7 +142,7 @@
             @if (_sortedStudios.Any())
             {
                 <div style="display: flex; flex-direction: row; flex-wrap: wrap">
-                    <MudText GutterBottom="true">Studios:&nbsp;</MudText>
+                    <MudText GutterBottom="true">Studios :&nbsp;</MudText>
                     <MudLink Href="@(@$"studio:""{_sortedStudios.Head().ToLowerInvariant()}""".GetRelativeSearchQuery())">@_sortedStudios.Head()</MudLink>
                     @foreach (string studio in _sortedStudios.Skip(1))
                     {
@@ -154,7 +154,7 @@
             @if (_sortedDirectors.Any())
             {
                 <div style="display: flex; flex-direction: row; flex-wrap: wrap">
-                    <MudText GutterBottom="true">Directors:&nbsp;</MudText>
+                    <MudText GutterBottom="true">Réalisation :&nbsp;</MudText>
                     <MudLink Href="@(@$"director:""{_sortedDirectors.Head().ToLowerInvariant()}""".GetRelativeSearchQuery())">@_sortedDirectors.Head()</MudLink>
                     @foreach (string director in _sortedDirectors.Skip(1))
                     {
@@ -166,7 +166,7 @@
             @if (_sortedWriters.Any())
             {
                 <div style="display: flex; flex-direction: row; flex-wrap: wrap">
-                    <MudText GutterBottom="true">Writers:&nbsp;</MudText>
+                    <MudText GutterBottom="true">Scénario :&nbsp;</MudText>
                     <MudLink Href="@(@$"writer:""{_sortedWriters.Head().ToLowerInvariant()}""".GetRelativeSearchQuery())">@_sortedWriters.Head()</MudLink>
                     @foreach (string writer in _sortedWriters.Skip(1))
                     {
@@ -178,7 +178,7 @@
             @if (_sortedGenres.Any())
             {
                 <div style="display: flex; flex-direction: row; flex-wrap: wrap">
-                    <MudText GutterBottom="true">Genres:&nbsp;</MudText>
+                    <MudText GutterBottom="true">Genres :&nbsp;</MudText>
                     <MudLink Href="@(@$"genre:""{_sortedGenres.Head().ToLowerInvariant()}""".GetRelativeSearchQuery())">@_sortedGenres.Head()</MudLink>
                     @foreach (string genre in _sortedGenres.Skip(1))
                     {
@@ -190,7 +190,7 @@
             @if (_sortedTags.Any())
             {
                 <div style="display: flex; flex-direction: row; flex-wrap: wrap">
-                    <MudText GutterBottom="true">Tags:&nbsp;</MudText>
+                    <MudText GutterBottom="true">Tags :&nbsp;</MudText>
                     <MudLink Href="@(@$"tag:""{_sortedTags.Head().ToLowerInvariant()}""".GetRelativeSearchQuery())">@_sortedTags.Head()</MudLink>
                     @foreach (string tag in _sortedTags.Skip(1))
                     {
@@ -205,7 +205,7 @@
 @if (_movie is not null && _movie.Actors.Any())
 {
     <MudContainer MaxWidth="MaxWidth.Large">
-        <MudText Class="mb-4">Actors</MudText>
+        <MudText Class="mb-4">Acteurs</MudText>
         <MudStack Row="true" Wrap="Wrap.Wrap">
             @foreach (ActorCardViewModel actor in _movie.Actors)
             {
@@ -301,7 +301,7 @@
         var parameters = new DialogParameters { { "EntityType", "movie" }, { "EntityName", _movie.Title } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        IDialogReference dialog = await Dialog.ShowAsync<AddToCollectionDialog>("Add To Collection", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<AddToCollectionDialog>("Ajouter à une collection", parameters, options);
         DialogResult result = await dialog.Result;
         if (result is { Canceled: false, Data: MediaCollectionViewModel collection })
         {
@@ -315,7 +315,7 @@
         var parameters = new DialogParameters { { "EntityType", "movie" }, { "EntityName", _movie.Title } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        IDialogReference dialog = await Dialog.ShowAsync<AddToPlaylistDialog>("Add To Playlist", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<AddToPlaylistDialog>("Ajouter à une playlist", parameters, options);
         DialogResult result = await dialog.Result;
         if (result is { Canceled: false, Data: PlaylistViewModel playlist })
         {
@@ -330,7 +330,7 @@
 
         foreach (BaseError error in maybeInfo.LeftToSeq())
         {
-            Snackbar.Add("Unexpected error loading media info");
+            Snackbar.Add("Erreur inattendue au chargement des infos du média");
             Logger.LogError("Unexpected error loading media info: {Error}", error.Value);
         }
 

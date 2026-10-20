@@ -29,7 +29,7 @@ public class UnavailableHealthCheck : BaseHealthCheck, IUnavailableHealthCheck
         _embyPathReplacementService = embyPathReplacementService;
     }
 
-    public override string Title => "Unavailable";
+    public override string Title => "Indisponibles";
 
     public async Task<HealthCheckResult> Check(CancellationToken cancellationToken)
     {
@@ -85,8 +85,8 @@ public class UnavailableHealthCheck : BaseHealthCheck, IUnavailableHealthCheck
             int count = await mediaItems.CountAsync(cancellationToken);
 
             return WarningResult(
-                $"There are {count} items that are unavailable because ErsatzTV cannot find them on disk, including the following: {files}",
-                $"There are {count} items that are unavailable",
+                $"{count} élément(s) indisponible(s) car introuvable(s) sur le disque, dont : {files}",
+                $"{count} élément(s) indisponible(s)",
                 new HealthCheckLink("search?query=state%3aUnavailable"));
         }
 

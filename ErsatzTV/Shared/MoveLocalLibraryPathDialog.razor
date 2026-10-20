@@ -11,16 +11,16 @@
         <EditForm Model="@_dummyModel" OnSubmit="@(_ => Submit())">
             <MudContainer Class="mb-6">
                 <MudText>
-                    Select the destination library
+                    Choisissez la bibliothèque de destination
                 </MudText>
             </MudContainer>
-            <MudSelect Label="Library" @bind-Value="_selectedLibrary" Class="mb-6 mx-4">
+            <MudSelect Label="Bibliothèque" @bind-Value="_selectedLibrary" Class="mb-6 mx-4">
                 @foreach (LocalLibraryViewModel library in _libraries)
                 {
                     <MudSelectItem Value="@library">@library.Name</MudSelectItem>
                 }
             </MudSelect>
-            <MudTextField T="string" Label="New Library Name"
+            <MudTextField T="string" Label="Nom de la nouvelle bibliothèque"
                           Disabled="@(_selectedLibrary != _newLibrary)"
                           @bind-Text="@_newLibraryName"
                           Class="mb-6 mx-4">
@@ -28,9 +28,9 @@
         </EditForm>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel" ButtonType="ButtonType.Reset">Cancel</MudButton>
+        <MudButton OnClick="Cancel" ButtonType="ButtonType.Reset">Annuler</MudButton>
         <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">
-            Move To Library
+            Déplacer vers la bibliothèque
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -77,7 +77,7 @@
 
         try
         {
-            _newLibrary = new LocalLibraryViewModel(-1, "(New Library)", MediaKind, -1);
+            _newLibrary = new LocalLibraryViewModel(-1, "(Nouvelle bibliothèque)", MediaKind, -1);
 
             _libraries = await Mediator.Send(new GetAllLocalLibraries(), token)
                 .Map(list => list.Filter(ll => ll.MediaKind == MediaKind && ll.Id != SourceLibraryId))

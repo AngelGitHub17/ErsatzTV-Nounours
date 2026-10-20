@@ -10,18 +10,18 @@
 <MudForm @ref="_form" @bind-IsValid="@_success" Style="max-height: 100%">
     <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
         <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(_ => HandleSubmitAsync())" Class="ml-6" StartIcon="@Icons.Material.Filled.Save">
-            @(IsEdit ? "Save Multi Collection" : "Add Multi Collection")
+            @(IsEdit ? "Enregistrer la multi-collection" : "Ajouter la multi-collection")
         </MudButton>
     </MudPaper>
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
-            <MudText Typo="Typo.h5" Class="mb-2">Multi Collection</MudText>
+            <MudText Typo="Typo.h5" Class="mb-2">Multi-collection</MudText>
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Name</MudText>
+                    <MudText>Nom</MudText>
                 </div>
-                <MudTextField @bind-Value="_model.Name" For="@(() => _model.Name)" Required="true" RequiredError="Multi-collection name is required!"/>
+                <MudTextField @bind-Value="_model.Name" For="@(() => _model.Name)" Required="true" RequiredError="Le nom de la multi-collection est obligatoire !"/>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
@@ -30,7 +30,7 @@
                 <MudSelect @ref="_collectionSelect"
                            T="MediaCollectionViewModel"
                            @bind-value="_selectedCollection"
-                           HelperText="Disabled collections are already present in this multi collection">
+                           HelperText="Les collections grisées sont déjà dans cette multi-collection">
                     @foreach (MediaCollectionViewModel collection in _collections)
                     {
                         <MudSelectItem Disabled="@(_model.Items.Any(i => i.Collection.CollectionType == collection.CollectionType && i.Collection.Id == collection.Id))"
@@ -43,17 +43,17 @@
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex"></div>
                 <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="@(_ => AddCollection())" StartIcon="@Icons.Material.Filled.Add">
-                    Add Collection
+                    Ajouter une collection
                 </MudButton>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Smart Collections</MudText>
+                    <MudText>Collections intelligentes</MudText>
                 </div>
                 <MudSelect @ref="_smartCollectionSelect"
                            T="SmartCollectionViewModel"
                            @bind-value="_selectedSmartCollection"
-                           HelperText="Disabled collections are already present in this multi collection">
+                           HelperText="Les collections grisées sont déjà dans cette multi-collection">
                     @foreach (SmartCollectionViewModel collection in _smartCollections)
                     {
                         <MudSelectItem Disabled="@(_model.Items.Any(i => i.Collection.CollectionType == CollectionType.SmartCollection && i.Collection.Id == collection.Id))"
@@ -66,7 +66,7 @@
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex"></div>
                 <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="@(_ => AddSmartCollection())" StartIcon="@Icons.Material.Filled.Add">
-                    Add Smart Collection
+                    Ajouter une collection intelligente
                 </MudButton>
             </MudStack>
             <MudText Typo="Typo.h5" Class="mt-10 mb-2">@_model.Name Items</MudText>
@@ -82,8 +82,8 @@
                 </ColGroup>
                 <HeaderContent>
                     <MudTh>Collection</MudTh>
-                    <MudTh>Schedule As Group</MudTh>
-                    <MudTh>Playback Order</MudTh>
+                    <MudTh>Programmer en groupe</MudTh>
+                    <MudTh>Ordre de lecture</MudTh>
                     <MudTh/>
                 </HeaderContent>
                 <RowTemplate>
@@ -176,7 +176,7 @@
             }
             else
             {
-                _model.Name = "New Multi Collection";
+                _model.Name = "Nouvelle multi-collection";
                 _model.Items = new List<MultiCollectionItemEditViewModel>();
             }
         }

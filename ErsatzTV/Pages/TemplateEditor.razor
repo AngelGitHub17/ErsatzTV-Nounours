@@ -10,30 +10,30 @@
 <MudForm Style="max-height: 100%">
     <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
         <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-6" OnClick="@(_ => SaveChanges())" StartIcon="@Icons.Material.Filled.Save">
-            Save Template
+            Enregistrer le modèle
         </MudButton>
     </MudPaper>
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
-            <MudText Typo="Typo.h5" Class="mb-2">General</MudText>
+            <MudText Typo="Typo.h5" Class="mb-2">Général</MudText>
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Template Group Name</MudText>
+                    <MudText>Nom du groupe de modèles</MudText>
                 </div>
                 <MudTextField @bind-Value="_template.GroupName" Disabled="true"/>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Template Name</MudText>
+                    <MudText>Nom du modèle</MudText>
                 </div>
                 <MudTextField @bind-Value="_template.Name" For="@(() => _template.Name)"/>
             </MudStack>
-            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Add Content</MudText>
+            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Ajouter du contenu</MudText>
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Block Group</MudText>
+                    <MudText>Groupe de blocs</MudText>
                 </div>
                 <MudSelect T="string" ValueChanged="@(name => UpdateBlockGroupItems(name))">
                     @foreach (BlockGroupViewModel blockGroup in _blockGroups)
@@ -44,7 +44,7 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Block</MudText>
+                    <MudText>Bloc</MudText>
                 </div>
                 <MudSelect T="string" ValueChanged="@(name => UpdateSelectedBlock(name))">
                     @foreach (BlockViewModel block in _blocks)
@@ -55,7 +55,7 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Start Time On Or After</MudText>
+                    <MudText>Heure de début à partir de</MudText>
                 </div>
                 <MudSelect T="DateTime" @bind-value="_selectedBlockStart">
                     @foreach (DateTime startTime in _startTimes)
@@ -69,17 +69,17 @@
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex"></div>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(_ => AddBlockToTemplate())" Disabled="@(_selectedBlock is null)" StartIcon="@Icons.Material.Filled.Add">
-                    Add Block To Template
+                    Ajouter le bloc au modèle
                 </MudButton>
             </MudStack>
-            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Remove Content</MudText>
+            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Retirer le contenu</MudText>
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Block To Remove</MudText>
+                    <MudText>Bloc à retirer</MudText>
                 </div>
                 <MudSelect T="TemplateItemEditViewModel" @bind-Value="_blockToRemove">
-                    <MudSelectItem Value="@((TemplateItemEditViewModel)null)">(none)</MudSelectItem>
+                    <MudSelectItem Value="@((TemplateItemEditViewModel)null)">(aucun)</MudSelectItem>
                     @foreach (TemplateItemEditViewModel item in _template.Items.OrderBy(i => i.Start))
                     {
                         <MudSelectItem Value="@item">@item.Start.ToShortTimeString() - @item.Text</MudSelectItem>
@@ -89,10 +89,10 @@
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex"></div>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(_ => RemoveBlockFromTemplate())" Disabled="@(_blockToRemove is null)" StartIcon="@Icons.Material.Filled.Remove">
-                    Remove Block From Template
+                    Retirer le bloc du modèle
                 </MudButton>
             </MudStack>
-            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Content</MudText>
+            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Contenu</MudText>
             <MudDivider Class="mb-6"/>
             <MudCalendar @ref="_calendar"
                          T="CalendarItem"
@@ -317,7 +317,7 @@
         errorMessages.HeadOrNone().Match(
             error =>
             {
-                Snackbar.Add($"Unexpected error saving template: {error.Value}", Severity.Error);
+                Snackbar.Add($"Erreur à l'enregistrement du modèle : {error.Value}", Severity.Error);
                 Logger.LogError("Unexpected error saving template: {Error}", error.Value);
             },
             () => NavigationManager.NavigateTo("templates"));

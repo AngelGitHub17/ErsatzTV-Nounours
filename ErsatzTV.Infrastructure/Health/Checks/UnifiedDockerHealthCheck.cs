@@ -10,7 +10,7 @@ public class UnifiedDockerHealthCheck : BaseHealthCheck, IUnifiedDockerHealthChe
         Assembly.GetEntryAssembly()!.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             ?.InformationalVersion ?? "unknown";
 
-    public override string Title => "Unified Docker";
+    public override string Title => "Image Docker unifiée";
 
     public Task<HealthCheckResult> Check(CancellationToken cancellationToken)
     {
@@ -19,7 +19,7 @@ public class UnifiedDockerHealthCheck : BaseHealthCheck, IUnifiedDockerHealthChe
         {
             return WarningResult(
                     "VAAPI, NVIDIA, and ARM docker tag suffixes are deprecated; please remove `-vaapi`, `-nvidia`, `-arm64` or `-arm` and pull the default image.",
-                    "docker tag is deprecated")
+                    "tag docker obsolète")
                 .AsTask();
         }
 

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<root>
+    <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+        <xsd:element name="root" msdata:IsDataSet="true">
+
+        </xsd:element>
+    </xsd:schema>
+    <resheader name="resmimetype">
+        <value>text/microsoft-resx</value>
+    </resheader>
+    <resheader name="version">
+        <value>1.3</value>
+    </resheader>
+    <resheader name="reader">
+        <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    </resheader>
+    <resheader name="writer">
+        <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    </resheader>
+    <data name="ButtonAddChannel" xml:space="preserve">
+        <value>Ajouter une chaîne</value>
+    </data>
+    <data name="ButtonEditChannelNumbers" xml:space="preserve">
+        <value>Modifier la numérotation</value>
+    </data>
+    <data name="LabelChannels" xml:space="preserve">
+        <value>Chaînes</value>
+    </data>
+    <data name="ButtonShowDisabled" xml:space="preserve">
+        <value>Afficher les désactivées</value>
+    </data>
+    <data name="LabelNumber" xml:space="preserve">
+        <value>Numéro</value>
+    </data>
+    <data name="LabelLogo" xml:space="preserve">
+        <value>Logo</value>
+    </data>
+    <data name="LabelName" xml:space="preserve">
+        <value>Nom</value>
+    </data>
+    <data name="LabelLanguage" xml:space="preserve">
+        <value>Langue</value>
+    </data>
+    <data name="LabelStreamingMode" xml:space="preserve">
+        <value>Mode</value>
+    </data>
+    <data name="LabelFFmpegProfile" xml:space="preserve">
+        <value>Profil FFmpeg</value>
+    </data>
+    <data name="LabelChannelDisabledHelp" xml:space="preserve">
+        <value>Chaîne désactivée</value>
+    </data>
+    <data name="LabelChannelHiddenHelp" xml:space="preserve">
+        <value>Chaîne masquée du guide</value>
+    </data>
+    <data name="LabelChannelHiddenAbbreviation" xml:space="preserve">
+        <value>M</value>
+    </data>
+    <data name="LabelChannelDisabledAbbreviation" xml:space="preserve">
+        <value>D</value>
+    </data>
+    <data name="ButtonPreviewChannelHelp" xml:space="preserve">
+        <value>Regarder la chaîne</value>
+    </data>
+    <data name="ButtonPreviewChannelHelpNormalize" xml:space="preserve">
+        <value>Regarder la chaîne ; le son et/ou l’image peuvent ne pas fonctionner sans normalisation</value>
+    </data>
+    <data name="ButtonPreviewChannelHelpBrowser" xml:space="preserve">
+        <value>L'aperçu nécessite un profil FFmpeg compatible avec ce navigateur</value>
+    </data>
+    <data name="ButtonPreviewChannelHelpSettings" xml:space="preserve">
+        <value>L'aperçu nécessite un playout, le mode MPEG-TS ou HLS segmenté et un profil FFmpeg compatible</value>
+    </data>
+    <data name="ButtonStopTranscodeHelp" xml:space="preserve">
+        <value>Arrêter le transcodage</value>
+    </data>
+    <data name="ButtonEditChannelHelp" xml:space="preserve">
+        <value>Modifier la chaîne</value>
+    </data>
+    <data name="ButtonTroubleshootChannelHelp" xml:space="preserve">
+        <value>Dépanner la chaîne</value>
+    </data>
+    <data name="ButtonDeleteChannelHelp" xml:space="preserve">
+        <value>Supprimer la chaîne</value>
+    </data>
+</root>

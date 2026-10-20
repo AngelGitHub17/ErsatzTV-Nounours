@@ -18,39 +18,39 @@
 
 <MudForm Model="@_model" @ref="@_form" Validation="@(_validator.ValidateValue)" ValidationDelay="0" Style="max-height: 100%">
 <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-6" OnClick="@HandleSubmitAsync" StartIcon="@(IsEdit ? Icons.Material.Filled.Save : Icons.Material.Filled.Add)">@(IsEdit ? "Save Profile" : "Add Profile")</MudButton>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-6" OnClick="@HandleSubmitAsync" StartIcon="@(IsEdit ? Icons.Material.Filled.Save : Icons.Material.Filled.Add)">@(IsEdit ? "Enregistrer le profil" : "Ajouter le profil")</MudButton>
 </MudPaper>
 <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
     <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
-        <MudText Typo="Typo.h5" Class="mb-2">General</MudText>
+        <MudText Typo="Typo.h5" Class="mb-2">Général</MudText>
         <MudDivider Class="mb-6"/>
         <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
             <div class="d-flex">
-                <MudText>Name</MudText>
+                <MudText>Nom</MudText>
             </div>
             <MudTextField @bind-Value="_model.Name" For="@(() => _model.Name)" Immediate="true"/>
         </MudStack>
         <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
             <div class="d-flex">
-                <MudText>Thread Count</MudText>
+                <MudText>Nombre de threads</MudText>
             </div>
             <MudTextField @bind-Value="@_model.ThreadCount" For="@(() => _model.ThreadCount)"/>
         </MudStack>
         <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
             <div class="d-flex">
-                <MudText>Normalize Audio</MudText>
+                <MudText>Normaliser l'audio</MudText>
             </div>
             <MudCheckBox @bind-Value="@_model.NormalizeAudio" For="@(() => _model.NormalizeAudio)" Dense="true"/>
         </MudStack>
         <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
             <div class="d-flex">
-                <MudText>Normalize Video</MudText>
+                <MudText>Normaliser la vidéo</MudText>
             </div>
             <MudCheckBox @bind-Value="@_model.NormalizeVideo" For="@(() => _model.NormalizeVideo)" Dense="true"/>
         </MudStack>
         <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
             <div class="d-flex">
-                <MudText>Preferred Resolution</MudText>
+                <MudText>Résolution préférée</MudText>
             </div>
             <MudSelect @bind-Value="_model.Resolution" For="@(() => _model.Resolution)">
                 @foreach (ResolutionViewModel resolution in _resolutions)
@@ -63,28 +63,28 @@
         {
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Scaling Behavior</MudText>
+                    <MudText>Mise à l'échelle</MudText>
                 </div>
                 <MudSelect @bind-Value="_model.ScalingBehavior" For="@(() => _model.ScalingBehavior)">
-                    <MudSelectItem Value="@ScalingBehavior.ScaleAndPad">Scale and Pad</MudSelectItem>
-                    <MudSelectItem Value="@ScalingBehavior.Stretch">Stretch</MudSelectItem>
-                    <MudSelectItem Value="@ScalingBehavior.Crop">Crop</MudSelectItem>
+                    <MudSelectItem Value="@ScalingBehavior.ScaleAndPad">Mettre à l'échelle et compléter</MudSelectItem>
+                    <MudSelectItem Value="@ScalingBehavior.Stretch">Étirer</MudSelectItem>
+                    <MudSelectItem Value="@ScalingBehavior.Crop">Recadrer</MudSelectItem>
                 </MudSelect>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Pad Mode</MudText>
+                    <MudText>Mode de complément</MudText>
                 </div>
                 <MudSelect @bind-Value="_model.PadMode"
                            For="@(() => _model.PadMode)"
                            Disabled="_model.HardwareAcceleration is not HardwareAccelerationKind.Vaapi"
-                           HelperText="If hardware padding is green, software padding should be used instead">
-                    <MudSelectItem Value="@FilterMode.HardwareIfPossible">Hardware If Possible</MudSelectItem>
-                    <MudSelectItem Value="@FilterMode.Software">Software</MudSelectItem>
+                           HelperText="Si le remplissage matériel est vert, utilisez plutôt le remplissage logiciel">
+                    <MudSelectItem Value="@FilterMode.HardwareIfPossible">Matériel si possible</MudSelectItem>
+                    <MudSelectItem Value="@FilterMode.Software">Logiciel</MudSelectItem>
                 </MudSelect>
             </MudStack>
         }
-        <MudText Typo="Typo.h5" Class="mt-10 mb-2">Video</MudText>
+        <MudText Typo="Typo.h5" Class="mt-10 mb-2">Vidéo</MudText>
         <MudDivider Class="mb-6"/>
         @if (_model.NormalizeVideo)
         {
@@ -104,7 +104,7 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Profile</MudText>
+                    <MudText>Profil</MudText>
                 </div>
                 <MudSelect @bind-Value="_model.VideoProfile"
                            For="@(() => _model.VideoProfile)"
@@ -124,7 +124,7 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Preset</MudText>
+                    <MudText>Préréglage</MudText>
                 </div>
                 @{
                     ICollection<string> presets = FFmpegLibraryHelper.PresetsForFFmpegProfile(
@@ -147,13 +147,13 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Allow B-Frames</MudText>
+                    <MudText>Autoriser les images B</MudText>
                 </div>
                 <MudCheckBox @bind-Value="@_model.AllowBFrames" For="@(() => _model.AllowBFrames)" Dense="true"/>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Bit Depth</MudText>
+                    <MudText>Profondeur de couleur</MudText>
                 </div>
                 <MudSelect @bind-Value="_model.BitDepth" For="@(() => _model.BitDepth)">
                     <MudSelectItem Value="@FFmpegProfileBitDepth.EightBit">8-bit</MudSelectItem>
@@ -162,19 +162,19 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Bitrate</MudText>
+                    <MudText>Débit</MudText>
                 </div>
                 <MudTextField @bind-Value="_model.VideoBitrate" For="@(() => _model.VideoBitrate)" Adornment="Adornment.End" AdornmentText="kBit/s"/>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Buffer Size</MudText>
+                    <MudText>Taille du tampon</MudText>
                 </div>
                 <MudTextField @bind-Value="_model.VideoBufferSize" For="@(() => _model.VideoBufferSize)" Adornment="Adornment.End" AdornmentText="kBit"/>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Hardware Acceleration</MudText>
+                    <MudText>Accélération matérielle</MudText>
                 </div>
                 <MudSelect @bind-Value="_model.HardwareAcceleration" For="@(() => _model.HardwareAcceleration)">
                     @foreach (HardwareAccelerationKind hwAccel in _hardwareAccelerationKinds)
@@ -189,7 +189,7 @@
                 {
                     <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                         <div class="d-flex">
-                            <MudText>VAAPI Driver</MudText>
+                            <MudText>Pilote VAAPI</MudText>
                         </div>
                         <MudSelect @bind-Value="_model.VaapiDriver" For="@(() => _model.VaapiDriver)">
                             @foreach (VaapiDriver driver in Enum.GetValues<VaapiDriver>())
@@ -200,7 +200,7 @@
                     </MudStack>
                     <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                         <div class="d-flex">
-                            <MudText>VAAPI Display</MudText>
+                            <MudText>Affichage VAAPI</MudText>
                         </div>
                         <MudSelect @bind-Value="_model.VaapiDisplay" For="@(() => _model.VaapiDisplay)">
                             @foreach (string display in _vaapiDisplays)
@@ -231,7 +231,7 @@
             {
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>QSV Extra Hardware Frames</MudText>
+                        <MudText>Images matérielles QSV supplémentaires</MudText>
                     </div>
                     <MudTextField @bind-Value="_model.QsvExtraHardwareFrames" For="@(() => _model.QsvExtraHardwareFrames)"/>
                 </MudStack>
@@ -240,7 +240,7 @@
             {
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Tonemap Algorithm</MudText>
+                        <MudText>Algorithme de tone mapping</MudText>
                     </div>
                     <MudSelect @bind-Value="_model.TonemapAlgorithm" For="@(() => _model.TonemapAlgorithm)">
                         @foreach (FFmpegProfileTonemapAlgorithm algorithm in Enum.GetValues<FFmpegProfileTonemapAlgorithm>())
@@ -253,26 +253,26 @@
 
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Normalize Frame Rate</MudText>
+                    <MudText>Normaliser la fréquence d'images</MudText>
                 </div>
                 <MudCheckBox @bind-Value="@_model.NormalizeFramerate" For="@(() => _model.NormalizeFramerate)" Dense="true"/>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Normalize Colors</MudText>
+                    <MudText>Normaliser les couleurs</MudText>
                 </div>
                 <MudCheckBox @bind-Value="@_model.NormalizeColors" For="@(() => _model.NormalizeColors)" Dense="true"/>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Auto Deinterlace Video</MudText>
+                    <MudText>Désentrelacer automatiquement</MudText>
                 </div>
                 <MudCheckBox @bind-Value="@_model.DeinterlaceVideo" For="@(() => _model.DeinterlaceVideo)" Dense="true"/>
             </MudStack>
         }
         else
         {
-            <MudText>Video will be copied as-is, including timestamps, which *will* cause issues with most clients</MudText>
+            <MudText>La vidéo sera copiée telle quelle, horodatage compris, ce qui posera *forcément* problème à la plupart des lecteurs</MudText>
         }
         <MudText Typo="Typo.h5" Class="mt-10 mb-2">Audio</MudText>
         <MudDivider Class="mb-6"/>
@@ -289,34 +289,34 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Bitrate</MudText>
+                    <MudText>Débit</MudText>
                 </div>
                 <MudTextField @bind-Value="_model.AudioBitrate" For="@(() => _model.AudioBitrate)" Adornment="Adornment.End" AdornmentText="kBit/s"/>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Buffer Size</MudText>
+                    <MudText>Taille du tampon</MudText>
                 </div>
                 <MudTextField @bind-Value="_model.AudioBufferSize" For="@(() => _model.AudioBufferSize)" Adornment="Adornment.End" AdornmentText="kBit"/>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Channels</MudText>
+                    <MudText>Chaînes</MudText>
                 </div>
                 <MudTextField @bind-Value="_model.AudioChannels" For="@(() => _model.AudioChannels)"/>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Sample Rate</MudText>
+                    <MudText>Fréquence d'échantillonnage</MudText>
                 </div>
                 <MudTextField @bind-Value="_model.AudioSampleRate" For="@(() => _model.AudioSampleRate)" Adornment="Adornment.End" AdornmentText="kHz"/>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Normalize Loudness</MudText>
+                    <MudText>Normaliser le volume</MudText>
                 </div>
                 <MudSelect @bind-Value="_model.NormalizeLoudnessMode" For="@(() => _model.NormalizeLoudnessMode)">
-                    <MudSelectItem Value="@NormalizeLoudnessMode.Off">Off</MudSelectItem>
+                    <MudSelectItem Value="@NormalizeLoudnessMode.Off">Désactivé</MudSelectItem>
                     <MudSelectItem Value="@NormalizeLoudnessMode.LoudNorm">loudnorm</MudSelectItem>
                 </MudSelect>
             </MudStack>
@@ -324,7 +324,7 @@
             {
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Target Loudness</MudText>
+                        <MudText>Volume cible</MudText>
                     </div>
                     <MudTextField @bind-Value="_model.TargetLoudness" For="@(() => _model.TargetLoudness)" Adornment="Adornment.End" AdornmentText="LUFS"/>
                 </MudStack>
@@ -332,7 +332,7 @@
         }
         else
         {
-            <MudText>Audio will be copied as-is, including timestamps, which *will* cause issues with most clients</MudText>
+            <MudText>L'audio sera copié tel quel, horodatage compris, ce qui posera *forcément* problème à la plupart des lecteurs</MudText>
         }
     </MudContainer>
 </div>
@@ -490,7 +490,7 @@
                 errorMessage.HeadOrNone().Match(
                     error =>
                     {
-                        Snackbar.Add("Unexpected error saving ffmpeg profile");
+                        Snackbar.Add("Erreur inattendue à l'enregistrement du profil FFmpeg");
                         Logger.LogError("Unexpected error saving ffmpeg profile: {Error}", error.Value);
                     },
                     () => NavigationManager.NavigateTo("ffmpeg"));

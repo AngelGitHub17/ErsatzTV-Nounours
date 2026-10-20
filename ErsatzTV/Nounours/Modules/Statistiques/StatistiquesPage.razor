@@ -1,0 +1,74 @@
+@page "/modules/statistiques"
+@using System.Globalization
+@using ErsatzTV.Application.Channels
+@using ErsatzTV.Application.Nounours
+@inject IGuideService GuideService
+@inject IMediator Mediator
+
+<PageTitle>Statistiques · ErsatzTV</PageTitle>
+
+<div class="n-page" style="height: 100%; overflow-y: auto">
+    <div class="n-page-header">
+        <div>
+            <h1>Statistiques de diffusion</h1>
+            <p>Ce qui est programmé sur les prochaines 24 heures. <span class="n-muted">(module d'exemple « @Module.Name »)</span></p>
+        </div>
+    </div>
+    @if (_rows is null)
+    {
+        <MudProgressLinear Indeterminate="true"/>
+    }
+    else
+    {
+        <div class="n-card">
+            <MudSimpleTable Dense="true" Hover="true" Style="background: transparent">
+                <thead>
+                <tr>
+                    <th>Chaîne</th>
+                    @foreach ((GuideEntryKind _, string label, string _) in StatistiquesCalcul.Kinds)
+                    {
+                        <th style="text-align: right">@label</th>
+                    }
+                    <th style="text-align: right">Programmes</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach ((ChannelViewModel channel, Dictionary<GuideEntryKind, double> hours, int count) in _rows)
+                {
+                    <tr>
+                        <td><b>@channel.Number</b> · @channel.Name</td>
+                        @foreach ((GuideEntryKind kind, string _, string _) in StatistiquesCalcul.Kinds)
+                        {
+                            double h = hours.GetValueOrDefault(kind);
+                            <td style="text-align: right; font-variant-numeric: tabular-nums" class="@(h > 0 ? "" : "n-muted")">@(h > 0 ? $"{h.ToString("0.#", Fr)} h" : "–")</td>
+                        }
+                        <td style="text-align: right">@count</td>
+                    </tr>
+                }
+                </tbody>
+            </MudSimpleTable>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
+    private static readonly StatistiquesModule Module = new();
+    private List<(ChannelViewModel, Dictionary<GuideEntryKind, double>, int)> _rows;
+
+    protected override async Task OnInitializedAsync()
+    {
+        DateTimeOffset start = DateTimeOffset.Now;
+        DateTimeOffset finish = start.AddHours(24);
+        List<ChannelViewModel> channels = await Mediator.Send(new GetAllChannels());
+        List<GuideEntry> entries = await GuideService.GetEntries(start, finish, [], includeFiller: false, CancellationToken.None);
+        _rows = channels
+            .OrderBy(c => double.TryParse(c.Number, NumberStyles.Number, CultureInfo.InvariantCulture, out double n) ? n : 0)
+            .Select(c =>
+            {
+                var mine = entries.Where(e => e.ChannelId == c.Id).ToList();
+                return (c, StatistiquesCalcul.HoursByKind(mine, start, finish), mine.Count(e => e.Kind != GuideEntryKind.Gap));
+            })
+            .ToList();
+    }
+}

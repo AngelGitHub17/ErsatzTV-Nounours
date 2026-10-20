@@ -3,10 +3,10 @@
         <EditForm Model="@_dummyModel" OnSubmit="@(_ => Submit())">
             <MudContainer Class="mb-6">
                 <MudText>
-                    Enter Trakt List URL
+                    Adresse de la liste Trakt
                 </MudText>
             </MudContainer>
-            <MudTextField T="string" Label="Trakt List URL"
+            <MudTextField T="string" Label="Adresse de la liste Trakt"
                           Placeholder="https://trakt.tv/users/username/lists/list-name"
                           @bind-Text="@_traktListUrl"
                           Style="min-width: 400px"
@@ -15,7 +15,7 @@
         </EditForm>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel" ButtonType="ButtonType.Reset">Cancel</MudButton>
+        <MudButton OnClick="Cancel" ButtonType="ButtonType.Reset">Annuler</MudButton>
         <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">
             Add
         </MudButton>

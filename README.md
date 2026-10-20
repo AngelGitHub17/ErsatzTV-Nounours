@@ -1,4 +1,18 @@
-# ErsatzTV
+# ErsatzTV — édition Nounours
+
+Fork d'ErsatzTV Legacy (v26.5.1) repensé : interface en français, tableau de bord, assistant de chaîne,
+**programmes composés** (pubs → jingle → programme coupé par des pubs → pubs), planning visuel,
+studio d'habillage façon OBS avec horloge en direct, et système de modules.
+
+- Ce qui change et comment s'en servir : [NOUNOURS.md](NOUNOURS.md)
+- Créer un module : [MODULES.md](MODULES.md)
+
+**Compiler et lancer** : ouvrir `ErsatzTV.sln` dans Visual Studio (SDK .NET 10) et démarrer le projet `ErsatzTV`,
+ou `dotnet run --project ErsatzTV -c Release`, puis ouvrir http://localhost:8409.
+
+---
+
+## ErsatzTV (projet d'origine)
 
 ErsatzTV lets you transform your media library into a personalized, live TV experience - complete with EPG, channel scheduling, and seamless streaming to all your devices. Rediscover your content, your way.
 

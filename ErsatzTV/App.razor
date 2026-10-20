@@ -1,12 +1,17 @@
-﻿<CascadingAuthenticationState>
-    <Router AppAssembly="@typeof(Program).Assembly">
+@inject ErsatzTV.Plugins.IPluginRegistry PluginRegistry
+<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(Program).Assembly" AdditionalAssemblies="@PluginRegistry.RoutableAssemblies">
         <Found Context="routeData">
             <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)"/>
         </Found>
         <NotFound>
-            <PageTitle>Not found</PageTitle>
+            <PageTitle>Page introuvable</PageTitle>
             <LayoutView Layout="@typeof(MainLayout)">
-                <p role="alert">Sorry, there's nothing at this address.</p>
+                <MudContainer MaxWidth="MaxWidth.Small" Class="pt-16" Style="text-align:center">
+                    <MudIcon Icon="@Icons.Material.Filled.TvOff" Style="font-size: 4rem" Color="Color.Secondary"/>
+                    <MudText Typo="Typo.h5" Class="mt-4">Cette page n'existe pas.</MudText>
+                    <MudButton Href="" Variant="Variant.Filled" Color="Color.Primary" Class="mt-6">Retour à l'accueil</MudButton>
+                </MudContainer>
             </LayoutView>
         </NotFound>
     </Router>

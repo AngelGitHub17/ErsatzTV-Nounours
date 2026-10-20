@@ -1,0 +1,92 @@
+@page "/programmes"
+@using System.Globalization
+@using ErsatzTV.Application.Nounours
+@inject IProgrammeService ProgrammeService
+@inject IDialogService Dialog
+@inject ISnackbar Snackbar
+
+<PageTitle>Programmes · ErsatzTV</PageTitle>
+
+<div class="n-page" style="height: 100%; overflow-y: auto">
+    <div class="n-page-header">
+        <div>
+            <h1>Programmes</h1>
+            <p>Composez de vrais programmes TV : pubs, jingle d'ouverture, le programme avec ses coupures pub, générique… puis enchaînez-les entre eux.</p>
+        </div>
+        <MudButton Href="programmes/nouveau" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">Nouveau programme</MudButton>
+    </div>
+
+    @if (_programmes is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary"/>
+    }
+    else if (_programmes.Count == 0)
+    {
+        <div class="n-empty">
+            <MudIcon Icon="@Icons.Material.Filled.ViewTimeline" Style="font-size: 3.5rem" Color="Color.Primary"/>
+            <MudText Typo="Typo.h6">Aucun programme pour l'instant</MudText>
+            <MudText Class="n-muted" Style="max-width: 600px">
+                Exemple : <b>Pubs → Jingle « Le film du soir » → Film (coupé par des pubs toutes les 20 min) → Pubs</b>.
+                Une fois créé, choisissez-le comme contenu dans l'assistant de chaîne ou dans le planning.
+            </MudText>
+            <div class="d-flex gap-2 flex-wrap justify-center mt-2">
+                <MudButton Href="programmes/nouveau?modele=film" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Movie">Modèle « Film du soir »</MudButton>
+                <MudButton Href="programmes/nouveau?modele=serie" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Tv">Modèle « Série »</MudButton>
+                <MudButton Href="programmes/nouveau?modele=bloc" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.ViewDay">Modèle « Bloc jeunesse »</MudButton>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="n-modules">
+            @foreach (ProgrammeSummary p in _programmes)
+            {
+                <div class="n-card d-flex flex-column" @key="p.Slug" style="border-left: 4px solid @p.Color">
+                    <div class="d-flex align-center gap-2">
+                        <MudText Typo="Typo.h6" Style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">@p.Name</MudText>
+                        @if (p.HasBreaks)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Text">coupures pub</MudChip>
+                        }
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(p.Description))
+                    {
+                        <MudText Typo="Typo.body2" Class="n-muted mt-1">@p.Description</MudText>
+                    }
+                    <MudText Typo="Typo.body2" Class="n-muted mt-2" Style="flex: 1">
+                        @p.Segments segment(s) · modifié le @p.UpdatedAt.ToString("d MMM à HH:mm", CultureInfo.GetCultureInfo("fr-FR"))
+                    </MudText>
+                    <div class="d-flex gap-1 mt-3">
+                        <MudButton Href="@($"programmes/{p.Slug}")" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Edit">Ouvrir</MudButton>
+                        <MudSpacer/>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => Delete(p))" aria-label="Supprimer"/>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<ProgrammeSummary> _programmes;
+
+    protected override async Task OnInitializedAsync() => _programmes = await ProgrammeService.GetAll(CancellationToken.None);
+
+    private async Task Delete(ProgrammeSummary p)
+    {
+        bool? confirm = await Dialog.ShowMessageBoxAsync(
+            "Supprimer le programme ?",
+            $"« {p.Name} » sera supprimé. S'il est déjà programmé sur une chaîne, sa playlist est conservée tant que la chaîne l'utilise.",
+            yesText: "Supprimer",
+            cancelText: "Annuler");
+        if (confirm != true)
+        {
+            return;
+        }
+
+        await ProgrammeService.Delete(p.Slug, CancellationToken.None);
+        Snackbar.Add("Programme supprimé", Severity.Success);
+        _programmes = await ProgrammeService.GetAll(CancellationToken.None);
+    }
+
+}

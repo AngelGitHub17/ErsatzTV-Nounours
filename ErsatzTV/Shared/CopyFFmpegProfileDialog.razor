@@ -9,19 +9,19 @@
         <EditForm Model="@_dummyModel" OnSubmit="@(_ => Submit())">
             <MudContainer Class="mb-6">
                 <MudText>
-                    Enter a name for the new FFmpeg Profile
+                    Nom du nouveau profil FFmpeg
                 </MudText>
             </MudContainer>
-            <MudTextField T="string" Label="New FFmpeg Profile Name"
+            <MudTextField T="string" Label="Nom du nouveau profil FFmpeg"
                           @bind-Text="@_newFFmpegProfileName"
                           Class="mb-6 mx-4">
             </MudTextField>
         </EditForm>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="@Cancel" ButtonType="ButtonType.Reset">Cancel</MudButton>
+        <MudButton OnClick="@Cancel" ButtonType="ButtonType.Reset">Annuler</MudButton>
         <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@Submit">
-            Copy Profile
+            Copier le profil
         </MudButton>
     </DialogActions>
 </MudDialog>

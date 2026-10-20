@@ -1,4 +1,4 @@
-@page "/settings/scanner"
+﻿@page "/settings/scanner"
 @using ErsatzTV.Application.Configuration
 @implements IDisposable
 @inject IMediator Mediator
@@ -7,17 +7,17 @@
 
 <MudForm @ref="_form" @bind-IsValid="@_scannerSuccess" Style="max-height: 100%">
     <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(_ => SaveScannerSettings())" Class="ml-6" StartIcon="@Icons.Material.Filled.Save">Save Settings</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(_ => SaveScannerSettings())" Class="ml-6" StartIcon="@Icons.Material.Filled.Save">Enregistrer les réglages</MudButton>
     </MudPaper>
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
-            <MudText Typo="Typo.h5" Class="mb-2">Scanner</MudText>
+            <MudText Typo="Typo.h5" Class="mb-2">Analyse</MudText>
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Library Refresh Interval</MudText>
+                    <MudText>Intervalle d'actualisation des bibliothèques</MudText>
                 </div>
-                <MudTextField @bind-Value="_libraryRefreshInterval" Validation="@(new Func<int, string>(ValidateLibraryRefreshInterval))" Required="true" RequiredError="Library refresh interval is required!" Adornment="Adornment.End" AdornmentText="hours"/>
+                <MudTextField @bind-Value="_libraryRefreshInterval" Validation="@(new Func<int, string>(ValidateLibraryRefreshInterval))" Required="true" RequiredError="L'intervalle d'actualisation est obligatoire !" Adornment="Adornment.End" AdornmentText="hours"/>
             </MudStack>
         </MudContainer>
     </div>
@@ -56,8 +56,8 @@
 
     private static string ValidateLibraryRefreshInterval(int libraryRefreshInterval) => libraryRefreshInterval switch
     {
-        <= -1 => "Library refresh interval must be 0 (do not refresh) or greater than zero",
-        >= 1_000_000 => "Library refresh interval must be less than 1,000,000. Use 0 to disable automatic refresh",
+        <= -1 => "L'intervalle doit valoir 0 (pas d'actualisation) ou plus",
+        >= 1_000_000 => "L'intervalle doit être inférieur à 1 000 000. Mettez 0 pour désactiver l'actualisation automatique",
         _ => null
     };
 
@@ -73,7 +73,7 @@
                     Snackbar.Add(error.Value, Severity.Error);
                     Logger.LogError("Unexpected error saving scanner settings: {Error}", error.Value);
                 },
-                Right: _ => Snackbar.Add("Successfully saved scanner settings", Severity.Success));
+                Right: _ => Snackbar.Add("Réglages d'analyse enregistrés", Severity.Success));
         }
     }
 

@@ -23,6 +23,10 @@ public partial class TextElement(
 
     public override int ZIndex { get; } = textElement.ZIndex ?? 0;
 
+    // used by ClockElement to reuse the text rendering pipeline
+    internal SKBitmap RenderedImage => _image;
+    internal SKPointI RenderedLocation => _location;
+
     public override string DebugKey { get; } = $"Text {textElement.DebugName()}";
 
     public void Dispose()

@@ -1,4 +1,4 @@
-@page "/settings/logging"
+﻿@page "/settings/logging"
 @using ErsatzTV.Application.Configuration
 @using Serilog.Events
 @implements IDisposable
@@ -8,76 +8,76 @@
 
 <MudForm Style="max-height: 100%">
     <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(_ => SaveLoggingSettings())" Class="ml-6" StartIcon="@Icons.Material.Filled.Save">Save Settings</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(_ => SaveLoggingSettings())" Class="ml-6" StartIcon="@Icons.Material.Filled.Save">Enregistrer les réglages</MudButton>
     </MudPaper>
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
-            <MudText Typo="Typo.h5" Class="mb-2">Logging</MudText>
+            <MudText Typo="Typo.h5" Class="mb-2">Journalisation</MudText>
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Default Minimum Log Level</MudText>
+                    <MudText>Niveau de journal minimal par défaut</MudText>
                 </div>
                 <MudSelect @bind-Value="_loggingSettings.DefaultMinimumLogLevel">
-                    <MudSelectItem Value="@LogEventLevel.Debug">Debug</MudSelectItem>
+                    <MudSelectItem Value="@LogEventLevel.Debug">Débogage</MudSelectItem>
                     <MudSelectItem Value="@LogEventLevel.Information">Information</MudSelectItem>
-                    <MudSelectItem Value="@LogEventLevel.Warning">Warning</MudSelectItem>
-                    <MudSelectItem Value="@LogEventLevel.Error">Error</MudSelectItem>
+                    <MudSelectItem Value="@LogEventLevel.Warning">Avertissement</MudSelectItem>
+                    <MudSelectItem Value="@LogEventLevel.Error">Erreur</MudSelectItem>
                 </MudSelect>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Scanning Minimum Log Level</MudText>
+                    <MudText>Niveau minimal des journaux d'analyse</MudText>
                 </div>
                 <MudSelect @bind-Value="_loggingSettings.ScanningMinimumLogLevel">
-                    <MudSelectItem Value="@LogEventLevel.Debug">Debug</MudSelectItem>
+                    <MudSelectItem Value="@LogEventLevel.Debug">Débogage</MudSelectItem>
                     <MudSelectItem Value="@LogEventLevel.Information">Information</MudSelectItem>
-                    <MudSelectItem Value="@LogEventLevel.Warning">Warning</MudSelectItem>
-                    <MudSelectItem Value="@LogEventLevel.Error">Error</MudSelectItem>
+                    <MudSelectItem Value="@LogEventLevel.Warning">Avertissement</MudSelectItem>
+                    <MudSelectItem Value="@LogEventLevel.Error">Erreur</MudSelectItem>
                 </MudSelect>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Scheduling Minimum Log Level</MudText>
+                    <MudText>Niveau minimal des journaux de programmation</MudText>
                 </div>
                 <MudSelect @bind-Value="_loggingSettings.SchedulingMinimumLogLevel">
-                    <MudSelectItem Value="@LogEventLevel.Debug">Debug</MudSelectItem>
+                    <MudSelectItem Value="@LogEventLevel.Debug">Débogage</MudSelectItem>
                     <MudSelectItem Value="@LogEventLevel.Information">Information</MudSelectItem>
-                    <MudSelectItem Value="@LogEventLevel.Warning">Warning</MudSelectItem>
-                    <MudSelectItem Value="@LogEventLevel.Error">Error</MudSelectItem>
+                    <MudSelectItem Value="@LogEventLevel.Warning">Avertissement</MudSelectItem>
+                    <MudSelectItem Value="@LogEventLevel.Error">Erreur</MudSelectItem>
                 </MudSelect>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Searching Minimum Log Level</MudText>
+                    <MudText>Niveau minimal des journaux de recherche</MudText>
                 </div>
                 <MudSelect @bind-Value="_loggingSettings.SearchingMinimumLogLevel">
-                    <MudSelectItem Value="@LogEventLevel.Debug">Debug</MudSelectItem>
+                    <MudSelectItem Value="@LogEventLevel.Debug">Débogage</MudSelectItem>
                     <MudSelectItem Value="@LogEventLevel.Information">Information</MudSelectItem>
-                    <MudSelectItem Value="@LogEventLevel.Warning">Warning</MudSelectItem>
-                    <MudSelectItem Value="@LogEventLevel.Error">Error</MudSelectItem>
+                    <MudSelectItem Value="@LogEventLevel.Warning">Avertissement</MudSelectItem>
+                    <MudSelectItem Value="@LogEventLevel.Error">Erreur</MudSelectItem>
                 </MudSelect>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Streaming Minimum Log Level</MudText>
+                    <MudText>Niveau minimal des journaux de diffusion</MudText>
                 </div>
                 <MudSelect @bind-Value="_loggingSettings.StreamingMinimumLogLevel">
-                    <MudSelectItem Value="@LogEventLevel.Debug">Debug</MudSelectItem>
+                    <MudSelectItem Value="@LogEventLevel.Debug">Débogage</MudSelectItem>
                     <MudSelectItem Value="@LogEventLevel.Information">Information</MudSelectItem>
-                    <MudSelectItem Value="@LogEventLevel.Warning">Warning</MudSelectItem>
-                    <MudSelectItem Value="@LogEventLevel.Error">Error</MudSelectItem>
+                    <MudSelectItem Value="@LogEventLevel.Warning">Avertissement</MudSelectItem>
+                    <MudSelectItem Value="@LogEventLevel.Error">Erreur</MudSelectItem>
                 </MudSelect>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Request Logging Minimum Log Level</MudText>
+                    <MudText>Niveau minimal des journaux de requêtes</MudText>
                 </div>
                 <MudSelect @bind-Value="_loggingSettings.HttpMinimumLogLevel">
-                    <MudSelectItem Value="@LogEventLevel.Debug">Debug</MudSelectItem>
+                    <MudSelectItem Value="@LogEventLevel.Debug">Débogage</MudSelectItem>
                     <MudSelectItem Value="@LogEventLevel.Information">Information</MudSelectItem>
-                    <MudSelectItem Value="@LogEventLevel.Warning">Warning</MudSelectItem>
-                    <MudSelectItem Value="@LogEventLevel.Error">Error</MudSelectItem>
+                    <MudSelectItem Value="@LogEventLevel.Warning">Avertissement</MudSelectItem>
+                    <MudSelectItem Value="@LogEventLevel.Error">Erreur</MudSelectItem>
                 </MudSelect>
             </MudStack>
         </MudContainer>
@@ -121,7 +121,7 @@
                 Snackbar.Add(error.Value, Severity.Error);
                 Logger.LogError("Unexpected error saving logging settings: {Error}", error.Value);
             },
-            Right: _ => Snackbar.Add("Successfully saved logging settings", Severity.Success));
+            Right: _ => Snackbar.Add("Réglages de journalisation enregistrés", Severity.Success));
     }
 
 }

@@ -8,27 +8,27 @@
     <DialogContent>
         <EditForm Model="@_dummyModel" OnSubmit="@(_ => Submit())">
             <div class="d-flex mb-6">
-                <MudText>Select a group for the new template</MudText>
+                <MudText>Choisissez un groupe pour le nouveau modèle</MudText>
             </div>
-            <MudSelect @bind-Value="_selectedTemplateGroup" Class="mb-6 mx-4" Label="New Template Group">
+            <MudSelect @bind-Value="_selectedTemplateGroup" Class="mb-6 mx-4" Label="Nouveau groupe de modèles">
                 @foreach (TemplateGroupViewModel templateGroup in _templateGroups)
                 {
                     <MudSelectItem Value="@templateGroup">@templateGroup.Name</MudSelectItem>
                 }
             </MudSelect>
             <div class="d-flex mb-6">
-                <MudText>Enter a name for the new template</MudText>
+                <MudText>Nom du nouveau modèle</MudText>
             </div>
-            <MudTextField T="string" Label="New Template Name"
+            <MudTextField T="string" Label="Nom du nouveau modèle"
                           @bind-Text="@_newName"
                           Class="mb-6 mx-4">
             </MudTextField>
         </EditForm>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="@Cancel" ButtonType="ButtonType.Reset">Cancel</MudButton>
+        <MudButton OnClick="@Cancel" ButtonType="ButtonType.Reset">Annuler</MudButton>
         <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@Submit">
-            Copy Template
+            Copier le modèle
         </MudButton>
     </DialogActions>
 </MudDialog>

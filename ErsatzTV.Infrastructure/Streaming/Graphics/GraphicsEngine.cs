@@ -49,6 +49,10 @@ public class GraphicsEngine(
                     elements.Add(new ImageElement(imageElementContext.ImageElement, logger));
                     break;
 
+                case ClockElementDataContext clockElementContext:
+                    elements.Add(new ClockElement(graphicsEngineFonts, clockElementContext.ClockElement, logger));
+                    break;
+
                 case TextElementDataContext textElementContext:
                     elements.Add(new TextElement(graphicsEngineFonts, textElementContext.TextElement, logger));
                     break;

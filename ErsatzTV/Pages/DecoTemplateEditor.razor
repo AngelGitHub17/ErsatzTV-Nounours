@@ -10,30 +10,30 @@
 <MudForm Style="max-height: 100%">
     <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
         <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-6" OnClick="@(_ => SaveChanges())" StartIcon="@Icons.Material.Filled.Save">
-            Save Deco Template
+            Enregistrer le modèle de déco
         </MudButton>
     </MudPaper>
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
-            <MudText Typo="Typo.h5" Class="mb-2">General</MudText>
+            <MudText Typo="Typo.h5" Class="mb-2">Général</MudText>
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Deco Template Group Name</MudText>
+                    <MudText>Nom du groupe de modèles de déco</MudText>
                 </div>
                 <MudTextField @bind-Value="_decoTemplate.GroupName" Disabled="true"/>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Deco Template Name</MudText>
+                    <MudText>Nom du modèle de déco</MudText>
                 </div>
                 <MudTextField @bind-Value="_decoTemplate.Name" For="@(() => _decoTemplate.Name)"/>
             </MudStack>
-            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Add Content</MudText>
+            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Ajouter du contenu</MudText>
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Deco Group</MudText>
+                    <MudText>Groupe de décos</MudText>
                 </div>
                 <MudSelect T="DecoGroupViewModel" ValueChanged="@(vm => UpdateDecoGroupItems(vm))">
                     @foreach (DecoGroupViewModel decoGroup in _decoGroups)
@@ -44,7 +44,7 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Deco</MudText>
+                    <MudText>Déco</MudText>
                 </div>
                 <MudSelect T="DecoViewModel" @bind-value="_selectedDeco">
                     @foreach (DecoViewModel deco in _decos)
@@ -55,7 +55,7 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Start Time On Or After</MudText>
+                    <MudText>Heure de début à partir de</MudText>
                 </div>
                 <MudSelect T="DateTime" @bind-value="_selectedDecoStart">
                     @foreach (DateTime startTime in _startTimes)
@@ -68,7 +68,7 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Duration</MudText>
+                    <MudText>Durée</MudText>
                 </div>
                 <MudTextField T="int"
                               @bind-Value="_durationHours"
@@ -95,17 +95,17 @@
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex"></div>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(_ => AddDecoToDecoTemplate())" Disabled="@(_selectedDeco is null)" StartIcon="@Icons.Material.Filled.Add">
-                    Add Deco To Template
+                    Ajouter la déco au modèle
                 </MudButton>
             </MudStack>
-            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Remove Content</MudText>
+            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Retirer le contenu</MudText>
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Deco To Remove</MudText>
+                    <MudText>Déco à retirer</MudText>
                 </div>
                 <MudSelect T="DecoTemplateItemEditViewModel" @bind-Value="_decoToRemove">
-                    <MudSelectItem Value="@((DecoTemplateItemEditViewModel)null)">(none)</MudSelectItem>
+                    <MudSelectItem Value="@((DecoTemplateItemEditViewModel)null)">(aucun)</MudSelectItem>
                     @foreach (DecoTemplateItemEditViewModel item in _decoTemplate.Items.OrderBy(i => i.Start))
                     {
                         <MudSelectItem Value="@item">@item.Start.ToShortTimeString() - @item.Text</MudSelectItem>
@@ -115,10 +115,10 @@
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex"></div>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(_ => RemoveDecoFromDecoTemplate())" Disabled="@(_decoToRemove is null)" StartIcon="@Icons.Material.Filled.Remove">
-                    Remove Deco From Template
+                    Retirer la déco du modèle
                 </MudButton>
             </MudStack>
-            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Content</MudText>
+            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Contenu</MudText>
             <MudDivider Class="mb-6"/>
             <MudCalendar T="CalendarItem"
                          Class="mb-6"
@@ -322,7 +322,7 @@
     {
         if (_decoTemplate.Items.Any(i => i.End is null))
         {
-            Snackbar.Add("Template item cannot end after midnight", Severity.Error);
+            Snackbar.Add("Un élément du modèle ne peut pas finir après minuit", Severity.Error);
             return;
         }
 
@@ -334,7 +334,7 @@
         errorMessages.HeadOrNone().Match(
             error =>
             {
-                Snackbar.Add($"Unexpected error saving template: {error.Value}", Severity.Error);
+                Snackbar.Add($"Erreur à l'enregistrement du modèle : {error.Value}", Severity.Error);
                 Logger.LogError("Unexpected error saving template: {Error}", error.Value);
             },
             () => NavigationManager.NavigateTo("deco-templates"));

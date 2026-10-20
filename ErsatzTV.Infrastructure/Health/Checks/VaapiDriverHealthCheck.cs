@@ -16,7 +16,7 @@ public class VaapiDriverHealthCheck(
     IDbContextFactory<TvContext> dbContextFactory)
     : BaseHealthCheck, IVaapiDriverHealthCheck
 {
-    public override string Title => "VAAPI Driver";
+    public override string Title => "Pilote VAAPI";
 
     public async Task<HealthCheckResult> Check(CancellationToken cancellationToken)
     {
@@ -73,7 +73,7 @@ public class VaapiDriverHealthCheck(
                 {
                     return FailResult(
                         $"FFmpeg Profile {profile.Name} is using device and driver combination ({profile.VaapiDevice} and {profile.VaapiDriver}) that reports no capabilities. Hardware Acceleration WILL NOT WORK as configured.",
-                        "Hardware acceleration WILL NOT WORK...");
+                        "L'accélération matérielle NE FONCTIONNERA PAS…");
                 }
             }
         }
@@ -86,7 +86,7 @@ public class VaapiDriverHealthCheck(
         return defaultProfiles.Count != 0
             ? InfoResult(
                 $"{defaultProfiles.Count} FFmpeg Profile{(defaultProfiles.Count > 1 ? "s are" : " is")} set to use Default VAAPI Driver; selecting iHD (Gen 8+) or i965 (up to Gen 9) may offer better performance with Intel iGPU",
-                "Default VAAPI driver is not optimal")
+                "Le pilote VAAPI par défaut n'est pas optimal")
             : OkResult();
     }
 

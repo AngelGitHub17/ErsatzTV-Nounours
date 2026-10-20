@@ -1,4 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO.Abstractions;
 using System.Reflection;
@@ -358,6 +358,11 @@ public class Startup
             FileSystemLayout.GraphicsElementsScriptTemplatesFolder,
             FileSystemLayout.GraphicsElementsSubtitleTemplatesFolder,
             FileSystemLayout.GraphicsElementsMotionTemplatesFolder,
+            FileSystemLayout.GraphicsElementsClockTemplatesFolder,
+            FileSystemLayout.HabillageScenesFolder,
+            FileSystemLayout.HabillageAssetsFolder,
+            FileSystemLayout.ProgrammesFolder,
+            FileSystemLayout.PluginsFolder,
             FileSystemLayout.ScriptsFolder,
             FileSystemLayout.MultiEpisodeShuffleTemplatesFolder,
             FileSystemLayout.AudioStreamSelectorScriptsFolder,
@@ -493,6 +498,7 @@ public class Startup
         services.AddResponseCompression(options => { options.EnableForHttps = true; });
 
         CustomServices(services);
+        NounoursServices(services);
     }
 
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
@@ -526,6 +532,16 @@ public class Startup
         }
 
         app.UseCors("AllowAll");
+        app.Use(async (context, next) =>
+        {
+            context.Response.OnStarting(() =>
+            {
+                context.Response.Headers.Remove("X-Frame-Options");
+                context.Response.Headers.Append("Content-Security-Policy", "frame-ancestors *");
+                return Task.CompletedTask;
+            });
+            await next(context);
+        });
         app.UseForwardedHeaders();
 
         //app.UseHttpLogging();
@@ -687,6 +703,42 @@ public class Startup
                    path.StartsWithSegments("/lineup.json") ||
                    path.StartsWithSegments("/lineup_status.json");
         }
+    }
+
+    // ---- édition Nounours : nouvelles fonctionnalités + modules -------------------------------
+    private void NounoursServices(IServiceCollection services)
+    {
+        services.AddScoped<ErsatzTV.Application.Nounours.IGuideService, ErsatzTV.Application.Nounours.GuideService>();
+        services.AddScoped<ErsatzTV.Application.Nounours.IContentCatalog, ErsatzTV.Application.Nounours.ContentCatalog>();
+        services.AddScoped<ErsatzTV.Application.Nounours.IHabillageService, ErsatzTV.Application.Nounours.HabillageService>();
+        services.AddScoped<ErsatzTV.Application.Nounours.IProgrammeService, ErsatzTV.Application.Nounours.ProgrammeService>();
+        services.AddScoped<ErsatzTV.Nounours.ChannelWizardService>();
+        services.AddScoped<ErsatzTV.Nounours.UiPreferences>();
+
+        ErsatzTV.Nounours.Plugins.PluginRegistry registry = ErsatzTV.Nounours.Plugins.PluginRegistry.Load(
+            FileSystemLayout.PluginsFolder,
+            typeof(Startup).Assembly);
+        services.AddSingleton<ErsatzTV.Plugins.IPluginRegistry>(registry);
+
+        foreach (ErsatzTV.Plugins.LoadedPlugin loaded in registry.Plugins.Where(p => p.IsEnabled))
+        {
+            try
+            {
+                loaded.Plugin.ConfigureServices(services, Configuration);
+                Log.Information("Module chargé : {Plugin} {Version} ({Source})", loaded.Plugin.Name, loaded.Plugin.Version, loaded.Source);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Impossible de configurer le module {Plugin}", loaded.Plugin.Name);
+            }
+        }
+
+        foreach (ErsatzTV.Plugins.PluginLoadError error in registry.Errors)
+        {
+            Log.Warning("Module ignoré {Source} : {Message}", error.Source, error.Message);
+        }
+
+        services.AddHostedService<ErsatzTV.Nounours.Plugins.PluginStartupService>();
     }
 
     private static void CustomServices(IServiceCollection services)

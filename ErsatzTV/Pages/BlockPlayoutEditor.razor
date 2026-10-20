@@ -11,7 +11,7 @@
 <MudForm Style="max-height: 100%">
     <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
         <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-6" OnClick="@(_ => SaveDefaultDeco())" StartIcon="@Icons.Material.Filled.Save">
-            Save Default Deco
+            Enregistrer la déco par défaut
         </MudButton>
     </MudPaper>
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
@@ -20,17 +20,17 @@
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Playout Templates</MudText>
+                    <MudText>Modèles de playout</MudText>
                 </div>
                 <MudButton Disabled="@EntityLocker.IsPlayoutLocked(Id)" Variant="Variant.Filled" Color="Color.Primary" Href="@($"playouts/{Id}/templates")" StartIcon="@Icons.Material.Filled.Edit">
-                    Edit Templates
+                    Modifier les modèles
                 </MudButton>
             </MudStack>
-            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Default Deco</MudText>
+            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Déco par défaut</MudText>
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Enable Default Deco</MudText>
+                    <MudText>Activer la déco par défaut</MudText>
                 </div>
                 <MudCheckBox @bind-Value="_enableDefaultDeco" Dense="true"/>
             </MudStack>
@@ -38,7 +38,7 @@
             {
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Deco Group</MudText>
+                        <MudText>Groupe de décos</MudText>
                     </div>
                     <MudSelect T="DecoGroupViewModel"
                                Value="@_selectedDefaultDecoGroup"
@@ -51,7 +51,7 @@
                 </MudStack>
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Deco</MudText>
+                        <MudText>Déco</MudText>
                     </div>
                     <MudSelect @bind-Value="_defaultDeco"
                                For="@(() => _defaultDeco)"
@@ -67,16 +67,16 @@
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Playout Items and History</MudText>
+                    <MudText>Éléments et historique du playout</MudText>
                 </div>
                 <MudButton Disabled="@EntityLocker.IsPlayoutLocked(Id)" Variant="Variant.Filled" Color="Color.Warning" OnClick="@(_ => EraseItems(eraseHistory: false))" StartIcon="@Icons.Material.Filled.Delete">
-                    Erase Items
+                    Effacer les éléments
                 </MudButton>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex"></div>
                 <MudButton Disabled="@EntityLocker.IsPlayoutLocked(Id)" Variant="Variant.Filled" Color="Color.Error" OnClick="@(_ => EraseItems(eraseHistory: true))" StartIcon="@Icons.Material.Filled.Delete">
-                    Erase Items and History
+                    Effacer les éléments et l'historique
                 </MudButton>
             </MudStack>
         </MudContainer>
@@ -155,7 +155,7 @@
         IRequest request = eraseHistory ? new ErasePlayoutHistory(Id) : new ErasePlayoutItems(Id);
         await Mediator.Send(request, _cts.Token);
 
-        string message = eraseHistory ? "Erased playout items and history" : "Erased playout items";
+        string message = eraseHistory ? "Éléments et historique du playout effacés" : "Éléments du playout effacés";
         Snackbar.Add(message, Severity.Info);
     }
 
@@ -166,10 +166,10 @@
         result.Match(
             error =>
             {
-                Snackbar.Add($"Unexpected error saving default deco: {error.Value}", Severity.Error);
+                Snackbar.Add($"Erreur à l'enregistrement de la déco par défaut : {error.Value}", Severity.Error);
                 Logger.LogError("Unexpected error saving default deco: {Error}", error.Value);
             },
-            () => { Snackbar.Add($"Saved default deco for playout {_channelName}", Severity.Success); });
+            () => { Snackbar.Add($"Déco par défaut enregistrée pour {_channelName}", Severity.Success); });
     }
 
 }

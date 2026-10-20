@@ -1,4 +1,4 @@
-@page "/system/troubleshooting/playback"
+﻿@page "/system/troubleshooting/playback"
 @using System.Globalization
 @using System.IO.Abstractions
 @using ErsatzTV.Application.Channels
@@ -29,7 +29,7 @@
                        StartIcon="@Icons.Material.Filled.Download"
                        Disabled="@(!_hasPlayed || Locker.IsTroubleshootingPlaybackLocked())"
                        OnClick="@DownloadResults">
-                Download Results
+                Télécharger les résultats
             </MudButton>
             @if (MediaItemId.HasValue)
             {
@@ -38,7 +38,7 @@
                            Class="ml-6"
                            StartIcon="@Icons.Material.Filled.DownloadForOffline"
                            OnClick="@DownloadSample">
-                    Download Media Sample
+                    Télécharger un échantillon du média
                 </MudButton>
             }
         </div>
@@ -63,7 +63,7 @@
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>FFmpeg Profile</MudText>
+                    <MudText>Profil FFmpeg</MudText>
                 </div>
                 <MudSelect @bind-Value="_ffmpegProfileId" For="@(() => _ffmpegProfileId)">
                     @foreach (FFmpegProfileViewModel profile in _ffmpegProfiles)
@@ -74,7 +74,7 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Stream Selector</MudText>
+                    <MudText>Sélecteur de flux</MudText>
                 </div>
                 <MudSelect @bind-Value="_streamSelector" For="@(() => _streamSelector)" Clearable="true" Disabled="@(_streamSelectors.Count == 0)">
                     @foreach (string selector in _streamSelectors)
@@ -87,7 +87,7 @@
             {
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Date and Time</MudText>
+                        <MudText>Date et heure</MudText>
                     </div>
                     <MudTextField T="string" @bind-Value="_startString" OnBlur="@OnStartStringBlur" />
                 </MudStack>
@@ -96,10 +96,10 @@
             {
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Subtitle</MudText>
+                        <MudText>Sous-titres</MudText>
                     </div>
                     <MudSelect @bind-Value="_subtitleId" For="@(() => _subtitleId)" Clearable="true" Disabled="@(!string.IsNullOrWhiteSpace(_streamSelector))">
-                        <MudSelectItem T="int?" Value="@((int?)null)">(none)</MudSelectItem>
+                        <MudSelectItem T="int?" Value="@((int?)null)">(aucun)</MudSelectItem>
                         @foreach (SubtitleViewModel subtitleStream in _subtitleStreams)
                         {
                             <MudSelectItem T="int?" Value="@subtitleStream.Id">@($"{subtitleStream.Id}: {subtitleStream.Language} - {subtitleStream.Title} ({subtitleStream.Codec})")</MudSelectItem>
@@ -108,7 +108,7 @@
                 </MudStack>
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Watermarks</MudText>
+                        <MudText>Filigranes</MudText>
                     </div>
                     <MudSelect T="string" @bind-SelectedValues="_watermarkNames" Clearable="true" MultiSelection="true">
                         @foreach (WatermarkViewModel watermark in _watermarks)
@@ -119,7 +119,7 @@
                 </MudStack>
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Graphics Elements</MudText>
+                        <MudText>Éléments graphiques</MudText>
                     </div>
                     <MudSelect T="string" @bind-SelectedValues="_graphicsElementNames" Clearable="true" MultiSelection="true">
                         @foreach (GraphicsElementViewModel graphicsElement in _graphicsElements)
@@ -130,7 +130,7 @@
                 </MudStack>
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Start From Beginning</MudText>
+                        <MudText>Reprendre au début</MudText>
                     </div>
                     <MudCheckBox T="bool"
                                  Dense="true"
@@ -139,12 +139,12 @@
                 </MudStack>
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Seek Seconds</MudText>
+                        <MudText>Position (secondes)</MudText>
                     </div>
                     <MudTextField @bind-Value="@(_seekSeconds)" Disabled="@(_startFromBeginning)"/>
                 </MudStack>
             }
-            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Preview</MudText>
+            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Aperçu</MudText>
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex"></div>
@@ -176,7 +176,7 @@
             }
             else
             {
-                <MudText Typo="Typo.h5" Class="mt-10 mb-2">Logs</MudText>
+                <MudText Typo="Typo.h5" Class="mt-10 mb-2">Journaux</MudText>
             }
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="gap-md-8 mb-5">
@@ -431,11 +431,11 @@
 
         if (result.ExitCode == 0)
         {
-            Snackbar.Add("FFmpeg troubleshooting process exited successfully", Severity.Success);
+            Snackbar.Add("Le test FFmpeg s'est terminé avec succès", Severity.Success);
         }
         else
         {
-            Snackbar.Add($"FFmpeg troubleshooting process exited with code {result.ExitCode}", Severity.Warning);
+            Snackbar.Add($"Le test FFmpeg s'est terminé avec le code {result.ExitCode}", Severity.Warning);
         }
 
         string logFileName = Path.Combine(FileSystemLayout.TranscodeTroubleshootingFolder, "logs.txt");

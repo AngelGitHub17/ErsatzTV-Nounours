@@ -13,7 +13,7 @@ public class EpisodeMetadataHealthCheck : BaseHealthCheck, IEpisodeMetadataHealt
     public EpisodeMetadataHealthCheck(IDbContextFactory<TvContext> dbContextFactory) =>
         _dbContextFactory = dbContextFactory;
 
-    public override string Title => "Episode Metadata";
+    public override string Title => "Métadonnées des épisodes";
 
     public async Task<HealthCheckResult> Check(CancellationToken cancellationToken)
     {
@@ -38,8 +38,8 @@ public class EpisodeMetadataHealthCheck : BaseHealthCheck, IEpisodeMetadataHealt
             var folders = string.Join(", ", paths);
 
             return WarningResult(
-                $"There are {episodes.Count} episodes with missing metadata, including in the following folders: {folders}",
-                $"There are {episodes.Count} episodes with missing metadata");
+                $"{episodes.Count} épisode(s) sans métadonnées, notamment dans : {folders}",
+                $"{episodes.Count} épisode(s) sans métadonnées");
         }
 
         return OkResult();

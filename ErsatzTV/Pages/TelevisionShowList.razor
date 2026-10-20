@@ -149,7 +149,7 @@
             var parameters = new DialogParameters { { "EntityType", "show" }, { "EntityName", show.Title } };
             var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-            IDialogReference dialog = await Dialog.ShowAsync<AddToCollectionDialog>("Add To Collection", parameters, options);
+            IDialogReference dialog = await Dialog.ShowAsync<AddToCollectionDialog>("Ajouter à une collection", parameters, options);
             DialogResult result = await dialog.Result;
             if (result is { Canceled: false, Data: MediaCollectionViewModel collection })
             {
@@ -158,10 +158,10 @@
                 addResult.Match(
                     Left: error =>
                     {
-                        Snackbar.Add($"Unexpected error adding show to collection: {error.Value}");
+                        Snackbar.Add($"Erreur lors de l'ajout de la série à la collection : {error.Value}");
                         Logger.LogError("Unexpected error adding show to collection: {Error}", error.Value);
                     },
-                    Right: _ => Snackbar.Add($"Added {show.Title} to collection {collection.Name}", Severity.Success));
+                    Right: _ => Snackbar.Add($"« {show.Title} » ajoutée à la collection {collection.Name}", Severity.Success));
             }
         }
     }

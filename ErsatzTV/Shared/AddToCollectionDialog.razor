@@ -21,7 +21,7 @@
                     <MudSelectItem Value="@collection">@collection.Name</MudSelectItem>
                 }
             </MudSelect>
-            <MudTextField T="string" Label="New Collection Name"
+            <MudTextField T="string" Label="Nom de la nouvelle collection"
                           Disabled="@(_selectedCollection != _newCollection)"
                           @bind-Text="@_newCollectionName"
                           Class="mb-6 mx-4">
@@ -29,9 +29,9 @@
         </EditForm>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel" ButtonType="ButtonType.Reset">Cancel</MudButton>
+        <MudButton OnClick="Cancel" ButtonType="ButtonType.Reset">Annuler</MudButton>
         <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">
-            Add To Collection
+            Ajouter à une collection
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -58,7 +58,7 @@
     private readonly MediaCollectionViewModel _newCollection = new(
         CollectionType.Collection,
         -1,
-        "(New Collection)",
+        "(Nouvelle collection)",
         false,
         MediaItemState.Normal);
 

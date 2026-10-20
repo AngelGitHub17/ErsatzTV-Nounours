@@ -1,0 +1,906 @@
+@page "/habillage/nouveau"
+@page "/habillage/{Slug}"
+@using System.Globalization
+@using System.Text.RegularExpressions
+@using ErsatzTV.Application.Nounours
+@implements IAsyncDisposable
+@inject IHabillageService HabillageService
+@inject IJSRuntime JsRuntime
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+
+<PageTitle>@(_scene?.Name ?? "Habillage") · Studio</PageTitle>
+
+<div class="n-page" style="max-width: none; height: 100%; overflow-y: auto">
+    @if (_scene is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary"/>
+    }
+    else
+    {
+        <div class="n-page-header" style="align-items: center">
+            <div class="d-flex align-center gap-3" style="flex: 1; min-width: 300px">
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Href="habillage" aria-label="Retour"/>
+                <MudTextField @bind-Value="_scene.Name" Variant="Variant.Text" Style="font-size: 1.5rem; font-weight: 700" Immediate="true"
+                              @bind-Value:after="@MarkDirty" Placeholder="Nom de l'habillage"/>
+                @if (_dirty)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined">Non enregistré</MudChip>
+                }
+            </div>
+            <div class="d-flex gap-2 align-center flex-wrap">
+                <MudButton OnClick="@Save" Disabled="@_busy" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save">Enregistrer</MudButton>
+                <MudButton OnClick="@OpenApply" Disabled="@_busy" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.LiveTv">Appliquer aux chaînes</MudButton>
+            </div>
+        </div>
+
+        <div class="n-studio">
+            @* ------------------------------------------------ boîte à outils + calques *@
+            <div class="d-flex flex-column gap-3">
+                <div class="n-card">
+                    <div class="n-card-title">Ajouter</div>
+                    <div class="n-toolbox">
+                        <div class="n-tool" @onclick="@(() => Add("clock"))"><MudIcon Icon="@Icons.Material.Filled.Schedule"/>Horloge</div>
+                        <div class="n-tool" @onclick="@(() => Add("date"))"><MudIcon Icon="@Icons.Material.Filled.Today"/>Date</div>
+                        <div class="n-tool" @onclick="@(() => Add("text"))"><MudIcon Icon="@Icons.Material.Filled.TextFields"/>Texte</div>
+                        <div class="n-tool" @onclick="@(() => Add("title"))"><MudIcon Icon="@Icons.Material.Filled.Title"/>Titre du programme</div>
+                        <div class="n-tool" @onclick="@(() => Add("next"))"><MudIcon Icon="@Icons.Material.Filled.SkipNext"/>À suivre</div>
+                        <div class="n-tool" @onclick="@(() => Add("image"))"><MudIcon Icon="@Icons.Material.Filled.Image"/>Logo / image</div>
+                        <div class="n-tool" @onclick="@(() => Add("banner"))"><MudIcon Icon="@Icons.Material.Filled.CropLandscape"/>Bandeau</div>
+                        <div class="n-tool" @onclick="@(() => Add("lowerthird"))"><MudIcon Icon="@Icons.Material.Filled.ViewDay"/>Bas d'écran</div>
+                    </div>
+                </div>
+                <div class="n-card" style="padding: 12px">
+                    <div class="n-card-title" style="padding: 0 6px">Calques <span class="n-muted" style="font-weight: 400">(le plus haut au-dessus)</span></div>
+                    @if (_scene.Items.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="n-muted pa-2">Ajoutez un élément avec les boutons ci-dessus.</MudText>
+                    }
+                    <MudList T="string" Dense="true" Class="n-layers-list">
+                        @foreach (HabillageItem item in _scene.Items.OrderByDescending(i => i.ZIndex))
+                        {
+                            <MudListItem T="string" @key="item.Id" Class="@(item.Id == _selectedId ? "is-selected" : "")" OnClick="@(() => _selectedId = item.Id)">
+                                <div class="d-flex align-center gap-1">
+                                    <MudIcon Icon="@KindIcon(item.Kind)" Size="Size.Small"/>
+                                    <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; @(item.Visible ? "" : "opacity: .45")">@item.Label</span>
+                                    <MudIconButton Icon="@(item.Visible ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)" Size="Size.Small"
+                                                   OnClick="@(() => { item.Visible = !item.Visible; MarkDirty(); })" aria-label="Afficher/masquer"/>
+                                </div>
+                            </MudListItem>
+                        }
+                    </MudList>
+                </div>
+                <div class="n-card">
+                    <div class="n-card-title">Aperçu</div>
+                    <MudSelect T="string" Value="@_background" ValueChanged="@SetBackground" Label="Fond de l'aperçu" Variant="Variant.Outlined" Margin="Margin.Dense">
+                        <MudSelectItem Value="@("gradient")">Dégradé</MudSelectItem>
+                        <MudSelectItem Value="@("bars")">Mire</MudSelectItem>
+                        <MudSelectItem Value="@("checker")">Damier</MudSelectItem>
+                        <MudSelectItem Value="@("custom")">Image…</MudSelectItem>
+                    </MudSelect>
+                    @if (_background == "custom")
+                    {
+                        <MudTextField @bind-Value="_scene.PreviewBackground" Label="Adresse de l'image" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"
+                                      HelperText="Capture d'un de vos programmes, par exemple"/>
+                    }
+                    <MudSwitch T="bool" @bind-Value="_showSafe" Color="Color.Primary" Label="Zone de sécurité" Class="mt-2"/>
+                </div>
+            </div>
+
+            @* ------------------------------------------------ scène *@
+            <div class="n-stage-wrap">
+                <div class="n-stage" @ref="_stage" style="@StageBackground()">
+                    @foreach (HabillageItem item in _scene.Items.OrderBy(i => i.ZIndex))
+                    {
+                        <div class="n-layer @(item.Id == _selectedId ? "is-selected" : "") @(item.Visible ? "" : "is-hidden")"
+                             data-id="@item.Id" @key="item.Id"
+                             style="@LayerStyle(item)">
+                            @switch (item.Kind)
+                            {
+                                case HabillageItemKind.Clock:
+                                case HabillageItemKind.Text:
+                                    <div class="n-layer-text" style="@TextStyle(item)">@PreviewText(item)</div>
+                                    break;
+                                case HabillageItemKind.Image:
+                                    @if (string.IsNullOrWhiteSpace(item.ImagePath))
+                                    {
+                                        <div style="aspect-ratio: 16/9; border: 2px dashed rgba(255,255,255,.5); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.7); font-size: 1.4cqw">Choisir une image →</div>
+                                    }
+                                    else
+                                    {
+                                        <img src="@ImageUrl(item.ImagePath)" alt=""/>
+                                    }
+                                    break;
+                                case HabillageItemKind.Banner:
+                                    <div style="@BannerStyle(item)"></div>
+                                    break;
+                            }
+                            @if (item.Id == _selectedId && item.Kind is HabillageItemKind.Image or HabillageItemKind.Banner)
+                            {
+                                <div class="n-layer-handle"></div>
+                            }
+                        </div>
+                    }
+                    @if (_showSafe)
+                    {
+                        <div class="n-stage-safe"></div>
+                    }
+                </div>
+                <div class="d-flex justify-space-between mt-2 n-muted" style="font-size: .78rem">
+                    <span>Glissez les calques pour les placer · flèches du clavier pour ajuster (Maj = plus vite) · Suppr pour effacer</span>
+                    <span>Aperçu indicatif : le rendu final est calculé par le moteur, au format de chaque chaîne.</span>
+                </div>
+                @if (_targetsUsing.Count > 0)
+                {
+                    <div class="mt-3 d-flex align-center gap-2 flex-wrap">
+                        <span class="n-muted" style="font-size: .85rem">Appliqué à :</span>
+                        @foreach (HabillageChannelTarget t in _targetsUsing)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text">@t.Number · @t.Name</MudChip>
+                        }
+                    </div>
+                }
+            </div>
+
+            @* ------------------------------------------------ propriétés *@
+            <div class="n-card">
+                @if (Selected is null)
+                {
+                    <div class="n-card-title">Habillage</div>
+                    <MudTextField @bind-Value="_scene.Description" Label="Description" Variant="Variant.Outlined" Lines="2" Margin="Margin.Dense" @bind-Value:after="@MarkDirty"/>
+                    <MudSwitch T="bool" @bind-Value="_scene.UseDuringFiller" @bind-Value:after="@MarkDirty" Color="Color.Primary" Label="Afficher aussi pendant les intercalaires" Class="mt-3"/>
+                    <MudSwitch T="bool" @bind-Value="_scene.MergeWithSchedule" @bind-Value:after="@MarkDirty" Color="Color.Primary" Label="Garder les éléments prévus par les plannings" Class="mt-1"/>
+                    <MudText Typo="Typo.body2" Class="n-muted mt-4">Sélectionnez un calque sur la scène ou dans la liste pour modifier ses réglages.</MudText>
+                }
+                else
+                {
+                    HabillageItem item = Selected;
+                    <div class="d-flex align-center justify-space-between">
+                        <div class="n-card-title" style="margin: 0">@KindLabel(item.Kind)</div>
+                        <div>
+                            <MudTooltip Text="Monter"><MudIconButton Icon="@Icons.Material.Filled.FlipToFront" Size="Size.Small" OnClick="@(() => Reorder(item, 1))"/></MudTooltip>
+                            <MudTooltip Text="Descendre"><MudIconButton Icon="@Icons.Material.Filled.FlipToBack" Size="Size.Small" OnClick="@(() => Reorder(item, -1))"/></MudTooltip>
+                            <MudTooltip Text="Dupliquer"><MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" OnClick="@(() => Duplicate(item))"/></MudTooltip>
+                            <MudTooltip Text="Supprimer"><MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => Remove(item))"/></MudTooltip>
+                        </div>
+                    </div>
+                    <MudTextField @bind-Value="item.Label" Label="Nom du calque" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" @bind-Value:after="@MarkDirty"/>
+
+                    <MudTabs Elevation="0" Rounded="true" TabPanelsClass="pt-3" Class="mt-2" ApplyEffectsToContainer="true" Outlined="false">
+                        <MudTabPanel Text="Contenu">
+                            @if (item.Kind == HabillageItemKind.Clock)
+                            {
+                                <MudSelect T="string" Value="@item.Format" ValueChanged="@(v => { item.Format = v; MarkDirty(); })" Label="Format" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                    @foreach ((string format, string label) in ClockFormats)
+                                    {
+                                        <MudSelectItem Value="@format">@label</MudSelectItem>
+                                    }
+                                </MudSelect>
+                                <MudTextField @bind-Value="item.Format" Label="Format personnalisé" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" Immediate="true"
+                                              HelperText="HH heures · mm minutes · ss secondes · dddd jour · MMMM mois" @bind-Value:after="@MarkDirty"/>
+                                <MudTextField @bind-Value="item.Text" Label="Texte autour (facultatif)" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" Immediate="true"
+                                              HelperText="{clock} est remplacé par l'heure, ex. « Il est {clock} »" @bind-Value:after="@MarkDirty"/>
+                                <MudSelect T="string" @bind-Value="item.TimeZone" Label="Fuseau horaire" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" @bind-Value:after="@MarkDirty">
+                                    <MudSelectItem Value="@("Europe/Paris")">Paris</MudSelectItem>
+                                    <MudSelectItem Value="@("Europe/London")">Londres</MudSelectItem>
+                                    <MudSelectItem Value="@("America/Montreal")">Montréal</MudSelectItem>
+                                    <MudSelectItem Value="@("Indian/Reunion")">La Réunion</MudSelectItem>
+                                    <MudSelectItem Value="@("America/Martinique")">Martinique</MudSelectItem>
+                                    <MudSelectItem Value="@("UTC")">UTC</MudSelectItem>
+                                    <MudSelectItem Value="@string.Empty">Celui du serveur</MudSelectItem>
+                                </MudSelect>
+                            }
+                            else if (item.Kind == HabillageItemKind.Text)
+                            {
+                                <MudTextField @bind-Value="item.Text" Label="Texte" Variant="Variant.Outlined" Lines="3" Immediate="true" @bind-Value:after="@MarkDirty"/>
+                                <MudMenu Label="Insérer une info du programme" Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.DataObject" Class="mt-1">
+                                    @foreach ((string token, string label) in Variables)
+                                    {
+                                        <MudMenuItem OnClick="@(() => Insert(item, token))">@label</MudMenuItem>
+                                    }
+                                </MudMenu>
+                                <MudNumericField @bind-Value="item.EpgEntries" Label="Programmes à charger depuis le guide" Min="0" Max="10" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"
+                                                 HelperText="Nécessaire pour « à suivre » (2 = actuel + suivant)" @bind-Value:after="@MarkDirty"/>
+                            }
+                            else if (item.Kind == HabillageItemKind.Image)
+                            {
+                                <MudSelect T="string" Value="@item.ImagePath" ValueChanged="@(v => { item.ImagePath = v; MarkDirty(); })" Label="Image importée" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                    @foreach (string asset in _assets)
+                                    {
+                                        <MudSelectItem Value="@asset">@System.IO.Path.GetFileName(asset)</MudSelectItem>
+                                    }
+                                </MudSelect>
+                                <label class="d-inline-flex mt-2" style="cursor: pointer">
+                                    <InputFile OnChange="@(e => Upload(item, e.File))" accept=".png,.jpg,.jpeg,.gif,.webp" style="display: none"/>
+                                    <span class="mud-button-root mud-button mud-button-outlined mud-button-outlined-default mud-button-outlined-size-small" style="padding: 4px 10px">
+                                        <MudIcon Icon="@Icons.Material.Filled.Upload" Size="Size.Small" Class="mr-1"/>Importer une image (PNG transparent conseillé)
+                                    </span>
+                                </label>
+                                <MudTextField @bind-Value="item.ImagePath" Label="…ou chemin / adresse web" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" @bind-Value:after="@MarkDirty"
+                                              HelperText="Chemin sur le serveur ou URL http(s). Les GIF animés sont pris en charge."/>
+                            }
+                            else
+                            {
+                                <MudColorPicker Value="@(new MudBlazor.Utilities.MudColor(item.BackgroundColor))" ValueChanged="@(c => { item.BackgroundColor = c.Value; MarkDirty(); })"
+                                                Label="Couleur du bandeau" Variant="Variant.Outlined" Margin="Margin.Dense" ShowAlpha="true"/>
+                                <MudText Typo="Typo.caption" Class="n-muted">Arrondi des coins</MudText>
+                                <MudSlider T="double" @bind-Value="item.CornerRadius" Min="0" Max="60" Step="1" Color="Color.Primary" @bind-Value:after="@MarkDirty"/>
+                                <MudText Typo="Typo.caption" Class="n-muted">Hauteur : @Num(item.Height) %</MudText>
+                                <MudSlider T="double" @bind-Value="item.Height" Min="1" Max="100" Step="0.5" Color="Color.Primary" @bind-Value:after="@MarkDirty"/>
+                                <MudText Typo="Typo.body2" Class="n-muted mt-1">Astuce : placez un texte au-dessus du bandeau pour faire un « bas d'écran ».</MudText>
+                            }
+                        </MudTabPanel>
+
+                        @if (item.Kind is HabillageItemKind.Clock or HabillageItemKind.Text)
+                        {
+                            <MudTabPanel Text="Style">
+                                <MudAutocomplete T="string" Value="@item.FontFamily" ValueChanged="@(v => { item.FontFamily = v; MarkDirty(); })" SearchFunc="@SearchFonts"
+                                                 Label="Police" Variant="Variant.Outlined" Margin="Margin.Dense" CoerceValue="true" Strict="false"
+                                                 HelperText="Polices du dossier fonts d'ErsatzTV (ajoutez vos .ttf/.otf dedans)"/>
+                                <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Taille : @Num(item.FontSize) px (en 1080p)</MudText>
+                                <MudSlider T="double" @bind-Value="item.FontSize" Min="10" Max="200" Step="1" Color="Color.Primary" @bind-Value:after="@MarkDirty"/>
+                                <div class="d-flex gap-2">
+                                    <MudSelect T="int" @bind-Value="item.FontWeight" Label="Graisse" Variant="Variant.Outlined" Margin="Margin.Dense" @bind-Value:after="@MarkDirty">
+                                        <MudSelectItem Value="300">Fin</MudSelectItem>
+                                        <MudSelectItem Value="400">Normal</MudSelectItem>
+                                        <MudSelectItem Value="600">Demi-gras</MudSelectItem>
+                                        <MudSelectItem Value="700">Gras</MudSelectItem>
+                                        <MudSelectItem Value="900">Très gras</MudSelectItem>
+                                    </MudSelect>
+                                    <MudSelect T="string" @bind-Value="item.Align" Label="Alignement" Variant="Variant.Outlined" Margin="Margin.Dense" @bind-Value:after="@MarkDirty">
+                                        <MudSelectItem Value="@("Left")">Gauche</MudSelectItem>
+                                        <MudSelectItem Value="@("Center")">Centré</MudSelectItem>
+                                        <MudSelectItem Value="@("Right")">Droite</MudSelectItem>
+                                    </MudSelect>
+                                </div>
+                                <MudCheckBox T="bool" @bind-Value="item.Italic" Label="Italique" Color="Color.Primary" Dense="true" @bind-Value:after="@MarkDirty"/>
+                                <MudColorPicker Value="@(new MudBlazor.Utilities.MudColor(item.Color))" ValueChanged="@(c => { item.Color = c.Value; MarkDirty(); })"
+                                                Label="Couleur du texte" Variant="Variant.Outlined" Margin="Margin.Dense" ShowAlpha="true" Class="mt-2"/>
+                                <MudColorPicker Value="@(new MudBlazor.Utilities.MudColor(item.HaloColor))" ValueChanged="@(c => { item.HaloColor = c.Value; MarkDirty(); })"
+                                                Label="Couleur du contour" Variant="Variant.Outlined" Margin="Margin.Dense" ShowAlpha="true" Class="mt-2"/>
+                                <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Épaisseur du contour : @Num(item.HaloWidth)</MudText>
+                                <MudSlider T="double" @bind-Value="item.HaloWidth" Min="0" Max="12" Step="0.5" Color="Color.Primary" @bind-Value:after="@MarkDirty"/>
+                                <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Largeur max : @(item.Width <= 0 ? "libre" : $"{Num(item.Width)} % (le texte rétrécit pour tenir)")</MudText>
+                                <MudSlider T="double" @bind-Value="item.Width" Min="0" Max="100" Step="1" Color="Color.Primary" @bind-Value:after="@MarkDirty"/>
+                            </MudTabPanel>
+                        }
+
+                        <MudTabPanel Text="Position">
+                            <div class="d-flex gap-2">
+                                <MudNumericField T="double" @bind-Value="item.X" Label="X (%)" Min="0" Max="100" Step="0.5" Variant="Variant.Outlined" Margin="Margin.Dense" @bind-Value:after="@MarkDirty"/>
+                                <MudNumericField T="double" @bind-Value="item.Y" Label="Y (%)" Min="0" Max="100" Step="0.5" Variant="Variant.Outlined" Margin="Margin.Dense" @bind-Value:after="@MarkDirty"/>
+                            </div>
+                            @if (item.Kind is HabillageItemKind.Image or HabillageItemKind.Banner)
+                            {
+                                <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Largeur : @Num(item.Width) %</MudText>
+                                <MudSlider T="double" @bind-Value="item.Width" Min="1" Max="100" Step="0.5" Color="Color.Primary" @bind-Value:after="@MarkDirty"/>
+                            }
+                            <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Placer rapidement</MudText>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; max-width: 180px">
+                                @foreach ((string key, string icon) in Anchors)
+                                {
+                                    <MudIconButton Icon="@icon" Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => Snap(item, key))"/>
+                                }
+                            </div>
+                            <MudText Typo="Typo.caption" Class="n-muted d-block mt-3">Opacité : @item.Opacity %</MudText>
+                            <MudSlider T="int" @bind-Value="item.Opacity" Min="5" Max="100" Step="5" Color="Color.Primary" @bind-Value:after="@MarkDirty"/>
+                        </MudTabPanel>
+
+                        <MudTabPanel Text="Apparition">
+                            <MudSelect T="HabillageVisibility" @bind-Value="item.Visibility" Label="Quand l'afficher ?" Variant="Variant.Outlined" Margin="Margin.Dense" @bind-Value:after="@MarkDirty">
+                                <MudSelectItem Value="HabillageVisibility.Always">Tout le temps</MudSelectItem>
+                                <MudSelectItem Value="HabillageVisibility.ProgramStart">Au début de chaque programme</MudSelectItem>
+                                <MudSelectItem Value="HabillageVisibility.ProgramEnd">À la fin de chaque programme</MudSelectItem>
+                                <MudSelectItem Value="HabillageVisibility.Periodic">Régulièrement (toutes les X minutes)</MudSelectItem>
+                            </MudSelect>
+                            @if (item.Visibility != HabillageVisibility.Always)
+                            {
+                                <MudNumericField @bind-Value="item.VisibleSeconds" Label="Pendant (secondes)" Min="1" Max="3600" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" @bind-Value:after="@MarkDirty"/>
+                            }
+                            @if (item.Visibility == HabillageVisibility.Periodic)
+                            {
+                                <MudNumericField @bind-Value="item.PeriodMinutes" Label="Toutes les (minutes)" Min="1" Max="720" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" @bind-Value:after="@MarkDirty"/>
+                                <MudText Typo="Typo.caption" Class="n-muted">Calé sur l'horloge : toutes les 15 min = à :00, :15, :30, :45.</MudText>
+                            }
+                            <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Apparition et disparition en fondu d'une seconde.</MudText>
+                        </MudTabPanel>
+
+                        <MudTabPanel Text="YAML">
+                            <MudText Typo="Typo.caption" Class="n-muted">Fichier généré pour le moteur graphique d'ErsatzTV :</MudText>
+                            <div class="n-yaml mt-1">@HabillageService.GenerateYamlPreview(item)</div>
+                        </MudTabPanel>
+                    </MudTabs>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@* ------------------------------------------------ appliquer aux chaînes *@
+@if (_applyOpen)
+{
+    <MudOverlay Visible="true" OnClick="@(() => _applyOpen = false)" DarkBackground="true" ZIndex="1400"/>
+    <div class="n-card" style="position: fixed; left: 50%; top: 10vh; transform: translateX(-50%); width: 520px; max-width: calc(100vw - 32px); max-height: 75vh; overflow: auto; z-index: 1401">
+        <MudText Typo="Typo.h6">Appliquer « @_scene.Name »</MudText>
+        <MudText Typo="Typo.body2" Class="n-muted mb-3">L'habillage devient la « deco par défaut » des chaînes cochées. Il s'affiche dès le prochain programme.</MudText>
+        @if (_targets.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info">Aucune chaîne n'a encore de playout. Créez une chaîne avec l'assistant d'abord.</MudAlert>
+        }
+        @foreach (HabillageChannelTarget target in _targets)
+        {
+            <div class="d-flex align-center">
+                <MudCheckBox T="bool" Value="@_checked.Contains(target.ChannelId)" ValueChanged="@(v => Toggle(target.ChannelId, v))" Color="Color.Primary"
+                             Label="@($"{target.Number} · {target.Name}")"/>
+                @if (target.CurrentDecoId.HasValue && target.CurrentDecoId != _scene.DecoId)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Warning">remplacera « @target.CurrentDecoName »</MudText>
+                }
+            </div>
+        }
+        <div class="d-flex justify-end gap-2 mt-4">
+            <MudButton OnClick="@(() => _applyOpen = false)">Annuler</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@Apply" Disabled="@_busy">Appliquer</MudButton>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string Slug { get; set; }
+
+    [SupplyParameterFromQuery(Name = "modele")]
+    public string Template { get; set; }
+
+    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
+
+    private static readonly (string, string)[] ClockFormats =
+    [
+        ("HH:mm", "20:45"),
+        ("HH:mm:ss", "20:45:12"),
+        ("HH'h'mm", "20h45"),
+        ("dddd d MMMM", "mardi 20 octobre"),
+        ("ddd d MMM · HH:mm", "mar. 20 oct. · 20:45"),
+        ("dd/MM/yyyy", "20/10/2026")
+    ];
+
+    private static readonly (string, string)[] Variables =
+    [
+        ("{{ MediaItem_Title }}", "Titre du programme"),
+        ("{{ MediaItem_ShowTitle }}", "Nom de la série"),
+        ("{{ MediaItem_ShowYear }}", "Année de la série"),
+        ("{{ MediaItem_ContentRating }}", "Classification (âge)"),
+        ("{{ if Epg.size > 1 }}À suivre : {{ Epg[1].Title }}{{ end }}", "À suivre : titre"),
+        ("{{ if Epg.size > 1 }}{{ format_datetime Epg[1].Start \"Europe/Paris\" \"HH:mm\" }}{{ end }}", "À suivre : heure"),
+        ("{{ format_datetime MediaItem_Start \"Europe/Paris\" \"HH:mm\" }}", "Heure de début du programme")
+    ];
+
+    private static readonly (string, string)[] Anchors =
+    [
+        ("tl", Icons.Material.Filled.NorthWest), ("tc", Icons.Material.Filled.North), ("tr", Icons.Material.Filled.NorthEast),
+        ("ml", Icons.Material.Filled.West), ("mc", Icons.Material.Filled.CenterFocusStrong), ("mr", Icons.Material.Filled.East),
+        ("bl", Icons.Material.Filled.SouthWest), ("bc", Icons.Material.Filled.South), ("br", Icons.Material.Filled.SouthEast)
+    ];
+
+    private HabillageScene _scene;
+    private string _selectedId;
+    private bool _dirty;
+    private bool _busy;
+    private bool _showSafe = true;
+    private string _background = "gradient";
+    private ElementReference _stage;
+    private DotNetObjectReference<HabillageStudio> _dotnetRef;
+    private bool _stageReady;
+    private Timer _clockTimer;
+    private List<string> _assets = [];
+    private List<HabillageFont> _fonts = [];
+    private List<HabillageChannelTarget> _targets = [];
+    private List<HabillageChannelTarget> _targetsUsing = [];
+    private bool _applyOpen;
+    private System.Collections.Generic.HashSet<int> _checked = [];
+
+    private HabillageItem Selected => _scene?.Items.Find(i => i.Id == _selectedId);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _stageReady = false;
+        if (string.IsNullOrWhiteSpace(Slug))
+        {
+            _scene = new HabillageScene();
+            if (Template == "classique")
+            {
+                _scene.Name = "Habillage classique";
+                _scene.Items =
+                [
+                    NewItem("clock"),
+                    NewItem("title"),
+                    NewItem("next")
+                ];
+            }
+        }
+        else
+        {
+            Option<HabillageScene> maybeScene = await HabillageService.GetScene(Slug, CancellationToken.None);
+            _scene = maybeScene.IfNone(() =>
+            {
+                NavigationManager.NavigateTo("habillage");
+                return new HabillageScene();
+            });
+        }
+
+        _background = string.IsNullOrWhiteSpace(_scene.PreviewBackground)
+            ? "gradient"
+            : _scene.PreviewBackground is "bars" or "checker" or "gradient" ? _scene.PreviewBackground : "custom";
+        _assets = HabillageService.GetAssets();
+        _fonts = HabillageService.GetFonts();
+        await RefreshTargets();
+
+        _clockTimer ??= new Timer(
+            _ =>
+            {
+                if (_scene?.Items.Any(i => i.Kind == HabillageItemKind.Clock && i.Visible) == true)
+                {
+                    InvokeAsync(StateHasChanged);
+                }
+            },
+            null,
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromSeconds(1));
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_scene is not null && !_stageReady)
+        {
+            _stageReady = true;
+            try
+            {
+                _dotnetRef ??= DotNetObjectReference.Create(this);
+                await JsRuntime.InvokeVoidAsync("nounours.initStage", _stage, _dotnetRef);
+                await JsRuntime.InvokeVoidAsync("nounours.loadFonts", _fonts.Select(f => new { family = f.Family, fileName = f.FileName }));
+            }
+            catch (JSDisconnectedException)
+            {
+                // ignore
+            }
+            catch (InvalidOperationException)
+            {
+                // prérendu : on réessaiera
+                _stageReady = false;
+            }
+        }
+    }
+
+    private async Task RefreshTargets()
+    {
+        _targets = await HabillageService.GetTargets(CancellationToken.None);
+        _targetsUsing = _scene?.DecoId is null ? [] : _targets.Where(t => t.CurrentDecoId == _scene.DecoId).ToList();
+    }
+
+    // ------------------------------------------------ interactions JS
+
+    [JSInvokable]
+    public Task OnLayerSelected(string id)
+    {
+        _selectedId = string.IsNullOrEmpty(id) ? null : id;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnLayerMoved(string id, double x, double y)
+    {
+        HabillageItem item = _scene.Items.Find(i => i.Id == id);
+        if (item is not null)
+        {
+            item.X = x;
+            item.Y = y;
+            MarkDirty();
+            StateHasChanged();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnLayerResized(string id, double width)
+    {
+        HabillageItem item = _scene.Items.Find(i => i.Id == id);
+        if (item is not null)
+        {
+            if (item.Kind == HabillageItemKind.Banner && item.Width > 0)
+            {
+                // un bandeau garde ses proportions quand on le redimensionne à la poignée
+                item.Height = Math.Round(item.Height * width / item.Width, 2);
+            }
+
+            item.Width = width;
+            MarkDirty();
+            StateHasChanged();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnNudge(double dx, double dy)
+    {
+        if (Selected is { } item)
+        {
+            item.X = Math.Clamp(Math.Round(item.X + dx, 2), 0, 100);
+            item.Y = Math.Clamp(Math.Round(item.Y + dy, 2), 0, 100);
+            MarkDirty();
+            StateHasChanged();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnDeleteSelected()
+    {
+        if (Selected is { } item)
+        {
+            Remove(item);
+            StateHasChanged();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    // ------------------------------------------------ calques
+
+    private void Add(string kind)
+    {
+        HabillageItem item = NewItem(kind);
+        item.ZIndex = _scene.Items.Count == 0 ? 10 : _scene.Items.Max(i => i.ZIndex) + 1;
+        if (kind == "lowerthird")
+        {
+            HabillageItem banner = NewItem("banner");
+            banner.Label = "Bas d'écran · fond";
+            banner.X = 5;
+            banner.Y = 78;
+            banner.Width = 50;
+            banner.Height = 12;
+            banner.Visibility = item.Visibility;
+            banner.VisibleSeconds = item.VisibleSeconds;
+            banner.ZIndex = item.ZIndex;
+            item.ZIndex++;
+            _scene.Items.Add(banner);
+        }
+
+        _scene.Items.Add(item);
+        _selectedId = item.Id;
+        MarkDirty();
+    }
+
+    private static HabillageItem NewItem(string kind) =>
+        kind switch
+        {
+            "clock" => new HabillageItem { Kind = HabillageItemKind.Clock, Label = "Horloge", X = 86, Y = 5, Width = 0, FontSize = 54, Format = "HH:mm" },
+            "date" => new HabillageItem { Kind = HabillageItemKind.Clock, Label = "Date", X = 72, Y = 11, Width = 0, FontSize = 30, FontWeight = 400, Format = "dddd d MMMM" },
+            "title" => new HabillageItem
+            {
+                Kind = HabillageItemKind.Text, Label = "Titre du programme", X = 5, Y = 5, Width = 0, FontSize = 40,
+                Text = "{{ MediaItem_Title }}", Visibility = HabillageVisibility.ProgramStart, VisibleSeconds = 15
+            },
+            "next" => new HabillageItem
+            {
+                Kind = HabillageItemKind.Text, Label = "À suivre", X = 5, Y = 88, Width = 0, FontSize = 34, EpgEntries = 2,
+                Text = "{{ if Epg.size > 1 }}À suivre : {{ Epg[1].Title }} · {{ format_datetime Epg[1].Start \"Europe/Paris\" \"HH:mm\" }}{{ end }}",
+                Visibility = HabillageVisibility.ProgramEnd, VisibleSeconds = 60
+            },
+            "image" => new HabillageItem { Kind = HabillageItemKind.Image, Label = "Logo", X = 87, Y = 82, Width = 9, Opacity = 85 },
+            "banner" => new HabillageItem { Kind = HabillageItemKind.Banner, Label = "Bandeau", X = 0, Y = 86, Width = 100, Height = 10, BackgroundColor = "#101828CC", CornerRadius = 0, ZIndex = 5 },
+            "lowerthird" => new HabillageItem
+            {
+                Kind = HabillageItemKind.Text, Label = "Bas d'écran · texte", X = 7, Y = 80.5, Width = 0, FontSize = 44, HaloWidth = 0,
+                Text = "{{ MediaItem_Title }}", Visibility = HabillageVisibility.ProgramStart, VisibleSeconds = 12
+            },
+            _ => new HabillageItem { Kind = HabillageItemKind.Text, Label = "Texte", X = 40, Y = 45, Width = 0, FontSize = 48, Text = "Votre texte" }
+        };
+
+    private void Remove(HabillageItem item)
+    {
+        _scene.Items.Remove(item);
+        if (_selectedId == item.Id)
+        {
+            _selectedId = null;
+        }
+
+        MarkDirty();
+    }
+
+    private void Duplicate(HabillageItem item)
+    {
+        string json = System.Text.Json.JsonSerializer.Serialize(item);
+        HabillageItem copy = System.Text.Json.JsonSerializer.Deserialize<HabillageItem>(json);
+        copy.Id = Guid.NewGuid().ToString("N")[..8];
+        copy.Label = item.Label + " (copie)";
+        copy.X = Math.Min(95, item.X + 2);
+        copy.Y = Math.Min(95, item.Y + 2);
+        copy.ZIndex = _scene.Items.Max(i => i.ZIndex) + 1;
+        _scene.Items.Add(copy);
+        _selectedId = copy.Id;
+        MarkDirty();
+    }
+
+    private void Reorder(HabillageItem item, int direction)
+    {
+        var ordered = _scene.Items.OrderBy(i => i.ZIndex).ToList();
+        int index = ordered.IndexOf(item);
+        int swap = index + direction;
+        if (swap < 0 || swap >= ordered.Count)
+        {
+            return;
+        }
+
+        (item.ZIndex, ordered[swap].ZIndex) = (ordered[swap].ZIndex, item.ZIndex);
+        if (item.ZIndex == ordered[swap].ZIndex)
+        {
+            item.ZIndex += direction;
+        }
+
+        MarkDirty();
+    }
+
+    private void Snap(HabillageItem item, string anchor)
+    {
+        // estimation de la taille du calque pour l'aligner à droite / en bas
+        double w = item.Kind is HabillageItemKind.Image or HabillageItemKind.Banner
+            ? item.Width
+            : Math.Min(60, PreviewText(item).Length * item.FontSize * 0.5 / 1920 * 100);
+        double h = item.Kind == HabillageItemKind.Banner ? item.Height : item.FontSize * 1.2 / 1080 * 100;
+
+        item.X = anchor[1] switch { 'l' => 5, 'c' => Math.Round(50 - w / 2, 1), _ => Math.Round(95 - w, 1) };
+        item.Y = anchor[0] switch { 't' => 5, 'm' => Math.Round(50 - h / 2, 1), _ => Math.Round(95 - h, 1) };
+        if (item.Kind == HabillageItemKind.Banner && Math.Abs(item.Width - 100) < 0.1)
+        {
+            item.X = 0;
+        }
+
+        MarkDirty();
+    }
+
+    private void Insert(HabillageItem item, string token)
+    {
+        item.Text = string.IsNullOrEmpty(item.Text) ? token : $"{item.Text} {token}";
+        if (token.Contains("Epg", StringComparison.Ordinal) && item.EpgEntries < 2)
+        {
+            item.EpgEntries = 2;
+        }
+
+        MarkDirty();
+    }
+
+    private async Task Upload(HabillageItem item, IBrowserFile file)
+    {
+        if (file is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await using Stream stream = file.OpenReadStream(20 * 1024 * 1024);
+            item.ImagePath = await HabillageService.SaveAsset(file.Name, stream, CancellationToken.None);
+            _assets = HabillageService.GetAssets();
+            MarkDirty();
+            Snackbar.Add("Image importée", Severity.Success);
+        }
+        catch (IOException ex)
+        {
+            Snackbar.Add($"Import impossible : {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void MarkDirty() => _dirty = true;
+
+    private void SetBackground(string value)
+    {
+        _background = value;
+        _scene.PreviewBackground = value == "custom" ? string.Empty : value;
+    }
+
+    // ------------------------------------------------ enregistrer / appliquer
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(_scene.Name))
+        {
+            Snackbar.Add("Donnez un nom à l'habillage", Severity.Warning);
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            bool isNew = string.IsNullOrWhiteSpace(_scene.Slug);
+            _scene = await HabillageService.Save(_scene, CancellationToken.None);
+            _dirty = false;
+            await RefreshTargets();
+            Snackbar.Add(
+                _targetsUsing.Count > 0
+                    ? $"Enregistré. Visible sur {_targetsUsing.Count} chaîne(s) dès le prochain programme."
+                    : "Enregistré. Appliquez-le maintenant à une ou plusieurs chaînes.",
+                Severity.Success);
+            if (isNew)
+            {
+                NavigationManager.NavigateTo($"habillage/{_scene.Slug}", replace: true);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Snackbar.Add($"Enregistrement impossible : {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task OpenApply()
+    {
+        if (_dirty || _scene.DecoId is null)
+        {
+            await Save();
+            if (_dirty)
+            {
+                return;
+            }
+        }
+
+        await RefreshTargets();
+        _checked = _targetsUsing.Select(t => t.ChannelId).ToHashSet();
+        _applyOpen = true;
+    }
+
+    private void Toggle(int channelId, bool value)
+    {
+        if (value)
+        {
+            _checked.Add(channelId);
+        }
+        else
+        {
+            _checked.Remove(channelId);
+        }
+    }
+
+    private async Task Apply()
+    {
+        _busy = true;
+        await HabillageService.Apply(_scene.Slug, _checked.ToList(), CancellationToken.None);
+        await RefreshTargets();
+        _busy = false;
+        _applyOpen = false;
+        Snackbar.Add(_checked.Count == 0 ? "Habillage retiré de toutes les chaînes" : $"Habillage appliqué à {_checked.Count} chaîne(s)", Severity.Success);
+    }
+
+    // ------------------------------------------------ rendu de l'aperçu
+
+    private string StageBackground() =>
+        _background switch
+        {
+            "bars" => "background: linear-gradient(90deg, #c0c0c0 0 14.28%, #c0c000 0 28.57%, #00c0c0 0 42.85%, #00c000 0 57.14%, #c000c0 0 71.42%, #c00000 0 85.71%, #0000c0 0)",
+            "checker" => "background: repeating-conic-gradient(#3b3f4a 0 25%, #2a2d36 0 50%) 0 0 / 4% 7.1%",
+            "custom" when !string.IsNullOrWhiteSpace(_scene.PreviewBackground) => $"background-image: url('{_scene.PreviewBackground.Replace("'", "%27")}')",
+            _ => string.Empty
+        };
+
+    private static string LayerStyle(HabillageItem item)
+    {
+        var css = $"left: {Num(item.X)}%; top: {Num(item.Y)}%; z-index: {item.ZIndex}; opacity: {Num(Math.Clamp(item.Opacity, 0, 100) / 100.0)};";
+        if (item.Kind is HabillageItemKind.Image or HabillageItemKind.Banner)
+        {
+            css += $" width: {Num(item.Width)}%;";
+        }
+        else if (item.Width > 0)
+        {
+            css += $" max-width: {Num(item.Width)}%; overflow: hidden;";
+        }
+
+        return css;
+    }
+
+    private static string TextStyle(HabillageItem item)
+    {
+        // 1 px en 1080p = 100/1080 % de la hauteur = 56.25/1080 cqw (largeur de la scène)
+        string px(double value) => $"{Num(value * 56.25 / 1080)}cqw";
+        var css = $"font-family: '{item.FontFamily}', Roboto, sans-serif; font-size: {px(item.FontSize)}; font-weight: {item.FontWeight}; color: {item.Color}; text-align: {item.Align.ToLowerInvariant()};";
+        if (item.Italic)
+        {
+            css += " font-style: italic;";
+        }
+
+        if (item.HaloWidth > 0)
+        {
+            css += $" -webkit-text-stroke: {px(item.HaloWidth * 2)} {item.HaloColor}; paint-order: stroke fill;";
+        }
+
+        return css;
+    }
+
+    private static string BannerStyle(HabillageItem item) =>
+        $"background: {item.BackgroundColor}; border-radius: {Num(item.CornerRadius * 100 / 1920)}cqw; aspect-ratio: {Num(Math.Max(0.01, item.Width * 16))} / {Num(Math.Max(0.01, item.Height * 9))}; width: 100%";
+
+    private static string PreviewText(HabillageItem item)
+    {
+        if (item.Kind == HabillageItemKind.Clock)
+        {
+            string clock;
+            try
+            {
+                TimeZoneInfo tz = string.IsNullOrWhiteSpace(item.TimeZone)
+                    ? TimeZoneInfo.Local
+                    : TimeZoneConverter.TZConvert.GetTimeZoneInfo(item.TimeZone);
+                clock = TimeZoneInfo.ConvertTime(DateTimeOffset.Now, tz).ToString(string.IsNullOrWhiteSpace(item.Format) ? "HH:mm" : item.Format, Fr);
+            }
+            catch (Exception ex) when (ex is FormatException or TimeZoneNotFoundException)
+            {
+                clock = "format ?";
+            }
+
+            return string.IsNullOrWhiteSpace(item.Text) ? clock : item.Text.Replace("{clock}", clock, StringComparison.Ordinal);
+        }
+
+        string text = item.Text ?? string.Empty;
+        text = Regex.Replace(text, @"\{\{\s*(if|end|else)[^}]*\}\}", string.Empty);
+        text = Regex.Replace(text, @"\{\{([^}]*)\}\}", m => Sample(m.Groups[1].Value));
+        return string.IsNullOrWhiteSpace(text) ? "(texte vide)" : text;
+    }
+
+    private static string Sample(string expression) =>
+        expression switch
+        {
+            _ when expression.Contains("format_datetime", StringComparison.Ordinal) => "21:00",
+            _ when expression.Contains("Epg", StringComparison.Ordinal) => "Le Journal",
+            _ when expression.Contains("ShowTitle", StringComparison.Ordinal) => "Nom de la série",
+            _ when expression.Contains("ShowYear", StringComparison.Ordinal) || expression.Contains("ReleaseDate", StringComparison.Ordinal) => "2024",
+            _ when expression.Contains("ContentRating", StringComparison.Ordinal) => "-12",
+            _ when expression.Contains("Title", StringComparison.Ordinal) => "Titre du programme",
+            _ => "…"
+        };
+
+    private static string ImageUrl(string path) =>
+        path.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+            ? path
+            : $"nounours/habillage/asset?path={Uri.EscapeDataString(path)}";
+
+    private Task<IEnumerable<string>> SearchFonts(string text, CancellationToken token)
+    {
+        IEnumerable<string> families = _fonts.Select(f => f.Family).Concat(["Roboto", "Arial", "Segoe UI"]).Distinct();
+        return Task.FromResult(string.IsNullOrWhiteSpace(text) ? families : families.Where(f => f.Contains(text, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private static string KindIcon(HabillageItemKind kind) =>
+        kind switch
+        {
+            HabillageItemKind.Clock => Icons.Material.Filled.Schedule,
+            HabillageItemKind.Image => Icons.Material.Filled.Image,
+            HabillageItemKind.Banner => Icons.Material.Filled.CropLandscape,
+            _ => Icons.Material.Filled.TextFields
+        };
+
+    private static string KindLabel(HabillageItemKind kind) =>
+        kind switch
+        {
+            HabillageItemKind.Clock => "Horloge",
+            HabillageItemKind.Image => "Image",
+            HabillageItemKind.Banner => "Bandeau",
+            _ => "Texte"
+        };
+
+    private static string Num(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_clockTimer is not null)
+        {
+            await _clockTimer.DisposeAsync();
+        }
+
+        _dotnetRef?.Dispose();
+    }
+
+}

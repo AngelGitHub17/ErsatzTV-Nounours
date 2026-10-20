@@ -30,7 +30,7 @@ public class HardwareAccelerationHealthCheck : BaseHealthCheck, IHardwareAcceler
         _runtimeInfo = runtimeInfo;
     }
 
-    public override string Title => "Hardware Acceleration";
+    public override string Title => "Accélération matérielle";
 
     public async Task<HealthCheckResult> Check(CancellationToken cancellationToken)
     {
@@ -38,7 +38,7 @@ public class HardwareAccelerationHealthCheck : BaseHealthCheck, IHardwareAcceler
             await _configElementRepository.GetConfigElement(ConfigElementKey.FFmpegPath, cancellationToken);
         if (maybeFFmpegPath.IsNone)
         {
-            return FailResult("Unable to locate ffmpeg", "Unable to locate ffmpeg");
+            return FailResult("ffmpeg introuvable", "ffmpeg introuvable");
         }
 
         string version = Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
@@ -68,8 +68,8 @@ public class HardwareAccelerationHealthCheck : BaseHealthCheck, IHardwareAcceler
         if (accelerationKinds.Count == 0)
         {
             return InfoResult(
-                "No compatible hardware acceleration kinds are supported by ffmpeg",
-                "FFmpeg does not support hardware acceleration");
+                "FFmpeg ne prend en charge aucune accélération matérielle compatible",
+                "FFmpeg ne prend pas en charge l'accélération matérielle");
         }
 
         Option<HealthCheckResult> maybeResult = await VerifyProfilesUseAcceleration(accelerationKinds);
@@ -97,7 +97,7 @@ public class HardwareAccelerationHealthCheck : BaseHealthCheck, IHardwareAcceler
             var channels = string.Join(", ", badChannels.Map(c => $"{c.Number} - {c.Name}"));
             return WarningResult(
                 $"The following channels use ffmpeg profiles that are not configured for hardware acceleration ({accel}): {channels}",
-                $"{badChannels.Count} channels are not configured for hardware acceleration");
+                $"{badChannels.Count} chaîne(s) sans accélération matérielle");
         }
 
         return None;

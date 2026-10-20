@@ -14,7 +14,7 @@ public class FileNotFoundHealthCheck : BaseHealthCheck, IFileNotFoundHealthCheck
     public FileNotFoundHealthCheck(IDbContextFactory<TvContext> dbContextFactory) =>
         _dbContextFactory = dbContextFactory;
 
-    public override string Title => "File Not Found";
+    public override string Title => "Fichiers introuvables";
 
     public async Task<HealthCheckResult> Check(CancellationToken cancellationToken)
     {
@@ -60,8 +60,8 @@ public class FileNotFoundHealthCheck : BaseHealthCheck, IFileNotFoundHealthCheck
             int count = await mediaItems.CountAsync(cancellationToken);
 
             return WarningResult(
-                $"There are {count} items that do not exist on disk, including the following: {files}",
-                $"There are {count} items that do not exist on disk",
+                $"{count} élément(s) absent(s) du disque, dont : {files}",
+                $"{count} élément(s) absent(s) du disque",
                 new HealthCheckLink("media/trash"));
         }
 

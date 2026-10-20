@@ -352,7 +352,12 @@ public abstract class ProgramScheduleItemCommandBase
             _ => throw new NotSupportedException($"Unsupported playout mode {item.PlayoutMode}")
         };
 
-        foreach (int watermarkId in item.WatermarkIds)
+        // édition Nounours : listes toujours initialisées (sinon la projection en view model plante
+        // quand aucun filigrane / élément graphique n'est choisi)
+        result.ProgramScheduleItemWatermarks ??= [];
+        result.ProgramScheduleItemGraphicsElements ??= [];
+
+        foreach (int watermarkId in item.WatermarkIds ?? [])
         {
             result.ProgramScheduleItemWatermarks ??= [];
             result.ProgramScheduleItemWatermarks.Add(
@@ -363,7 +368,7 @@ public abstract class ProgramScheduleItemCommandBase
                 });
         }
 
-        foreach (int graphicsElementId in item.GraphicsElementIds)
+        foreach (int graphicsElementId in item.GraphicsElementIds ?? [])
         {
             result.ProgramScheduleItemGraphicsElements ??= [];
             result.ProgramScheduleItemGraphicsElements.Add(

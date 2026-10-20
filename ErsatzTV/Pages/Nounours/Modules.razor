@@ -1,0 +1,95 @@
+@page "/modules"
+@using ErsatzTV.Plugins
+@inject IPluginRegistry PluginRegistry
+@inject ISnackbar Snackbar
+
+<PageTitle>Modules · ErsatzTV</PageTitle>
+
+<div class="n-page" style="height: 100%; overflow-y: auto">
+    <div class="n-page-header">
+        <div>
+            <h1>Modules</h1>
+            <p>Ajoutez des fonctionnalités sans toucher au cœur d'ErsatzTV : pages, entrées de menu, cartes du tableau de bord, services.</p>
+        </div>
+    </div>
+
+    @if (_restartNeeded)
+    {
+        <MudAlert Severity="Severity.Info" Class="mb-4">Redémarrez ErsatzTV pour prendre en compte les changements de modules.</MudAlert>
+    }
+
+    <div class="n-modules mb-6">
+        @foreach (LoadedPlugin loaded in PluginRegistry.Plugins)
+        {
+            bool enabled = _state.GetValueOrDefault(loaded.Plugin.Id, loaded.IsEnabled);
+            <div class="n-card d-flex flex-column" @key="loaded.Plugin.Id">
+                <div class="d-flex align-center gap-2">
+                    <MudIcon Icon="@(loaded.Plugin.Icon ?? Icons.Material.Filled.Extension)" Color="Color.Primary"/>
+                    <MudText Typo="Typo.h6" Style="flex: 1">@loaded.Plugin.Name</MudText>
+                    <MudSwitch T="bool" Value="@enabled" ValueChanged="@(v => SetEnabled(loaded, v))" Color="Color.Primary"/>
+                </div>
+                <MudText Typo="Typo.body2" Class="n-muted mt-1" Style="flex: 1">@loaded.Plugin.Description</MudText>
+                <div class="d-flex flex-wrap gap-1 mt-3">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">v@(loaded.Plugin.Version)</MudChip>
+                    @if (!string.IsNullOrWhiteSpace(loaded.Plugin.Author))
+                    {
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@loaded.Plugin.Author</MudChip>
+                    }
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="@(loaded.IsBuiltIn ? Color.Default : Color.Secondary)">@(loaded.IsBuiltIn ? "Intégré" : "Externe")</MudChip>
+                </div>
+                @if (!loaded.IsBuiltIn)
+                {
+                    <MudText Typo="Typo.caption" Class="n-muted mt-1" Style="word-break: break-all">@loaded.Source</MudText>
+                }
+                @if (loaded.IsEnabled)
+                {
+                    <div class="d-flex flex-wrap gap-1 mt-2">
+                        @foreach (PluginNavItem item in loaded.Plugin.NavItems)
+                        {
+                            <MudButton Href="@item.Href" Size="Size.Small" Variant="Variant.Text" EndIcon="@Icons.Material.Filled.ArrowForward">@item.Title</MudButton>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @if (PluginRegistry.Errors.Count > 0)
+    {
+        <MudText Typo="Typo.h6" Class="mb-2">Modules non chargés</MudText>
+        <MudAlert Severity="Severity.Warning" Class="mb-6">
+            @foreach (PluginLoadError error in PluginRegistry.Errors)
+            {
+                <div><b>@System.IO.Path.GetFileName(error.Source)</b> : @error.Message</div>
+            }
+        </MudAlert>
+    }
+
+    <div class="n-card">
+        <div class="n-card-title"><MudIcon Icon="@Icons.Material.Filled.Code" Size="Size.Small"/>Créer votre propre module</div>
+        <ol style="margin: 0; padding-left: 20px; line-height: 1.9">
+            <li>Copiez le projet d'exemple <code>plugins-exemple/ErsatzTV.Plugin.Exemple</code> du code source et renommez-le.</li>
+            <li>Implémentez <code>IErsatzPlugin</code> (nom, menu, cartes du tableau de bord, services) et ajoutez vos pages Razor avec <code>@@page "/modules/…"</code>.</li>
+            <li>Compilez : <code>dotnet build -c Release</code></li>
+            <li>Copiez le dossier de sortie dans <code>@PluginRegistry.PluginsFolder</code> (un sous-dossier par module), puis redémarrez ErsatzTV.</li>
+        </ol>
+        <MudText Typo="Typo.body2" Class="n-muted mt-3">
+            Dans vos pages, vous pouvez injecter tous les services d'ErsatzTV (<code>IMediator</code>, <code>IGuideService</code>, <code>IHabillageService</code>…).
+            Le détail est dans <code>MODULES.md</code> à la racine du code source.
+        </MudText>
+    </div>
+</div>
+
+@code {
+    private readonly Dictionary<string, bool> _state = new();
+    private bool _restartNeeded;
+
+    private async Task SetEnabled(LoadedPlugin loaded, bool enabled)
+    {
+        _state[loaded.Plugin.Id] = enabled;
+        await PluginRegistry.SetEnabledAsync(loaded.Plugin.Id, enabled);
+        _restartNeeded = true;
+        Snackbar.Add($"« {loaded.Plugin.Name} » sera {(enabled ? "activé" : "désactivé")} au prochain redémarrage", Severity.Info);
+    }
+
+}

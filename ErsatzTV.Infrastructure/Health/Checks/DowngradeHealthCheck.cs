@@ -1,4 +1,4 @@
-using ErsatzTV.Core.Health;
+﻿using ErsatzTV.Core.Health;
 using ErsatzTV.Core.Health.Checks;
 using ErsatzTV.Core.Interfaces.Database;
 
@@ -6,7 +6,7 @@ namespace ErsatzTV.Infrastructure.Health.Checks;
 
 public class DowngradeHealthCheck(IDatabaseMigrations databaseMigrations) : BaseHealthCheck, IDowngradeHealthCheck
 {
-    public override string Title => "ErsatzTV Downgrade";
+    public override string Title => "Retour à une version antérieure";
 
     public async Task<HealthCheckResult> Check(CancellationToken cancellationToken)
     {
@@ -14,8 +14,8 @@ public class DowngradeHealthCheck(IDatabaseMigrations databaseMigrations) : Base
         if (unknownMigrations.Any())
         {
             return FailResult(
-                "Downgrade detected; THIS IS NOT SUPPORTED AND WILL IMPACT STABILITY",
-                "Downgrade detected",
+                "Version antérieure détectée : NON PRIS EN CHARGE, la stabilité sera affectée",
+                "Version antérieure détectée",
                 new HealthCheckLink("https://ersatztv.org/docs/installation/#downgrading"));
         }
 

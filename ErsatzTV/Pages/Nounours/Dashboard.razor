@@ -1,0 +1,374 @@
+@page "/"
+@using System.Globalization
+@using ErsatzTV.Application.Channels
+@using ErsatzTV.Application.Health
+@using ErsatzTV.Application.Nounours
+@using ErsatzTV.Core.FFmpeg
+@using ErsatzTV.Core.Health
+@using ErsatzTV.Core.Interfaces.FFmpeg
+@using ErsatzTV.Plugins
+@implements IDisposable
+@inject IMediator Mediator
+@inject SystemStartup SystemStartup
+@inject IGuideService GuideService
+@inject IFFmpegSegmenterService SegmenterService
+@inject IPluginRegistry PluginRegistry
+@inject IDialogService Dialog
+@inject NavigationManager NavigationManager
+
+<PageTitle>Accueil · ErsatzTV</PageTitle>
+
+<div class="n-page" style="height: 100%; overflow-y: auto">
+    @if (!SystemStartup.IsDatabaseReady || !SystemStartup.IsSearchIndexReady)
+    {
+        <div class="n-empty" style="max-width: 560px; margin: 10vh auto 0">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true"/>
+            <MudText Typo="Typo.h5">
+                @(SystemStartup.IsDatabaseReady ? "Préparation de l'index de recherche…" : "Préparation de la base de données…")
+            </MudText>
+            <MudText Class="n-muted">Patientez, cela peut prendre quelques minutes. La page se rafraîchira toute seule.</MudText>
+        </div>
+    }
+    else
+    {
+        <div class="n-page-header">
+            <div>
+                <h1>@Greeting()</h1>
+                <p>Ce qui passe en ce moment sur vos chaînes · @DateTime.Now.ToString("dddd d MMMM, HH:mm", Fr)</p>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <MudButton Href="chaines/nouvelle" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddCircle">Nouvelle chaîne</MudButton>
+                <MudButton Href="planning" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.ViewTimeline">Planning</MudButton>
+                <MudButton Href="habillage" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Layers">Habillage</MudButton>
+            </div>
+        </div>
+
+        @if (_problems.Count > 0)
+        {
+            <MudAlert Severity="@(_problems.Any(p => p.Status == HealthCheckStatus.Fail) ? Severity.Error : Severity.Warning)"
+                      Class="mb-5" Variant="Variant.Outlined" Dense="true">
+                <div class="d-flex align-center flex-wrap gap-2">
+                    <b>@_problems.Count point(s) à vérifier :</b>
+                    <span>@string.Join(" · ", _problems.Take(3).Select(p => p.Title))</span>
+                    <MudButton Href="system/health" Size="Size.Small" Variant="Variant.Text" Color="Color.Inherit">Voir le détail</MudButton>
+                </div>
+            </MudAlert>
+        }
+
+        @if (_overview is not null)
+        {
+            <MudGrid Spacing="3" Class="mb-6">
+                @StatTile("Chaînes", _overview.Channels, Icons.Material.Filled.LiveTv, "channels")
+                @StatTile("Films", _overview.Movies, Icons.Material.Filled.Movie, "media/movies")
+                @StatTile("Séries", _overview.Shows, Icons.Material.Filled.Tv, "media/tv/shows", $"{_overview.Episodes.ToString("N0", Fr)} épisodes")
+                @StatTile("Clips & vidéos", _overview.MusicVideos + _overview.OtherVideos, Icons.Material.Filled.VideoLibrary, "media/other/videos")
+                @StatTile("Collections", _overview.Collections + _overview.SmartCollections, Icons.Material.Filled.CollectionsBookmark, "media/collections")
+                <MudItem xs="12" sm="6" md="4" lg="2">
+                    <a href="media/libraries" class="n-card d-block" style="color: inherit; text-decoration: none; height: 100%">
+                        <div class="n-card-title"><MudIcon Icon="@Icons.Material.Filled.Update" Size="Size.Small"/>Dernière analyse</div>
+                        <div class="n-stat">
+                            <span class="n-stat-value" style="font-size: 1.25rem">@(_overview.LastScan.HasValue ? Relative(_overview.LastScan.Value.ToLocalTime()) : "jamais")</span>
+                            <span class="n-stat-label">@_overview.Libraries bibliothèque(s)</span>
+                        </div>
+                    </a>
+                </MudItem>
+            </MudGrid>
+        }
+
+        @if (_channels is null)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary"/>
+        }
+        else if (_channels.Count == 0)
+        {
+            <div class="n-empty">
+                <MudIcon Icon="@Icons.Material.Filled.LiveTv" Style="font-size: 3.5rem" Color="Color.Primary"/>
+                <MudText Typo="Typo.h5">Bienvenue ! Créons votre première chaîne.</MudText>
+                <MudText Class="n-muted" Style="max-width: 560px">
+                    1. Ajoutez une source de vidéos (dossier, Plex, Jellyfin, Emby) · 2. Lancez l'assistant :
+                    choisissez le contenu, les horaires et l'habillage, il s'occupe du reste.
+                </MudText>
+                <div class="d-flex gap-2 mt-2 flex-wrap justify-center">
+                    <MudButton Href="media/sources/local" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.CreateNewFolder">Ajouter des vidéos</MudButton>
+                    <MudButton Href="chaines/nouvelle" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AutoFixHigh">Lancer l'assistant</MudButton>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="d-flex align-center justify-space-between mb-3 flex-wrap gap-2">
+                <MudText Typo="Typo.h6">En direct <span class="n-muted" style="font-weight: 400">· @_channels.Count chaîne(s)</span></MudText>
+                <MudTextField T="string" @bind-Value="_filter" Immediate="true" Placeholder="Filtrer les chaînes"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.FilterList"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 280px"/>
+            </div>
+            <div class="n-channels mb-8">
+                @foreach (ChannelViewModel channel in FilteredChannels)
+                {
+                    NowNext nowNext = _nowNext.GetValueOrDefault(channel.Id);
+                    bool streaming = SegmenterService.IsActive(channel.Number);
+                    <div class="n-channel" @key="channel.Id">
+                        <div class="n-channel-head">
+                            <img class="n-channel-logo" alt="" src="@LogoUrl(channel)"/>
+                            <div style="min-width: 0; flex: 1">
+                                <div class="n-channel-number">CH @channel.Number @(string.IsNullOrWhiteSpace(channel.Group) ? "" : $"· {channel.Group}")</div>
+                                <div class="n-channel-name">@channel.Name</div>
+                            </div>
+                            @if (streaming)
+                            {
+                                <MudTooltip Text="Quelqu'un regarde cette chaîne en ce moment">
+                                    <span class="n-onair">En cours</span>
+                                </MudTooltip>
+                            }
+                            else if (!channel.IsEnabled)
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">Désactivée</MudChip>
+                            }
+                        </div>
+                        <div class="n-channel-body">
+                            @if (nowNext is null)
+                            {
+                                <div class="n-next" style="padding: 10px 0">
+                                    @(channel.PlayoutCount == 0 ? "Aucune programmation pour l'instant." : "Programmation en cours de construction…")
+                                </div>
+                            }
+                            else
+                            {
+                                @foreach (GuideEntry now in nowNext.Now)
+                                {
+                                    double pct = Math.Clamp((DateTimeOffset.Now - now.Start).TotalSeconds / Math.Max(1, (now.Finish - now.Start).TotalSeconds) * 100, 0, 100);
+                                    <div class="n-now" title="@now.DisplayTitle">@now.DisplayTitle</div>
+                                    <div class="n-progress"><div style="width: @pct.ToString("0.#", CultureInfo.InvariantCulture)%"></div></div>
+                                    <div class="d-flex justify-space-between n-next">
+                                        <span>@now.Start.ToString("HH:mm", Fr) – @now.Finish.ToString("HH:mm", Fr)</span>
+                                        <span>encore @Remaining(now.Finish)</span>
+                                    </div>
+                                }
+                                @if (nowNext.Now.IsNone)
+                                {
+                                    <div class="n-next" style="padding: 6px 0">Rien à l'antenne en ce moment.</div>
+                                }
+                                @foreach (GuideEntry next in nowNext.Next)
+                                {
+                                    <div class="n-next mt-1" title="@next.DisplayTitle"><b>@next.Start.ToString("HH:mm", Fr)</b> · @next.DisplayTitle</div>
+                                }
+                            }
+                        </div>
+                        <div class="n-channel-actions">
+                            <MudTooltip Text="Regarder dans le navigateur">
+                                <MudIconButton Icon="@Icons.Material.Filled.PlayCircle" Size="Size.Small" Color="Color.Primary"
+                                               Disabled="@(!CanPreview(channel))" OnClick="@(() => Preview(channel))"/>
+                            </MudTooltip>
+                            <MudTooltip Text="Voir le planning">
+                                <MudIconButton Icon="@Icons.Material.Filled.ViewTimeline" Size="Size.Small" Href="@($"planning?chaine={channel.Id}")"/>
+                            </MudTooltip>
+                            <MudTooltip Text="Habillage">
+                                <MudIconButton Icon="@Icons.Material.Filled.Layers" Size="Size.Small" Href="habillage"/>
+                            </MudTooltip>
+                            <MudSpacer/>
+                            <MudTooltip Text="Modifier la chaîne">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Href="@($"channels/{channel.Id}")"/>
+                            </MudTooltip>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (_sessions.Count > 0)
+        {
+            <MudText Typo="Typo.h6" Class="mb-3">Diffusions en cours</MudText>
+            <div class="n-card mb-8">
+                <MudSimpleTable Dense="true" Hover="true" Style="background: transparent">
+                    <thead><tr><th>Chaîne</th><th>État</th><th>Transcodé jusqu'à</th><th>Dernier accès</th></tr></thead>
+                    <tbody>
+                    @foreach (HlsSessionModel session in _sessions)
+                    {
+                        <tr>
+                            <td>@session.ChannelNumber · @(_channels?.Find(c => c.Number == session.ChannelNumber)?.Name)</td>
+                            <td>@session.State</td>
+                            <td>@session.TranscodedUntil.ToLocalTime().ToString("HH:mm:ss", Fr)</td>
+                            <td>@Relative(session.LastAccess.LocalDateTime)</td>
+                        </tr>
+                    }
+                    </tbody>
+                </MudSimpleTable>
+            </div>
+        }
+
+        var widgets = PluginRegistry.Enabled
+            .SelectMany(p => p.Plugin.DashboardWidgets.Select(w => (p.Plugin, w)))
+            .OrderBy(x => x.w.Order)
+            .ToList();
+        @if (widgets.Count > 0)
+        {
+            <MudText Typo="Typo.h6" Class="mb-3">Modules</MudText>
+            <MudGrid Spacing="3">
+                @foreach ((IErsatzPlugin plugin, PluginDashboardWidget widget) in widgets)
+                {
+                    <MudItem xs="12" md="@Math.Clamp(widget.Columns, 3, 12)">
+                        <div class="n-card" style="height: 100%">
+                            <div class="n-card-title">
+                                <MudIcon Icon="@(plugin.Icon ?? Icons.Material.Filled.Extension)" Size="Size.Small"/>@widget.Title
+                            </div>
+                            <ErrorBoundary>
+                                <ChildContent>
+                                    <DynamicComponent Type="@widget.ComponentType"/>
+                                </ChildContent>
+                                <ErrorContent>
+                                    <MudText Color="Color.Error" Typo="Typo.body2">Le module « @plugin.Name » a rencontré une erreur.</MudText>
+                                </ErrorContent>
+                            </ErrorBoundary>
+                        </div>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
+
+    private CancellationTokenSource _cts = new();
+    private Timer _timer;
+    private List<ChannelViewModel> _channels;
+    private Dictionary<int, NowNext> _nowNext = new();
+    private LibraryOverview _overview;
+    private List<HealthCheckResult> _problems = [];
+    private List<HlsSessionModel> _sessions = [];
+    private string _filter;
+
+    private IEnumerable<ChannelViewModel> FilteredChannels =>
+        string.IsNullOrWhiteSpace(_filter)
+            ? _channels
+            : _channels.Where(c => c.Name.Contains(_filter, StringComparison.CurrentCultureIgnoreCase) || c.Number.StartsWith(_filter, StringComparison.Ordinal));
+
+    protected override void OnInitialized()
+    {
+        SystemStartup.OnDatabaseReady += OnStartupProgress;
+        SystemStartup.OnSearchIndexReady += OnStartupProgress;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Refresh();
+        _timer = new Timer(async _ => await InvokeAsync(async () =>
+        {
+            await Refresh();
+            StateHasChanged();
+        }), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+    }
+
+    private async Task Refresh()
+    {
+        if (!SystemStartup.IsDatabaseReady || !SystemStartup.IsSearchIndexReady)
+        {
+            return;
+        }
+
+        try
+        {
+            CancellationToken token = _cts.Token;
+            _channels = (await Mediator.Send(new GetAllChannels(), token))
+                .OrderBy(c => double.TryParse(c.Number, NumberStyles.Number, CultureInfo.InvariantCulture, out double n) ? n : 0)
+                .ToList();
+            _nowNext = await GuideService.GetNowNext(token);
+            _overview = await GuideService.GetOverview(token);
+            _problems = (await Mediator.Send(new GetAllHealthCheckResults(), token))
+                .Where(r => r.Status is HealthCheckStatus.Fail or HealthCheckStatus.Warning)
+                .ToList();
+            _sessions = SegmenterService.Workers.Select(w => w.GetModel()).ToList();
+        }
+        catch (OperationCanceledException)
+        {
+            // page fermée
+        }
+    }
+
+    private RenderFragment StatTile(string label, int value, string icon, string href, string sub = null) =>
+        @<MudItem xs="12" sm="6" md="4" lg="2">
+            <a href="@href" class="n-card d-block" style="color: inherit; text-decoration: none; height: 100%">
+                <div class="n-card-title"><MudIcon Icon="@icon" Size="Size.Small"/>@label</div>
+                <div class="n-stat">
+                    <span class="n-stat-value">@value.ToString("N0", Fr)</span>
+                    @if (!string.IsNullOrEmpty(sub))
+                    {
+                        <span class="n-stat-label">@sub</span>
+                    }
+                </div>
+            </a>
+        </MudItem>;
+
+    private static string Greeting() =>
+        DateTime.Now.Hour switch
+        {
+            < 5 => "Bonne nuit",
+            < 12 => "Bonjour",
+            < 18 => "Bon après-midi",
+            _ => "Bonsoir"
+        };
+
+    private static string Remaining(DateTimeOffset finish)
+    {
+        TimeSpan left = finish - DateTimeOffset.Now;
+        return left.TotalHours >= 1 ? $"{(int)left.TotalHours} h {left.Minutes:00}" : $"{Math.Max(0, (int)Math.Ceiling(left.TotalMinutes))} min";
+    }
+
+    private static string Relative(DateTime when)
+    {
+        TimeSpan ago = DateTime.Now - when;
+        return ago.TotalMinutes switch
+        {
+            < 1 => "à l'instant",
+            < 60 => $"il y a {(int)ago.TotalMinutes} min",
+            < 60 * 24 => $"il y a {(int)ago.TotalHours} h",
+            _ => when.ToString("d MMM", Fr)
+        };
+    }
+
+    private static string LogoUrl(ChannelViewModel channel) =>
+        string.IsNullOrWhiteSpace(channel.Logo?.Path)
+            ? $"iptv/logos/gen?text={channel.WebEncodedName}"
+            : channel.Logo.UrlWithContentType;
+
+    private static bool CanPreview(ChannelViewModel channel) =>
+        channel.IsEnabled && channel.PlayoutCount > 0 &&
+        channel.StreamingMode is not (StreamingMode.HttpLiveStreamingDirect or StreamingMode.TransportStream);
+
+    private async Task Preview(ChannelViewModel channel)
+    {
+        string uri = $"{NavigationManager.BaseUri}iptv/channel/{channel.Number}.m3u8?mode=segmenter";
+        if (JwtHelper.IsEnabled)
+        {
+            uri += $"&access_token={JwtHelper.GenerateToken()}";
+        }
+
+        var parameters = new DialogParameters { { "StreamUri", uri } };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraLarge };
+        await Dialog.ShowAsync<ChannelPreviewDialog>($"{channel.Number} · {channel.Name}", parameters, options);
+    }
+
+    private async void OnStartupProgress(object sender, EventArgs e)
+    {
+        try
+        {
+            await Refresh();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception)
+        {
+            // ignore
+        }
+    }
+
+    public void Dispose()
+    {
+        SystemStartup.OnDatabaseReady -= OnStartupProgress;
+        SystemStartup.OnSearchIndexReady -= OnStartupProgress;
+        _timer?.Dispose();
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+
+}

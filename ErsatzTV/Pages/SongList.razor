@@ -114,7 +114,7 @@
             var parameters = new DialogParameters { { "EntityType", "song" }, { "EntityName", song.Title } };
             var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-            IDialogReference dialog = await Dialog.ShowAsync<AddToCollectionDialog>("Add To Collection", parameters, options);
+            IDialogReference dialog = await Dialog.ShowAsync<AddToCollectionDialog>("Ajouter à une collection", parameters, options);
             DialogResult result = await dialog.Result;
             if (result is { Canceled: false, Data: MediaCollectionViewModel collection })
             {
@@ -123,10 +123,10 @@
                 addResult.Match(
                     Left: error =>
                     {
-                        Snackbar.Add($"Unexpected error adding song to collection: {error.Value}");
+                        Snackbar.Add($"Erreur lors de l'ajout du morceau à la collection : {error.Value}");
                         Logger.LogError("Unexpected error adding song to collection: {Error}", error.Value);
                     },
-                    Right: _ => Snackbar.Add($"Added {song.Title} to collection {collection.Name}", Severity.Success));
+                    Right: _ => Snackbar.Add($"« {song.Title} » ajouté à la collection {collection.Name}", Severity.Success));
             }
         }
     }

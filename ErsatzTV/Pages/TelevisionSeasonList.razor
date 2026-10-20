@@ -51,23 +51,23 @@
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="mb-6">
                 <MudMenu>
                     <ActivatorContent>
-                        <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" OnClick="@context.ToggleAsync">Add To</MudButton>
+                        <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" OnClick="@context.ToggleAsync">Ajouter à</MudButton>
                     </ActivatorContent>
                     <ChildContent>
                         <MudMenuItem Label="Collection" Icon="@Icons.Material.Filled.Add" OnClick="@AddToCollection"/>
                         <MudMenuItem Label="Playlist" Icon="@Icons.Material.Filled.PlaylistAdd" OnClick="@AddToPlaylist"/>
-                        <MudMenuItem Label="Schedule" Icon="@Icons.Material.Filled.Schedule" OnClick="@AddToSchedule"/>
+                        <MudMenuItem Label="Planning" Icon="@Icons.Material.Filled.Schedule" OnClick="@AddToSchedule"/>
                     </ChildContent>
                 </MudMenu>
                 @if (_show?.MediaSourceKind is MediaSourceKind.Plex or MediaSourceKind.Jellyfin or MediaSourceKind.Emby)
                 {
                     <MudMenu>
                         <ActivatorContent>
-                            <MudButton StartIcon="@Icons.Material.Filled.Search" Variant="Variant.Filled" Color="Color.Primary" OnClick="@context.ToggleAsync">Scan</MudButton>
+                            <MudButton StartIcon="@Icons.Material.Filled.Search" Variant="Variant.Filled" Color="Color.Primary" OnClick="@context.ToggleAsync">Analyser</MudButton>
                         </ActivatorContent>
                         <ChildContent>
-                            <MudMenuItem Label="Quick Scan" Icon="@Icons.Material.Filled.Search" OnClick="@(_ => ScanShow(false))"/>
-                            <MudMenuItem Label="Deep Scan" Icon="@Icons.Material.Filled.ManageSearch" OnClick="@(_ => ScanShow(true))"/>
+                            <MudMenuItem Label="Analyse rapide" Icon="@Icons.Material.Filled.Search" OnClick="@(_ => ScanShow(false))"/>
+                            <MudMenuItem Label="Analyse approfondie" Icon="@Icons.Material.Filled.ManageSearch" OnClick="@(_ => ScanShow(true))"/>
                         </ChildContent>
                     </MudMenu>
                 }
@@ -79,7 +79,7 @@
             @if (_sortedContentRatings.Any())
             {
                 <div style="display: flex; flex-direction: row; flex-wrap: wrap">
-                    <MudText GutterBottom="true">Content Ratings:&nbsp;</MudText>
+                    <MudText GutterBottom="true">Classifications :&nbsp;</MudText>
                     <MudLink Href="@(@$"content_rating:""{_sortedContentRatings.Head()}""".GetRelativeSearchQuery())">@_sortedContentRatings.Head()</MudLink>
                     @foreach (string contentRating in _sortedContentRatings.Skip(1))
                     {
@@ -91,7 +91,7 @@
             @if (_sortedLanguages.Any())
             {
                 <div style="display: flex; flex-direction: row; flex-wrap: wrap">
-                    <MudText GutterBottom="true">Languages:&nbsp;</MudText>
+                    <MudText GutterBottom="true">Langues :&nbsp;</MudText>
                     <MudLink Href="@(@$"language:""{_sortedLanguages.Head().EnglishName.ToLowerInvariant()}""".GetRelativeSearchQuery())">@_sortedLanguages.Head().EnglishName</MudLink>
                     @foreach (CultureInfo language in _sortedLanguages.Skip(1))
                     {
@@ -103,7 +103,7 @@
             @if (_sortedStudios.Any())
             {
                 <div style="display: flex; flex-direction: row; flex-wrap: wrap">
-                    <MudText GutterBottom="true">Studios:&nbsp;</MudText>
+                    <MudText GutterBottom="true">Studios :&nbsp;</MudText>
                     <MudLink Href="@(@$"studio:""{_sortedStudios.Head().ToLowerInvariant()}""".GetRelativeSearchQuery())">@_sortedStudios.Head()</MudLink>
                     @foreach (string studio in _sortedStudios.Skip(1))
                     {
@@ -115,7 +115,7 @@
             @if (_sortedNetworks.Any())
             {
                 <div style="display: flex; flex-direction: row; flex-wrap: wrap">
-                    <MudText GutterBottom="true">Networks:&nbsp;</MudText>
+                    <MudText GutterBottom="true">Diffuseurs :&nbsp;</MudText>
                     <MudLink Href="@(@$"network:""{_sortedNetworks.Head().ToLowerInvariant()}""".GetRelativeSearchQuery())">@_sortedNetworks.Head()</MudLink>
                     @foreach (string network in _sortedNetworks.Skip(1))
                     {
@@ -127,7 +127,7 @@
             @if (_sortedGenres.Any())
             {
                 <div style="display: flex; flex-direction: row; flex-wrap: wrap">
-                    <MudText GutterBottom="true">Genres:&nbsp;</MudText>
+                    <MudText GutterBottom="true">Genres :&nbsp;</MudText>
                     <MudLink Href="@(@$"genre:""{_sortedGenres.Head().ToLowerInvariant()}""".GetRelativeSearchQuery())">@_sortedGenres.Head()</MudLink>
                     @foreach (string genre in _sortedGenres.Skip(1))
                     {
@@ -139,7 +139,7 @@
             @if (_sortedTags.Any())
             {
                 <div style="display: flex; flex-direction: row; flex-wrap: wrap">
-                    <MudText GutterBottom="true">Tags:&nbsp;</MudText>
+                    <MudText GutterBottom="true">Tags :&nbsp;</MudText>
                     <MudLink Href="@(@$"tag:""{_sortedTags.Head().ToLowerInvariant()}""".GetRelativeSearchQuery())">@_sortedTags.Head()</MudLink>
                     @foreach (string tag in _sortedTags.Skip(1))
                     {
@@ -152,7 +152,7 @@
     </MudCard>
 </MudContainer>
 <MudContainer MaxWidth="MaxWidth.Large">
-    <MudText Class="mb-4">Seasons</MudText>
+    <MudText Class="mb-4">Saisons</MudText>
     <MudStack Row="true" Wrap="Wrap.Wrap">
         @foreach (TelevisionSeasonCardViewModel card in _data.Cards)
         {
@@ -163,7 +163,7 @@
     </MudStack>
     @if ((_show?.Actors?.Count ?? 0) > 0)
     {
-        <MudText Class="mb-4">Actors</MudText>
+        <MudText Class="mb-4">Acteurs</MudText>
         <MudStack Row="true" Wrap="Wrap.Wrap">
             @foreach (ActorCardViewModel actor in _show.Actors)
             {
@@ -234,7 +234,7 @@
         var parameters = new DialogParameters { { "EntityType", "show" }, { "EntityName", _show.Title } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        IDialogReference dialog = await Dialog.ShowAsync<AddToCollectionDialog>("Add To Collection", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<AddToCollectionDialog>("Ajouter à une collection", parameters, options);
         DialogResult result = await dialog.Result;
         if (result is { Canceled: false, Data: MediaCollectionViewModel collection })
         {
@@ -248,7 +248,7 @@
         var parameters = new DialogParameters { { "EntityType", "show" }, { "EntityName", _show.Title } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        IDialogReference dialog = await Dialog.ShowAsync<AddToPlaylistDialog>("Add To Playlist", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<AddToPlaylistDialog>("Ajouter à une playlist", parameters, options);
         DialogResult result = await dialog.Result;
         if (result is { Canceled: false, Data: PlaylistViewModel playlist })
         {
@@ -262,7 +262,7 @@
         var parameters = new DialogParameters { { "EntityType", "show" }, { "EntityName", _show.Title } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        IDialogReference dialog = await Dialog.ShowAsync<AddToScheduleDialog>("Add To Schedule", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<AddToScheduleDialog>("Ajouter à un planning", parameters, options);
         DialogResult result = await dialog.Result;
         if (result is { Canceled: false, Data: ProgramScheduleViewModel schedule })
         {
@@ -278,7 +278,7 @@
             var parameters = new DialogParameters { { "EntityType", "season" }, { "EntityName", season.Title } };
             var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-            IDialogReference dialog = await Dialog.ShowAsync<AddToCollectionDialog>("Add To Collection", parameters, options);
+            IDialogReference dialog = await Dialog.ShowAsync<AddToCollectionDialog>("Ajouter à une collection", parameters, options);
             DialogResult result = await dialog.Result;
             if (result is { Canceled: false, Data: MediaCollectionViewModel collection })
             {
@@ -287,10 +287,10 @@
                 addResult.Match(
                     Left: error =>
                     {
-                        Snackbar.Add($"Unexpected error adding season to collection: {error.Value}", Severity.Error);
+                        Snackbar.Add($"Erreur lors de l'ajout de la saison à la collection : {error.Value}", Severity.Error);
                         Logger.LogError("Unexpected error adding season to collection: {Error}", error.Value);
                     },
-                    Right: _ => Snackbar.Add($"Added {season.Title} to collection {collection.Name}", Severity.Success));
+                    Right: _ => Snackbar.Add($"« {season.Title} » ajoutée à la collection {collection.Name}", Severity.Success));
             }
         }
     }
@@ -310,11 +310,11 @@
         bool result = await Mediator.Send(new QueueShowScanByLibraryId(_show.LibraryId, _show.Id, _show.Title, deepScan));
         if (!result)
         {
-            Snackbar.Add($"Unable to scan show {_show.Title}", Severity.Error);
+            Snackbar.Add($"Impossible d'analyser la série {_show.Title}", Severity.Error);
         }
         else
         {
-            Snackbar.Add($"Done scanning show {_show.Title}", Severity.Success);
+            Snackbar.Add($"Analyse de la série {_show.Title} terminée", Severity.Success);
             StateHasChanged();
         }
     }

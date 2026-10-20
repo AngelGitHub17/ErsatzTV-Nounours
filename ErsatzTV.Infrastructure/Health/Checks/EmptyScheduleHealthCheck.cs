@@ -1,4 +1,4 @@
-using ErsatzTV.Core.Health;
+﻿using ErsatzTV.Core.Health;
 using ErsatzTV.Core.Health.Checks;
 using ErsatzTV.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -7,7 +7,7 @@ namespace ErsatzTV.Infrastructure.Health.Checks;
 
 public class EmptyScheduleHealthCheck(IDbContextFactory<TvContext> dbContextFactory) : BaseHealthCheck, IEmptyScheduleHealthCheck
 {
-    public override string Title => "Empty Schedule";
+    public override string Title => "Planning vide";
 
     public async Task<HealthCheckResult> Check(CancellationToken cancellationToken)
     {

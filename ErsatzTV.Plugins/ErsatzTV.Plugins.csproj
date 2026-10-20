@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+    <!--
+        Contrat des modules (plugins) ErsatzTV - édition Nounours.
+        Un module est une bibliothèque Razor (.dll) qui référence uniquement ce projet
+        (et éventuellement ErsatzTV.Application pour accéder aux données) et qui contient
+        une classe publique implémentant IErsatzPlugin.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <IsPackable>true</IsPackable>
+        <PackageId>ErsatzTV.Plugins</PackageId>
+        <Description>Contrat des modules pour ErsatzTV (édition Nounours)</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    </ItemGroup>
+
+</Project>

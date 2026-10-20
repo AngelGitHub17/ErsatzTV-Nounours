@@ -71,13 +71,13 @@
                            Color="Color.Primary"
                            StartIcon="@Icons.Material.Filled.Add"
                            OnClick="@AddToCollection">
-                    Add To Collection
+                    Ajouter à une collection
                 </MudButton>
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Primary"
                            StartIcon="@Icons.Material.Filled.Schedule"
                            OnClick="@AddToSchedule">
-                    Add To Schedule
+                    Ajouter à un planning
                 </MudButton>
             </MudStack>
         </div>
@@ -87,7 +87,7 @@
             @if (_sortedLanguages.Any())
             {
                 <div style="display: flex; flex-direction: row; flex-wrap: wrap">
-                    <MudText GutterBottom="true">Languages:&nbsp;</MudText>
+                    <MudText GutterBottom="true">Langues :&nbsp;</MudText>
                     <MudLink Href="@(@$"language:""{_sortedLanguages.Head().EnglishName.ToLowerInvariant()}""".GetRelativeSearchQuery())">@_sortedLanguages.Head().EnglishName</MudLink>
                     @foreach (CultureInfo language in _sortedLanguages.Skip(1))
                     {
@@ -99,7 +99,7 @@
             @if (_sortedGenres.Any())
             {
                 <div style="display: flex; flex-direction: row; flex-wrap: wrap">
-                    <MudText GutterBottom="true">Genres:&nbsp;</MudText>
+                    <MudText GutterBottom="true">Genres :&nbsp;</MudText>
                     <MudLink Href="@(@$"genre:""{_sortedGenres.Head().ToLowerInvariant()}""".GetRelativeSearchQuery())">@_sortedGenres.Head()</MudLink>
                     @foreach (string genre in _sortedGenres.Skip(1))
                     {
@@ -111,7 +111,7 @@
             @if (_sortedStyles.Any())
             {
                 <div style="display: flex; flex-direction: row; flex-wrap: wrap">
-                    <MudText GutterBottom="true">Styles:&nbsp;</MudText>
+                    <MudText GutterBottom="true">Styles :&nbsp;</MudText>
                     <MudLink Href="@(@$"style:""{_sortedStyles.Head().ToLowerInvariant()}""".GetRelativeSearchQuery())">@_sortedStyles.Head()</MudLink>
                     @foreach (string style in _sortedStyles.Skip(1))
                     {
@@ -123,7 +123,7 @@
             @if (_sortedMoods.Any())
             {
                 <div style="display: flex; flex-direction: row; flex-wrap: wrap">
-                    <MudText GutterBottom="true">Moods:&nbsp;</MudText>
+                    <MudText GutterBottom="true">Ambiances :&nbsp;</MudText>
                     <MudLink Href="@(@$"mood:""{_sortedMoods.Head().ToLowerInvariant()}""".GetRelativeSearchQuery())">@_sortedMoods.Head()</MudLink>
                     @foreach (string mood in _sortedMoods.Skip(1))
                     {
@@ -205,7 +205,7 @@
                             @if (!string.IsNullOrWhiteSpace(musicVideo.Album))
                             {
                                 <div style="display: flex; flex-direction: row">
-                                    <MudText GutterBottom="true">Album:&nbsp;</MudText>
+                                    <MudText GutterBottom="true">Album :&nbsp;</MudText>
                                     <MudLink Href="@(@$"album:""{musicVideo.Album}""".GetRelativeSearchQuery())">@musicVideo.Album</MudLink>
                                 </div>
                             }
@@ -215,7 +215,7 @@
                                            Color="Color.Primary"
                                            StartIcon="@Icons.Material.Filled.Add"
                                            OnClick="@(_ => AddMusicVideoToCollection(musicVideo))">
-                                    Add To Collection
+                                    Ajouter à une collection
                                 </MudButton>
                             </div>
                         </div>
@@ -225,7 +225,7 @@
                 {
                     <div class="ml-3 mt-3 mb-3" style="display: flex; flex-direction: row; flex-wrap: wrap">
                         <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" Class="mr-2"/>
-                        <MudText>File Not Found:&nbsp;</MudText>
+                        <MudText>Fichier introuvable :&nbsp;</MudText>
                         <MudText>@musicVideo.Path</MudText>
                     </div>
                 }
@@ -233,7 +233,7 @@
                 {
                     <div class="ml-3 mt-3 mb-3" style="display: flex; flex-direction: row; flex-wrap: wrap">
                         <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Class="mr-2"/>
-                        <MudText>Unavailable:&nbsp;</MudText>
+                        <MudText>Indisponible :&nbsp;</MudText>
                         <MudText>@musicVideo.LocalPath</MudText>
                     </div>
                 }
@@ -292,7 +292,7 @@
         var parameters = new DialogParameters { { "EntityType", "artist" }, { "EntityName", _artist.Name } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        IDialogReference dialog = await Dialog.ShowAsync<AddToCollectionDialog>("Add To Collection", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<AddToCollectionDialog>("Ajouter à une collection", parameters, options);
         DialogResult result = await dialog.Result;
         if (result is { Canceled: false, Data: MediaCollectionViewModel collection })
         {
@@ -306,7 +306,7 @@
         var parameters = new DialogParameters { { "EntityType", "artist" }, { "EntityName", _artist.Name } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        IDialogReference dialog = await Dialog.ShowAsync<AddToScheduleDialog>("Add To Schedule", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<AddToScheduleDialog>("Ajouter à un planning", parameters, options);
         DialogResult result = await dialog.Result;
         if (result is { Canceled: false, Data: ProgramScheduleViewModel schedule })
         {
@@ -320,7 +320,7 @@
         var parameters = new DialogParameters { { "EntityType", "music video" }, { "EntityName", musicVideo.Title } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        IDialogReference dialog = await Dialog.ShowAsync<AddToCollectionDialog>("Add To Collection", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<AddToCollectionDialog>("Ajouter à une collection", parameters, options);
         DialogResult result = await dialog.Result;
         if (result is { Canceled: false, Data: MediaCollectionViewModel collection })
         {
@@ -329,10 +329,10 @@
             addResult.Match(
                 Left: error =>
                 {
-                    Snackbar.Add($"Unexpected error adding music video to collection: {error.Value}");
+                    Snackbar.Add($"Erreur lors de l'ajout du clip à la collection : {error.Value}");
                     Logger.LogError("Unexpected error adding music video to collection: {Error}", error.Value);
                 },
-                Right: _ => Snackbar.Add($"Added {musicVideo.Title} to collection {collection.Name}", Severity.Success));
+                Right: _ => Snackbar.Add($"« {musicVideo.Title} » ajouté à la collection {collection.Name}", Severity.Success));
         }
     }
 

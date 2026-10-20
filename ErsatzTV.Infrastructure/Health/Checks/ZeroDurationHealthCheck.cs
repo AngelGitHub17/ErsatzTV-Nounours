@@ -14,7 +14,7 @@ public class ZeroDurationHealthCheck : BaseHealthCheck, IZeroDurationHealthCheck
     public ZeroDurationHealthCheck(IDbContextFactory<TvContext> dbContextFactory) =>
         _dbContextFactory = dbContextFactory;
 
-    public override string Title => "Zero Duration";
+    public override string Title => "Durée nulle";
 
     public async Task<HealthCheckResult> Check(CancellationToken cancellationToken)
     {
@@ -64,8 +64,8 @@ public class ZeroDurationHealthCheck : BaseHealthCheck, IZeroDurationHealthCheck
             var files = string.Join(", ", paths);
 
             return WarningResult(
-                $"There are {all.Count} files with zero duration, including the following: {files}",
-                $"There are {all.Count} files with zero duration");
+                $"{all.Count} fichier(s) de durée nulle, dont : {files}",
+                $"{all.Count} fichier(s) de durée nulle");
         }
 
         return OkResult();

@@ -11,10 +11,10 @@
 <MudForm Style="max-height: 100%">
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
-            <MudText Typo="Typo.h5" Class="mb-2">Troubleshooting</MudText>
+            <MudText Typo="Typo.h5" Class="mb-2">Dépannage</MudText>
             <MudDivider Class="mb-6"/>
             <MudTabs Class="mb-6">
-                <MudTabPanel Text="Tools">
+                <MudTabPanel Text="Outils">
                     <MudPaper Class="pa-6" Style="max-height: 500px">
                         <MudStack>
                         <!--
@@ -25,7 +25,7 @@
                                        Style="margin-right: auto"
                                        Disabled="true"
                                        Class="mt-6">
-                                Playback Troubleshooting
+                                Dépannage de la lecture
                             </MudButton>
                             -->
                             <MudButton Variant="Variant.Filled"
@@ -34,7 +34,7 @@
                                        Href="system/troubleshooting/sequential-schedule"
                                        Class="mt-6"
                                        Style="margin-right: auto">
-                                Sequential Schedule Validation
+                                Validation de planning séquentiel
                             </MudButton>
                             <MudButton Variant="Variant.Filled"
                                        Color="Color.Secondary"
@@ -42,12 +42,12 @@
                                        Href="system/troubleshooting/block-playout"
                                        Class="mt-6"
                                        Style="margin-right: auto">
-                                Block Playout Troubleshooting
+                                Dépannage des playouts par blocs
                             </MudButton>
                         </MudStack>
                     </MudPaper>
                 </MudTabPanel>
-                <MudTabPanel Text="General">
+                <MudTabPanel Text="Général">
                     <MudPaper Class="pa-6">
                         <div class="overflow-y-scroll" style="max-height: 500px">
                             <pre class="wrap-pre">

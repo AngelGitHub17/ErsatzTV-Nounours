@@ -1,4 +1,4 @@
-@page "/system/troubleshooting/block-playout/history"
+﻿@page "/system/troubleshooting/block-playout/history"
 @using System.Globalization
 @using ErsatzTV.Application.Configuration
 @using ErsatzTV.Application.Playouts
@@ -11,7 +11,7 @@
 <MudForm Style="max-height: 100%">
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
-            <MudText Typo="Typo.h5" Class="mb-2">Block Playout History</MudText>
+            <MudText Typo="Typo.h5" Class="mb-2">Historique du playout par blocs</MudText>
             <MudDivider Class="mb-6"/>
             <MudTable Hover="true"
                       Dense="true"
@@ -29,10 +29,10 @@
                     </MudHidden>
                 </ColGroup>
                 <HeaderContent>
-                    <MudTh>Start</MudTh>
-                    <MudTh>Finish</MudTh>
-                    <MudTh>Key</MudTh>
-                    <MudTh>Details</MudTh>
+                    <MudTh>Début</MudTh>
+                    <MudTh>Fin</MudTh>
+                    <MudTh>Clé</MudTh>
+                    <MudTh>Détails</MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd>@context.When.ToString("G", _dtf)</MudTd>
@@ -41,40 +41,40 @@
                     <MudTd>@context.Details</MudTd>
                 </RowTemplate>
                 <PagerContent>
-                    <MudTablePager/>
+                    <MudTablePager InfoFormat="{first_item}-{last_item} sur {all_items}"/>
                 </PagerContent>
             </MudTable>
-            <MudText Typo="Typo.h5" Class="mt-10 mb-2">History Details</MudText>
+            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Détails de l'historique</MudText>
             <MudDivider Class="mb-6"/>
             @if (_decodedHistory != null)
             {
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Playback Order</MudText>
+                        <MudText>Ordre de lecture</MudText>
                     </div>
                     <MudTextField Value="@_decodedHistory.PlaybackOrder.ToString()" ReadOnly="true" />
                 </MudStack>
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Collection Type</MudText>
+                        <MudText>Type de collection</MudText>
                     </div>
                     <MudTextField Value="@_decodedHistory.CollectionType.ToString()" ReadOnly="true" />
                 </MudStack>
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Collection Name</MudText>
+                        <MudText>Nom de la collection</MudText>
                     </div>
                     <MudTextField Value="@_decodedHistory.Name" ReadOnly="true" />
                 </MudStack>
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Media Item Type</MudText>
+                        <MudText>Type d'élément</MudText>
                     </div>
                     <MudTextField Value="@_decodedHistory.MediaItemType" ReadOnly="true" />
                 </MudStack>
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Media Item Title</MudText>
+                        <MudText>Titre de l'élément</MudText>
                     </div>
                     <MudTextField Value="@_decodedHistory.MediaItemTitle" ReadOnly="true" />
                 </MudStack>

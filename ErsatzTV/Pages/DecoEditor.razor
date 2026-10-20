@@ -15,41 +15,41 @@
 <MudForm Style="max-height: 100%">
 <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
     <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(_ => SaveChanges())" Class="ml-6" StartIcon="@Icons.Material.Filled.Save">
-        Save Changes
+        Enregistrer les modifications
     </MudButton>
 </MudPaper>
 <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
-<MudText Typo="Typo.h5" Class="mb-2">Deco</MudText>
+<MudText Typo="Typo.h5" Class="mb-2">Déco</MudText>
 <MudDivider Class="mb-6"/>
 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
     <div class="d-flex">
-        <MudText>Deco Group Name</MudText>
+        <MudText>Nom du groupe de décos</MudText>
     </div>
     <MudTextField @bind-Value="_deco.GroupName" Disabled="true"/>
 </MudStack>
 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
     <div class="d-flex">
-        <MudText>Deco Name</MudText>
+        <MudText>Nom de la déco</MudText>
     </div>
     <MudTextField @bind-Value="_deco.Name" For="@(() => _deco.Name)"/>
 </MudStack>
-<MudText Typo="Typo.h5" Class="mt-10 mb-2">Watermark</MudText>
+<MudText Typo="Typo.h5" Class="mt-10 mb-2">Filigrane</MudText>
 <MudDivider Class="mb-6"/>
 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
     <div class="d-flex">
-        <MudText>Watermark Mode</MudText>
+        <MudText>Mode du filigrane</MudText>
     </div>
     <MudSelect @bind-Value="_deco.WatermarkMode" For="@(() => _deco.WatermarkMode)">
-        <MudSelectItem Value="DecoMode.Inherit">Inherit</MudSelectItem>
-        <MudSelectItem Value="DecoMode.Disable">Disable</MudSelectItem>
-        <MudSelectItem Value="DecoMode.Override">Replace</MudSelectItem>
-        <MudSelectItem Value="DecoMode.Merge">Merge</MudSelectItem>
+        <MudSelectItem Value="DecoMode.Inherit">Hériter</MudSelectItem>
+        <MudSelectItem Value="DecoMode.Disable">Désactiver</MudSelectItem>
+        <MudSelectItem Value="DecoMode.Override">Remplacer</MudSelectItem>
+        <MudSelectItem Value="DecoMode.Merge">Fusionner</MudSelectItem>
     </MudSelect>
 </MudStack>
 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
     <div class="d-flex">
-        <MudText>Watermark</MudText>
+        <MudText>Filigrane</MudText>
     </div>
     <MudSelect T="WatermarkViewModel"
                @bind-SelectedValues="_deco.Watermarks"
@@ -65,29 +65,29 @@
 </MudStack>
 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
     <div class="d-flex">
-        <MudText>Use Watermark During Filler</MudText>
+        <MudText>Filigrane pendant le remplissage</MudText>
     </div>
     <MudCheckBox T="bool"
                  Disabled="@(_deco.WatermarkMode != DecoMode.Override)"
                  @bind-Value="_deco.UseWatermarkDuringFiller"
                  Dense="true"/>
 </MudStack>
-<MudText Typo="Typo.h5" Class="mt-10 mb-2">Graphics Elements</MudText>
+<MudText Typo="Typo.h5" Class="mt-10 mb-2">Éléments graphiques</MudText>
 <MudDivider Class="mb-6"/>
 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
     <div class="d-flex">
-        <MudText>Graphics Elements Mode</MudText>
+        <MudText>Mode des éléments graphiques</MudText>
     </div>
     <MudSelect @bind-Value="_deco.GraphicsElementsMode" For="@(() => _deco.GraphicsElementsMode)">
-        <MudSelectItem Value="DecoMode.Inherit">Inherit</MudSelectItem>
-        <MudSelectItem Value="DecoMode.Disable">Disable</MudSelectItem>
-        <MudSelectItem Value="DecoMode.Override">Replace</MudSelectItem>
-        <MudSelectItem Value="DecoMode.Merge">Merge</MudSelectItem>
+        <MudSelectItem Value="DecoMode.Inherit">Hériter</MudSelectItem>
+        <MudSelectItem Value="DecoMode.Disable">Désactiver</MudSelectItem>
+        <MudSelectItem Value="DecoMode.Override">Remplacer</MudSelectItem>
+        <MudSelectItem Value="DecoMode.Merge">Fusionner</MudSelectItem>
     </MudSelect>
 </MudStack>
 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
     <div class="d-flex">
-        <MudText>Graphics Elements</MudText>
+        <MudText>Éléments graphiques</MudText>
     </div>
     <MudSelect T="GraphicsElementViewModel"
                @bind-SelectedValues="_deco.GraphicsElements"
@@ -103,24 +103,24 @@
 </MudStack>
 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
     <div class="d-flex">
-        <MudText>Use Graphics Elements During Filler</MudText>
+        <MudText>Éléments graphiques pendant le remplissage</MudText>
     </div>
     <MudCheckBox T="bool"
                  Disabled="@(_deco.GraphicsElementsMode != DecoMode.Override)"
                  @bind-Value="_deco.UseGraphicsElementsDuringFiller"
                  Dense="true"/>
 </MudStack>
-<MudText Typo="Typo.h5" Class="mt-10 mb-2">Break Content</MudText>
+<MudText Typo="Typo.h5" Class="mt-10 mb-2">Contenu de coupure</MudText>
 <MudDivider Class="mb-6"/>
-<MudText Typo="Typo.body2" Class="mb-6">Break content can be used to play specific items (using playlists), and to pad blocks to their full configured duration.</MudText>
+<MudText Typo="Typo.body2" Class="mb-6">Le contenu de coupure permet de diffuser des éléments précis (via des playlists) et de compléter les blocs jusqu'à leur durée prévue.</MudText>
 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
     <div class="d-flex">
-        <MudText>Break Content Mode</MudText>
+        <MudText>Mode du contenu de coupure</MudText>
     </div>
     <MudSelect @bind-Value="_deco.BreakContentMode" For="@(() => _deco.BreakContentMode)">
-        <MudSelectItem Value="DecoMode.Inherit">Inherit</MudSelectItem>
-        <MudSelectItem Value="DecoMode.Disable">Disable</MudSelectItem>
-        <MudSelectItem Value="DecoMode.Override">Override</MudSelectItem>
+        <MudSelectItem Value="DecoMode.Inherit">Hériter</MudSelectItem>
+        <MudSelectItem Value="DecoMode.Disable">Désactiver</MudSelectItem>
+        <MudSelectItem Value="DecoMode.Override">Remplacer</MudSelectItem>
     </MudSelect>
 </MudStack>
 @if (_deco.BreakContentMode is DecoMode.Override)
@@ -128,10 +128,10 @@
     <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
         <div class="d-flex"></div>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(_ => AddBreakContent())" StartIcon="@Icons.Material.Filled.Add">
-            Add Break Content
+            Ajouter un contenu de coupure
         </MudButton>
     </MudStack>
-    <MudText Typo="Typo.h5" Class="mt-10 mb-2">Break Content Items</MudText>
+    <MudText Typo="Typo.h5" Class="mt-10 mb-2">Éléments de coupure</MudText>
     <MudDivider Class="mb-6"/>
     <MudTable T="DecoBreakContentEditViewModel" Class="mt-6" Hover="true" Items="_deco.BreakContent" Dense="true" SelectedItemChanged="@(vm => SelectedBreakContentChanged(vm))" RowClassFunc="@SelectedRowClassFunc">
         <ColGroup>
@@ -144,19 +144,19 @@
         </ColGroup>
         <HeaderContent>
             <MudTh>Type</MudTh>
-            <MudTh>Name</MudTh>
-            <MudTh>Placement</MudTh>
+            <MudTh>Nom</MudTh>
+            <MudTh>Emplacement</MudTh>
             <MudTh/>
         </HeaderContent>
         <RowTemplate>
             <MudTd DataLabel="Type">@context.CollectionType.ToString()</MudTd>
-            <MudTd DataLabel="Name">@context.CollectionName</MudTd>
-            <MudTd DataLabel="Placement">
+            <MudTd DataLabel="Nom">@context.CollectionName</MudTd>
+            <MudTd DataLabel="Emplacement">
                 @(context.Placement switch {
-                    DecoBreakPlacement.BlockStart => "Block Start",
-                    DecoBreakPlacement.BlockFinish => "Block Finish",
-                    DecoBreakPlacement.BetweenBlockItems => "Between Block Items",
-                    DecoBreakPlacement.ChapterMarkers => "At Chapter Markers",
+                    DecoBreakPlacement.BlockStart => "Début du bloc",
+                    DecoBreakPlacement.BlockFinish => "Fin du bloc",
+                    DecoBreakPlacement.BetweenBlockItems => "Entre les éléments du bloc",
+                    DecoBreakPlacement.ChapterMarkers => "Aux marqueurs de chapitre",
                     _ => string.Empty
                 })
             </MudTd>
@@ -174,32 +174,32 @@
     </MudTable>
     @if (_selectedBreakContent is not null)
     {
-        <MudText Typo="Typo.h5" Class="mt-10 mb-2">Break Content Item</MudText>
+        <MudText Typo="Typo.h5" Class="mt-10 mb-2">Élément de coupure</MudText>
         <MudDivider Class="mb-6"/>
         <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
             <div class="d-flex">
-                <MudText>Placement</MudText>
+                <MudText>Emplacement</MudText>
             </div>
             <MudSelect @bind-Value="_selectedBreakContent.Placement" For="@(() => _selectedBreakContent.Placement)" Disabled="true">
-                <MudSelectItem Value="DecoBreakPlacement.BlockStart">Block Start</MudSelectItem>
-                <MudSelectItem Value="DecoBreakPlacement.BetweenBlockItems">Between Block Items</MudSelectItem>
-                <MudSelectItem Value="DecoBreakPlacement.ChapterMarkers">At Chapter Markers</MudSelectItem>
-                <MudSelectItem Value="DecoBreakPlacement.BlockFinish">Block Finish</MudSelectItem>
+                <MudSelectItem Value="DecoBreakPlacement.BlockStart">Début du bloc</MudSelectItem>
+                <MudSelectItem Value="DecoBreakPlacement.BetweenBlockItems">Entre les éléments du bloc</MudSelectItem>
+                <MudSelectItem Value="DecoBreakPlacement.ChapterMarkers">Aux marqueurs de chapitre</MudSelectItem>
+                <MudSelectItem Value="DecoBreakPlacement.BlockFinish">Fin du bloc</MudSelectItem>
             </MudSelect>
         </MudStack>
         <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
             <div class="d-flex">
-                <MudText>Collection Type</MudText>
+                <MudText>Type de collection</MudText>
             </div>
             <MudSelect @bind-Value="_selectedBreakContent.CollectionType" For="@(() => _selectedBreakContent.CollectionType)" Disabled="true">
                 @* <MudSelectItem Value="CollectionType.Collection">Collection</MudSelectItem> *@
-                @* <MudSelectItem Value="CollectionType.TelevisionShow">Television Show</MudSelectItem> *@
-                @* <MudSelectItem Value="CollectionType.TelevisionSeason">Television Season</MudSelectItem> *@
+                @* <MudSelectItem Value="CollectionType.TelevisionShow">Série</MudSelectItem> *@
+                @* <MudSelectItem Value="CollectionType.TelevisionSeason">Saison</MudSelectItem> *@
 
-                @* <MudSelectItem Value="CollectionType.Artist">Artist</MudSelectItem> *@
-                @* <MudSelectItem Value="CollectionType.MultiCollection">Multi Collection</MudSelectItem> *@
+                @* <MudSelectItem Value="CollectionType.Artist">Artiste</MudSelectItem> *@
+                @* <MudSelectItem Value="CollectionType.MultiCollection">Multi-collection</MudSelectItem> *@
 
-                @* <MudSelectItem Value="CollectionType.SmartCollection">Smart Collection</MudSelectItem> *@
+                @* <MudSelectItem Value="CollectionType.SmartCollection">Collection intelligente</MudSelectItem> *@
                 <MudSelectItem Value="CollectionType.Playlist">Playlist</MudSelectItem>
             </MudSelect>
         </MudStack>
@@ -212,10 +212,10 @@
                 <MudAutocomplete T="MediaCollectionViewModel"
                                  @bind-Value="_selectedBreakContent.Collection"
                                  SearchFunc="@SearchCollections"
-                                 ToStringFunc="@(c => c?.Name)" Placeholder="Type to search...">
+                                 ToStringFunc="@(c => c?.Name)" Placeholder="Tapez pour rechercher…">
                     <MoreItemsTemplate>
                         <MudText Align="Align.Center" Class="px-4 py-1">
-                            Only the first 10 items are shown
+                            Seuls les 10 premiers éléments sont affichés
                         </MudText>
                     </MoreItemsTemplate>
                 </MudAutocomplete>
@@ -226,15 +226,15 @@
         {
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Multi Collection</MudText>
+                    <MudText>Multi-collection</MudText>
                 </div>
                 <MudAutocomplete T="MultiCollectionViewModel"
                                  @bind-Value="_selectedBreakContent.MultiCollection"
                                  SearchFunc="@SearchMultiCollections"
-                                 ToStringFunc="@(c => c?.Name)" Placeholder="Type to search...">
+                                 ToStringFunc="@(c => c?.Name)" Placeholder="Tapez pour rechercher…">
                     <MoreItemsTemplate>
                         <MudText Align="Align.Center" Class="px-4 py-1">
-                            Only the first 10 items are shown
+                            Seuls les 10 premiers éléments sont affichés
                         </MudText>
                     </MoreItemsTemplate>
                 </MudAutocomplete>
@@ -245,15 +245,15 @@
         {
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Smart Collection</MudText>
+                    <MudText>Collection intelligente</MudText>
                 </div>
                 <MudAutocomplete T="SmartCollectionViewModel"
                                  @bind-Value="_selectedBreakContent.SmartCollection"
                                  SearchFunc="@SearchSmartCollections"
-                                 ToStringFunc="@(c => c?.Name)" Placeholder="Type to search...">
+                                 ToStringFunc="@(c => c?.Name)" Placeholder="Tapez pour rechercher…">
                     <MoreItemsTemplate>
                         <MudText Align="Align.Center" Class="px-4 py-1">
-                            Only the first 10 items are shown
+                            Seuls les 10 premiers éléments sont affichés
                         </MudText>
                     </MoreItemsTemplate>
                 </MudAutocomplete>
@@ -264,15 +264,15 @@
         {
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Television Show</MudText>
+                    <MudText>Série</MudText>
                 </div>
                 <MudAutocomplete T="NamedMediaItemViewModel"
                                  @bind-Value="_selectedBreakContent.MediaItem"
                                  SearchFunc="@SearchTelevisionShows"
-                                 ToStringFunc="@(c => c?.Name)" Placeholder="Type to search...">
+                                 ToStringFunc="@(c => c?.Name)" Placeholder="Tapez pour rechercher…">
                     <MoreItemsTemplate>
                         <MudText Align="Align.Center" Class="px-4 py-1">
-                            Only the first 10 items are shown
+                            Seuls les 10 premiers éléments sont affichés
                         </MudText>
                     </MoreItemsTemplate>
                 </MudAutocomplete>
@@ -283,16 +283,16 @@
         {
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Television Season</MudText>
+                    <MudText>Saison</MudText>
                 </div>
                 <MudAutocomplete T="NamedMediaItemViewModel"
                                  @bind-Value="_selectedBreakContent.MediaItem"
                                  SearchFunc="@SearchTelevisionSeasons"
-                                 ToStringFunc="@(c => c?.Name)" Placeholder="Type to search..."
+                                 ToStringFunc="@(c => c?.Name)" Placeholder="Tapez pour rechercher…"
                                  MaxItems="20">
                     <MoreItemsTemplate>
                         <MudText Align="Align.Center" Class="px-4 py-1">
-                            Only the first 20 items are shown
+                            Seuls les 20 premiers éléments sont affichés
                         </MudText>
                     </MoreItemsTemplate>
                 </MudAutocomplete>
@@ -303,7 +303,7 @@
         {
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Playlist Group</MudText>
+                    <MudText>Groupe de playlists</MudText>
                 </div>
                 <MudSelect T="PlaylistGroupViewModel"
                            Value="@_selectedPlaylistGroup"
@@ -328,32 +328,32 @@
         }
     }
 }
-<MudText Typo="Typo.h5" Class="mt-10 mb-2">Default Filler</MudText>
+<MudText Typo="Typo.h5" Class="mt-10 mb-2">Remplissage par défaut</MudText>
 <MudDivider Class="mb-6"/>
-<MudText Typo="Typo.body2" Class="mb-6">After all blocks have been scheduled, a second pass will be made to fill unscheduled time using random items from this collection.</MudText>
+<MudText Typo="Typo.body2" Class="mb-6">Une fois tous les blocs programmés, un second passage comble le temps libre avec des éléments au hasard de cette collection.</MudText>
 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
     <div class="d-flex">
-        <MudText>Default Filler Mode</MudText>
+        <MudText>Mode de remplissage par défaut</MudText>
     </div>
     <MudSelect @bind-Value="_deco.DefaultFillerMode" For="@(() => _deco.DefaultFillerMode)">
-        <MudSelectItem Value="DecoMode.Inherit">Inherit</MudSelectItem>
-        <MudSelectItem Value="DecoMode.Disable">Disable</MudSelectItem>
-        <MudSelectItem Value="DecoMode.Override">Override</MudSelectItem>
+        <MudSelectItem Value="DecoMode.Inherit">Hériter</MudSelectItem>
+        <MudSelectItem Value="DecoMode.Disable">Désactiver</MudSelectItem>
+        <MudSelectItem Value="DecoMode.Override">Remplacer</MudSelectItem>
     </MudSelect>
 </MudStack>
 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
     <div class="d-flex">
-        <MudText>Default Filler Collection Type</MudText>
+        <MudText>Type de collection de remplissage</MudText>
     </div>
     <MudSelect Disabled="@(_deco.DefaultFillerMode != DecoMode.Override)"
                @bind-Value="_deco.DefaultFillerCollectionType"
                For="@(() => _deco.DefaultFillerCollectionType)">
         <MudSelectItem Value="CollectionType.Collection">Collection</MudSelectItem>
-        <MudSelectItem Value="CollectionType.TelevisionShow">Television Show</MudSelectItem>
-        <MudSelectItem Value="CollectionType.TelevisionSeason">Television Season</MudSelectItem>
-        <MudSelectItem Value="CollectionType.Artist">Artist</MudSelectItem>
-        <MudSelectItem Value="CollectionType.MultiCollection">Multi Collection</MudSelectItem>
-        <MudSelectItem Value="CollectionType.SmartCollection">Smart Collection</MudSelectItem>
+        <MudSelectItem Value="CollectionType.TelevisionShow">Série</MudSelectItem>
+        <MudSelectItem Value="CollectionType.TelevisionSeason">Saison</MudSelectItem>
+        <MudSelectItem Value="CollectionType.Artist">Artiste</MudSelectItem>
+        <MudSelectItem Value="CollectionType.MultiCollection">Multi-collection</MudSelectItem>
+        <MudSelectItem Value="CollectionType.SmartCollection">Collection intelligente</MudSelectItem>
     </MudSelect>
 </MudStack>
 @if (_deco.DefaultFillerCollectionType == CollectionType.Collection)
@@ -366,10 +366,10 @@
                          Disabled="@(_deco.DefaultFillerMode != DecoMode.Override)"
                          @bind-value="_deco.DefaultFillerCollection"
                          SearchFunc="@SearchCollections"
-                         ToStringFunc="@(c => c?.Name)" Placeholder="Type to search...">
+                         ToStringFunc="@(c => c?.Name)" Placeholder="Tapez pour rechercher…">
             <MoreItemsTemplate>
                 <MudText Align="Align.Center" Class="px-4 py-1">
-                    Only the first 10 items are shown
+                    Seuls les 10 premiers éléments sont affichés
                 </MudText>
             </MoreItemsTemplate>
         </MudAutocomplete>
@@ -379,16 +379,16 @@
 {
     <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
         <div class="d-flex">
-            <MudText>Multi Collection</MudText>
+            <MudText>Multi-collection</MudText>
         </div>
         <MudAutocomplete T="MultiCollectionViewModel"
                          Disabled="@(_deco.DefaultFillerMode != DecoMode.Override)"
                          @bind-value="_deco.DefaultFillerMultiCollection"
                          SearchFunc="@SearchMultiCollections"
-                         ToStringFunc="@(c => c?.Name)" Placeholder="Type to search...">
+                         ToStringFunc="@(c => c?.Name)" Placeholder="Tapez pour rechercher…">
             <MoreItemsTemplate>
                 <MudText Align="Align.Center" Class="px-4 py-1">
-                    Only the first 10 items are shown
+                    Seuls les 10 premiers éléments sont affichés
                 </MudText>
             </MoreItemsTemplate>
         </MudAutocomplete>
@@ -398,16 +398,16 @@
 {
     <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
         <div class="d-flex">
-            <MudText>Smart Collection</MudText>
+            <MudText>Collection intelligente</MudText>
         </div>
         <MudAutocomplete T="SmartCollectionViewModel"
                          Disabled="@(_deco.DefaultFillerMode != DecoMode.Override)"
                          @bind-value="_deco.DefaultFillerSmartCollection"
                          SearchFunc="@SearchSmartCollections"
-                         ToStringFunc="@(c => c?.Name)" Placeholder="Type to search...">
+                         ToStringFunc="@(c => c?.Name)" Placeholder="Tapez pour rechercher…">
             <MoreItemsTemplate>
                 <MudText Align="Align.Center" Class="px-4 py-1">
-                    Only the first 10 items are shown
+                    Seuls les 10 premiers éléments sont affichés
                 </MudText>
             </MoreItemsTemplate>
         </MudAutocomplete>
@@ -417,16 +417,16 @@
 {
     <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
         <div class="d-flex">
-            <MudText>Television Show</MudText>
+            <MudText>Série</MudText>
         </div>
         <MudAutocomplete T="NamedMediaItemViewModel"
                          Disabled="@(_deco.DefaultFillerMode != DecoMode.Override)"
                          @bind-value="_deco.DefaultFillerMediaItem"
                          SearchFunc="@SearchTelevisionShows"
-                         ToStringFunc="@(c => c?.Name)" Placeholder="Type to search...">
+                         ToStringFunc="@(c => c?.Name)" Placeholder="Tapez pour rechercher…">
             <MoreItemsTemplate>
                 <MudText Align="Align.Center" Class="px-4 py-1">
-                    Only the first 10 items are shown
+                    Seuls les 10 premiers éléments sont affichés
                 </MudText>
             </MoreItemsTemplate>
         </MudAutocomplete>
@@ -436,17 +436,17 @@
 {
     <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
         <div class="d-flex">
-            <MudText>Television Season</MudText>
+            <MudText>Saison</MudText>
         </div>
         <MudAutocomplete T="NamedMediaItemViewModel"
                          Disabled="@(_deco.DefaultFillerMode != DecoMode.Override)"
                          @bind-Value="_deco.DefaultFillerMediaItem"
                          SearchFunc="@SearchTelevisionSeasons"
-                         ToStringFunc="@(c => c?.Name)" Placeholder="Type to search..."
+                         ToStringFunc="@(c => c?.Name)" Placeholder="Tapez pour rechercher…"
                          MaxItems="20">
             <MoreItemsTemplate>
                 <MudText Align="Align.Center" Class="px-4 py-1">
-                    Only the first 20 items are shown
+                    Seuls les 20 premiers éléments sont affichés
                 </MudText>
             </MoreItemsTemplate>
         </MudAutocomplete>
@@ -456,17 +456,17 @@
 {
     <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
         <div class="d-flex">
-            <MudText>Artist</MudText>
+            <MudText>Artiste</MudText>
         </div>
         <MudAutocomplete T="NamedMediaItemViewModel"
                          Disabled="@(_deco.DefaultFillerMode != DecoMode.Override)"
                          @bind-Value="_deco.DefaultFillerMediaItem"
                          SearchFunc="@SearchArtists"
-                         ToStringFunc="@(c => c?.Name)" Placeholder="Type to search..."
+                         ToStringFunc="@(c => c?.Name)" Placeholder="Tapez pour rechercher…"
                          MaxItems="20">
             <MoreItemsTemplate>
                 <MudText Align="Align.Center" Class="px-4 py-1">
-                    Only the first 20 items are shown
+                    Seuls les 20 premiers éléments sont affichés
                 </MudText>
             </MoreItemsTemplate>
         </MudAutocomplete>
@@ -474,7 +474,7 @@
 }
 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
     <div class="d-flex">
-        <MudText>Trim To Fit</MudText>
+        <MudText>Couper pour tenir</MudText>
     </div>
     <MudCheckBox T="bool"
                  Disabled="@(_deco.DefaultFillerMode != DecoMode.Override)"
@@ -482,33 +482,33 @@
                  Color="Color.Primary"
                  Dense="true"/>
 </MudStack>
-<MudText Typo="Typo.h5" Class="mt-10 mb-2">Dead Air Fallback</MudText>
+<MudText Typo="Typo.h5" Class="mt-10 mb-2">Secours anti-écran noir</MudText>
 <MudDivider Class="mb-6"/>
-<MudText Typo="Typo.body2">When no playout item is found for the current time, *one* item will be randomly selected from this collection and looped and trimmed to exactly fit until the start of the next playout item.</MudText>
-<MudText Typo="Typo.body2" Class="mb-6 mt-3">This replaces the "Channel is Offline" image that would otherwise display.</MudText>
+<MudText Typo="Typo.body2">Quand rien n'est programmé à l'heure actuelle, *un* élément de cette collection est choisi au hasard, mis en boucle et coupé pour tenir jusqu'au programme suivant.</MudText>
+<MudText Typo="Typo.body2" Class="mb-6 mt-3">Remplace l'image « Chaîne hors antenne » qui s'afficherait sinon.</MudText>
 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
     <div class="d-flex">
-        <MudText>Dead Air Fallback Mode</MudText>
+        <MudText>Mode du secours anti-écran noir</MudText>
     </div>
     <MudSelect @bind-Value="_deco.DeadAirFallbackMode" For="@(() => _deco.DeadAirFallbackMode)">
-        <MudSelectItem Value="DecoMode.Inherit">Inherit</MudSelectItem>
-        <MudSelectItem Value="DecoMode.Disable">Disable</MudSelectItem>
-        <MudSelectItem Value="DecoMode.Override">Override</MudSelectItem>
+        <MudSelectItem Value="DecoMode.Inherit">Hériter</MudSelectItem>
+        <MudSelectItem Value="DecoMode.Disable">Désactiver</MudSelectItem>
+        <MudSelectItem Value="DecoMode.Override">Remplacer</MudSelectItem>
     </MudSelect>
 </MudStack>
 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
     <div class="d-flex">
-        <MudText>Dead Air Fallback Collection Type</MudText>
+        <MudText>Type de collection de secours</MudText>
     </div>
     <MudSelect Disabled="@(_deco.DeadAirFallbackMode != DecoMode.Override)"
                @bind-Value="_deco.DeadAirFallbackCollectionType"
                For="@(() => _deco.DeadAirFallbackCollectionType)">
         <MudSelectItem Value="CollectionType.Collection">Collection</MudSelectItem>
-        <MudSelectItem Value="CollectionType.TelevisionShow">Television Show</MudSelectItem>
-        <MudSelectItem Value="CollectionType.TelevisionSeason">Television Season</MudSelectItem>
-        <MudSelectItem Value="CollectionType.Artist">Artist</MudSelectItem>
-        <MudSelectItem Value="CollectionType.MultiCollection">Multi Collection</MudSelectItem>
-        <MudSelectItem Value="CollectionType.SmartCollection">Smart Collection</MudSelectItem>
+        <MudSelectItem Value="CollectionType.TelevisionShow">Série</MudSelectItem>
+        <MudSelectItem Value="CollectionType.TelevisionSeason">Saison</MudSelectItem>
+        <MudSelectItem Value="CollectionType.Artist">Artiste</MudSelectItem>
+        <MudSelectItem Value="CollectionType.MultiCollection">Multi-collection</MudSelectItem>
+        <MudSelectItem Value="CollectionType.SmartCollection">Collection intelligente</MudSelectItem>
     </MudSelect>
 </MudStack>
 @if (_deco.DeadAirFallbackCollectionType == CollectionType.Collection)
@@ -521,10 +521,10 @@
                          Disabled="@(_deco.DeadAirFallbackMode != DecoMode.Override)"
                          @bind-value="_deco.DeadAirFallbackCollection"
                          SearchFunc="@SearchCollections"
-                         ToStringFunc="@(c => c?.Name)" Placeholder="Type to search...">
+                         ToStringFunc="@(c => c?.Name)" Placeholder="Tapez pour rechercher…">
             <MoreItemsTemplate>
                 <MudText Align="Align.Center" Class="px-4 py-1">
-                    Only the first 10 items are shown
+                    Seuls les 10 premiers éléments sont affichés
                 </MudText>
             </MoreItemsTemplate>
         </MudAutocomplete>
@@ -534,16 +534,16 @@
 {
     <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
         <div class="d-flex">
-            <MudText>Multi Collection</MudText>
+            <MudText>Multi-collection</MudText>
         </div>
         <MudAutocomplete T="MultiCollectionViewModel"
                          Disabled="@(_deco.DeadAirFallbackMode != DecoMode.Override)"
                          @bind-value="_deco.DeadAirFallbackMultiCollection"
                          SearchFunc="@SearchMultiCollections"
-                         ToStringFunc="@(c => c?.Name)" Placeholder="Type to search...">
+                         ToStringFunc="@(c => c?.Name)" Placeholder="Tapez pour rechercher…">
             <MoreItemsTemplate>
                 <MudText Align="Align.Center" Class="px-4 py-1">
-                    Only the first 10 items are shown
+                    Seuls les 10 premiers éléments sont affichés
                 </MudText>
             </MoreItemsTemplate>
         </MudAutocomplete>
@@ -553,16 +553,16 @@
 {
     <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
         <div class="d-flex">
-            <MudText>Smart Collection</MudText>
+            <MudText>Collection intelligente</MudText>
         </div>
         <MudAutocomplete T="SmartCollectionViewModel"
                          Disabled="@(_deco.DeadAirFallbackMode != DecoMode.Override)"
                          @bind-value="_deco.DeadAirFallbackSmartCollection"
                          SearchFunc="@SearchSmartCollections"
-                         ToStringFunc="@(c => c?.Name)" Placeholder="Type to search...">
+                         ToStringFunc="@(c => c?.Name)" Placeholder="Tapez pour rechercher…">
             <MoreItemsTemplate>
                 <MudText Align="Align.Center" Class="px-4 py-1">
-                    Only the first 10 items are shown
+                    Seuls les 10 premiers éléments sont affichés
                 </MudText>
             </MoreItemsTemplate>
         </MudAutocomplete>
@@ -572,16 +572,16 @@
 {
     <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
         <div class="d-flex">
-            <MudText>Television Show</MudText>
+            <MudText>Série</MudText>
         </div>
         <MudAutocomplete T="NamedMediaItemViewModel"
                          Disabled="@(_deco.DeadAirFallbackMode != DecoMode.Override)"
                          @bind-value="_deco.DeadAirFallbackMediaItem"
                          SearchFunc="@SearchTelevisionShows"
-                         ToStringFunc="@(c => c?.Name)" Placeholder="Type to search...">
+                         ToStringFunc="@(c => c?.Name)" Placeholder="Tapez pour rechercher…">
             <MoreItemsTemplate>
                 <MudText Align="Align.Center" Class="px-4 py-1">
-                    Only the first 10 items are shown
+                    Seuls les 10 premiers éléments sont affichés
                 </MudText>
             </MoreItemsTemplate>
         </MudAutocomplete>
@@ -591,17 +591,17 @@
 {
     <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
         <div class="d-flex">
-            <MudText>Television Season</MudText>
+            <MudText>Saison</MudText>
         </div>
         <MudAutocomplete T="NamedMediaItemViewModel"
                          Disabled="@(_deco.DeadAirFallbackMode != DecoMode.Override)"
                          @bind-value="_deco.DeadAirFallbackMediaItem"
                          SearchFunc="@SearchTelevisionSeasons"
-                         ToStringFunc="@(c => c?.Name)" Placeholder="Type to search..."
+                         ToStringFunc="@(c => c?.Name)" Placeholder="Tapez pour rechercher…"
                          MaxItems="20">
             <MoreItemsTemplate>
                 <MudText Align="Align.Center" Class="px-4 py-1">
-                    Only the first 20 items are shown
+                    Seuls les 20 premiers éléments sont affichés
                 </MudText>
             </MoreItemsTemplate>
         </MudAutocomplete>
@@ -611,17 +611,17 @@
 {
     <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
         <div class="d-flex">
-            <MudText>Artist</MudText>
+            <MudText>Artiste</MudText>
         </div>
         <MudAutocomplete T="NamedMediaItemViewModel"
                          Disabled="@(_deco.DeadAirFallbackMode != DecoMode.Override)"
                          @bind-value="_deco.DeadAirFallbackMediaItem"
                          SearchFunc="@SearchArtists"
-                         ToStringFunc="@(c => c?.Name)" Placeholder="Type to search..."
+                         ToStringFunc="@(c => c?.Name)" Placeholder="Tapez pour rechercher…"
                          MaxItems="20">
             <MoreItemsTemplate>
                 <MudText Align="Align.Center" Class="px-4 py-1">
-                    Only the first 20 items are shown
+                    Seuls les 20 premiers éléments sont affichés
                 </MudText>
             </MoreItemsTemplate>
         </MudAutocomplete>
@@ -766,7 +766,7 @@
         errorMessages.HeadOrNone().Match(
             error =>
             {
-                Snackbar.Add($"Unexpected error saving deco: {error.Value}", Severity.Error);
+                Snackbar.Add($"Erreur à l'enregistrement de la déco : {error.Value}", Severity.Error);
                 Logger.LogError("Unexpected error saving deco: {Error}", error.Value);
             },
             () => NavigationManager.NavigateTo("decos"));

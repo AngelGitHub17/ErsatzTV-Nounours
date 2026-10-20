@@ -4,12 +4,12 @@
             <MudContainer>
                 <MudHighlighter Class="mud-primary-text"
                                 Style="background-color: transparent; font-weight: bold"
-                                Text="@($"Do you really want to disconnect {Name}? All synchronized content will be removed.")"/>
+                                Text="@($"Voulez-vous vraiment déconnecter {Name} ? Tout le contenu synchronisé sera retiré.")"/>
             </MudContainer>
         </DialogContent>
         <DialogActions>
-            <MudButton OnClick="Cancel">Cancel</MudButton>
-            <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="Submit">Disconnect</MudButton>
+            <MudButton OnClick="Cancel">Annuler</MudButton>
+            <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="Submit">Déconnecter</MudButton>
         </DialogActions>
     </MudDialog>
 </div>

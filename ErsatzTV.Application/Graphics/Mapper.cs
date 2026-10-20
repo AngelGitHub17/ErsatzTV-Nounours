@@ -14,6 +14,7 @@ public static class Mapper
             GraphicsElementKind.Subtitle => $"subtitle/{fileName}",
             GraphicsElementKind.Motion => $"motion/{fileName}",
             GraphicsElementKind.Script => $"script/{fileName}",
+            GraphicsElementKind.Clock => $"clock/{fileName}",
             _ => graphicsElement.Path
         };
 

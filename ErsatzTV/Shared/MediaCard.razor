@@ -72,23 +72,23 @@
                             @if (AddToCollectionClicked.HasDelegate)
                             {
                                 <MudMenuItem Icon="@Icons.Material.Filled.Add"
-                                             Label="Add To Collection"
+                                             Label="Ajouter à une collection"
                                              OnClick="@(() => AddToCollectionClicked.InvokeAsync(Data))"/>
                             }
                             @if (AddToPlaylistClicked.HasDelegate)
                             {
                                 <MudMenuItem Icon="@Icons.Material.Filled.PlaylistAdd"
-                                             Label="Add To Playlist"
+                                             Label="Ajouter à une playlist"
                                              OnClick="@(() => AddToPlaylistClicked.InvokeAsync(Data))"/>
                             }
                             @if (Data.HasMediaInfo)
                             {
                                 <MudMenuItem Icon="@Icons.Material.Filled.Info"
-                                             Label="Show Media Info"
+                                             Label="Infos du média"
                                              OnClick="@ShowMediaInfo"/>
 
                                 <MudMenuItem Icon="@Icons.Material.Filled.Troubleshoot"
-                                             Label="Troubleshoot Playback"
+                                             Label="Dépanner la lecture"
                                              OnClick="@TroubleshootPlayback"/>
                             }
                         </MudMenu>

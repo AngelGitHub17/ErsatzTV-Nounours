@@ -8,14 +8,15 @@
 }
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>@if (Assembly.GetEntryAssembly().GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration?.ToLower() != "release") { @(System.Environment.MachineName + " ") }ErsatzTV Legacy</title>
+    <title>@if (Assembly.GetEntryAssembly().GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration?.ToLower() != "release") { @(System.Environment.MachineName + " ") }ErsatzTV · édition Nounours</title>
     <base href="~/"/>
     <link href="_content/MudBlazor/MudBlazor.min.css?v=@(Assembly.GetAssembly(typeof(AbstractLocalizationInterceptor))?.GetName().Version?.ToString())" rel="stylesheet"/>
     <link href="css/site.css" asp-append-version="true" rel="stylesheet"/>
+    <link href="css/nounours.css" asp-append-version="true" rel="stylesheet"/>
     <link href="lib/roboto/roboto.css" asp-append-version="true" rel="stylesheet"/>
     <link href="lib/jqueryui/themes/base/jquery-ui.css" asp-append-version="true" rel="stylesheet"/>
     <link href="_content/BlazorSortable/css/blazor-sortable.css" rel="stylesheet"/>
@@ -119,6 +120,7 @@
 </div>
 
 <script src="_framework/blazor.server.js"></script>
+<script src="js/nounours.js" asp-append-version="true"></script>
 <script src="_content/MudBlazor/MudBlazor.min.js?v=@(Assembly.GetAssembly(typeof(AbstractLocalizationInterceptor))?.GetName().Version?.ToString())"></script>
 <script type="text/javascript">
     window.blazorHelpers = {

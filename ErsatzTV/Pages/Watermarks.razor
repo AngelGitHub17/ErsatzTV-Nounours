@@ -8,12 +8,12 @@
 <MudForm Style="max-height: 100%">
     <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
         <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-6" StartIcon="@Icons.Material.Filled.Add" Href="watermarks/add">
-            Add Watermark
+            Ajouter un filigrane
         </MudButton>
     </MudPaper>
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
-            <MudText Typo="Typo.h5" Class="mb-2">Watermarks</MudText>
+            <MudText Typo="Typo.h5" Class="mb-2">Filigranes</MudText>
             <MudDivider Class="mb-6"/>
             <MudTable Hover="true" Items="_watermarks">
                 <ColGroup>
@@ -26,14 +26,14 @@
                     </MudHidden>
                 </ColGroup>
                 <HeaderContent>
-                    <MudTh>Name</MudTh>
+                    <MudTh>Nom</MudTh>
                     <MudTh>Image</MudTh>
                     <MudTh>Mode</MudTh>
-                    <MudTh>Location</MudTh>
+                    <MudTh>Position</MudTh>
                     <MudTh/>
                 </HeaderContent>
                 <RowTemplate>
-                    <MudTd DataLabel="Name">@context.Name</MudTd>
+                    <MudTd DataLabel="Nom">@context.Name</MudTd>
                     <MudTd DataLabel="Image">
                         @if (!string.IsNullOrWhiteSpace(context.Image?.Path))
                         {
@@ -41,28 +41,28 @@
                         }
                         else if (context.ImageSource == ChannelWatermarkImageSource.ChannelLogo)
                         {
-                            <MudText>[channel logo]</MudText>
+                            <MudText>[logo de la chaîne]</MudText>
                         }
                     </MudTd>
                     <MudTd DataLabel="Mode">
-                        @context.Mode
+                        @ErsatzTV.Nounours.Fr.Label(context.Mode)
                     </MudTd>
-                    <MudTd DataLabel="Location">
+                    <MudTd DataLabel="Position">
                         @context.Location
                     </MudTd>
                     <MudTd>
                         <div style="align-items: center; display: flex;">
-                            <MudTooltip Text="Edit Watermark">
+                            <MudTooltip Text="Modifier le filigrane">
                                 <MudIconButton Icon="@Icons.Material.Filled.Edit"
                                                Href="@($"watermarks/{context.Id}")">
                                 </MudIconButton>
                             </MudTooltip>
-                            <MudTooltip Text="Copy Watermark">
+                            <MudTooltip Text="Copier le filigrane">
                                 <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
                                                OnClick="@(_ => CopyWatermarkAsync(context))">
                                 </MudIconButton>
                             </MudTooltip>
-                            <MudTooltip Text="Delete Watermark">
+                            <MudTooltip Text="Supprimer le filigrane">
                                 <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                                OnClick="@(_ => DeleteWatermarkAsync(context))">
                                 </MudIconButton>
@@ -108,7 +108,7 @@
         var parameters = new DialogParameters { { "EntityType", "watermark" }, { "EntityName", watermark.Name } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        IDialogReference dialog = await Dialog.ShowAsync<DeleteDialog>("Delete Watermark", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<DeleteDialog>("Supprimer le filigrane", parameters, options);
         DialogResult result = await dialog.Result;
         if (result is { Canceled: false })
         {
@@ -122,7 +122,7 @@
         var parameters = new DialogParameters { { "WatermarkId", watermark.Id } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        IDialogReference dialog = await Dialog.ShowAsync<CopyWatermarkDialog>("Copy Watermark", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<CopyWatermarkDialog>("Copier le filigrane", parameters, options);
         DialogResult dialogResult = await dialog.Result;
         if (dialogResult is { Canceled: false, Data: WatermarkViewModel data })
         {

@@ -1,0 +1,17 @@
+@inject NotesStore Store
+
+@if (_last is null)
+{
+    <MudText Typo="Typo.body2" Class="n-muted">Aucune note. <MudLink Href="modules/bloc-notes">En écrire une</MudLink></MudText>
+}
+else
+{
+    <MudText>@_last.Text</MudText>
+    <MudText Typo="Typo.caption" Class="n-muted">@_last.When.ToString("dd/MM HH:mm") · <MudLink Href="modules/bloc-notes" Typo="Typo.caption">toutes les notes</MudLink></MudText>
+}
+
+@code {
+    private Note? _last;
+
+    protected override async Task OnInitializedAsync() => _last = (await Store.GetAll()).FirstOrDefault();
+}

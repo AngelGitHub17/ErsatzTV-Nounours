@@ -1,4 +1,4 @@
-@page "/settings/playout"
+﻿@page "/settings/playout"
 @using ErsatzTV.Application.Configuration
 @implements IDisposable
 @inject IMediator Mediator
@@ -7,7 +7,7 @@
 
 <MudForm @ref="_form" @bind-IsValid="@_playoutSuccess" Style="max-height: 100%">
     <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(_ => SavePlayoutSettings())" Class="ml-6" StartIcon="@Icons.Material.Filled.Save">Save Settings</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(_ => SavePlayoutSettings())" Class="ml-6" StartIcon="@Icons.Material.Filled.Save">Enregistrer les réglages</MudButton>
     </MudPaper>
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
@@ -15,23 +15,23 @@
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Days To Build</MudText>
+                    <MudText>Jours à construire</MudText>
                 </div>
-                <MudTextField @bind-Value="_playoutSettings.DaysToBuild" Validation="@(new Func<int, string>(ValidatePlayoutDaysToBuild))" Required="true" RequiredError="Playout days to build is required!" Adornment="Adornment.End" AdornmentText="days"/>
+                <MudTextField @bind-Value="_playoutSettings.DaysToBuild" Validation="@(new Func<int, string>(ValidatePlayoutDaysToBuild))" Required="true" RequiredError="Le nombre de jours à construire est obligatoire !" Adornment="Adornment.End" AdornmentText="days"/>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Skip Missing Items</MudText>
+                    <MudText>Ignorer les éléments manquants</MudText>
                 </div>
                 <MudCheckBox @bind-Value="_playoutSettings.SkipMissingItems" Dense="true">
-                    <MudText Typo="Typo.caption" Style="font-weight: normal">Controls whether file-not-found or unavailable items should be included in playouts</MudText>
+                    <MudText Typo="Typo.caption" Style="font-weight: normal">Inclure ou non dans les playouts les éléments introuvables ou indisponibles</MudText>
                 </MudCheckBox>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Scripted Schedule Timeout</MudText>
+                    <MudText>Délai du planning scripté</MudText>
                 </div>
-                <MudTextField @bind-Value="_playoutSettings.ScriptedScheduleTimeoutSeconds" Validation="@(new Func<int, string>(ValidateScriptedScheduleTimeoutSeconds))" Required="true" RequiredError="Scripted schedule timeout is required!" Adornment="Adornment.End" AdornmentText="seconds"/>
+                <MudTextField @bind-Value="_playoutSettings.ScriptedScheduleTimeoutSeconds" Validation="@(new Func<int, string>(ValidateScriptedScheduleTimeoutSeconds))" Required="true" RequiredError="Le délai du planning scripté est obligatoire !" Adornment="Adornment.End" AdornmentText="seconds"/>
             </MudStack>
         </MudContainer>
     </div>
@@ -68,9 +68,9 @@
         }
     }
 
-    private static string ValidatePlayoutDaysToBuild(int daysToBuild) => daysToBuild <= 0 ? "Playout days to build must be greater than zero" : null;
+    private static string ValidatePlayoutDaysToBuild(int daysToBuild) => daysToBuild <= 0 ? "Le nombre de jours doit être supérieur à zéro" : null;
 
-    private static string ValidateScriptedScheduleTimeoutSeconds(int seconds) => seconds < 10 ? "Scripted schedule timeout seconds must be at least 10" : null;
+    private static string ValidateScriptedScheduleTimeoutSeconds(int seconds) => seconds < 10 ? "Le délai du planning scripté doit être d'au moins 10 secondes" : null;
 
     private async Task SavePlayoutSettings()
     {
@@ -84,7 +84,7 @@
                     Snackbar.Add(error.Value, Severity.Error);
                     Logger.LogError("Unexpected error saving playout settings: {Error}", error.Value);
                 },
-                Right: _ => Snackbar.Add("Successfully saved playout settings", Severity.Success));
+                Right: _ => Snackbar.Add("Réglages de programmation enregistrés", Severity.Success));
         }
     }
 

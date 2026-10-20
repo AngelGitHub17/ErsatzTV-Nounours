@@ -1,0 +1,54 @@
+@using System.Globalization
+@using ErsatzTV.Application.Nounours
+@inject IGuideService GuideService
+
+@if (_hours is null)
+{
+    <MudProgressLinear Indeterminate="true"/>
+}
+else if (_total <= 0)
+{
+    <MudText Typo="Typo.body2" Class="n-muted">Rien de programmé pour l'instant.</MudText>
+}
+else
+{
+    <div style="display: flex; height: 12px; border-radius: 99px; overflow: hidden; margin-bottom: 12px">
+        @foreach ((GuideEntryKind kind, string _, string color) in StatistiquesCalcul.Kinds)
+        {
+            double h = _hours.GetValueOrDefault(kind);
+            if (h > 0)
+            {
+                <div style="width: @((h / _total * 100).ToString("0.##", CultureInfo.InvariantCulture))%; background: @color" title="@h.ToString("0.#", Fr) h"></div>
+            }
+        }
+    </div>
+    <div class="d-flex flex-wrap gap-4">
+        @foreach ((GuideEntryKind kind, string label, string color) in StatistiquesCalcul.Kinds)
+        {
+            double h = _hours.GetValueOrDefault(kind);
+            if (h > 0)
+            {
+                <div>
+                    <div class="n-muted" style="font-size: .8rem"><span style="display: inline-block; width: 9px; height: 9px; border-radius: 2px; background: @color; margin-right: 5px"></span>@label</div>
+                    <div style="font-weight: 700; font-variant-numeric: tabular-nums">@h.ToString("0.#", Fr) h</div>
+                </div>
+            }
+        }
+    </div>
+    <MudLink Href="modules/statistiques" Typo="Typo.body2" Class="d-block mt-3">Détail par chaîne →</MudLink>
+}
+
+@code {
+    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
+    private Dictionary<GuideEntryKind, double> _hours;
+    private double _total;
+
+    protected override async Task OnInitializedAsync()
+    {
+        DateTimeOffset start = DateTimeOffset.Now;
+        DateTimeOffset finish = start.AddHours(24);
+        List<GuideEntry> entries = await GuideService.GetEntries(start, finish, [], includeFiller: true, CancellationToken.None);
+        _hours = StatistiquesCalcul.HoursByKind(entries, start, finish);
+        _total = _hours.Values.Sum();
+    }
+}

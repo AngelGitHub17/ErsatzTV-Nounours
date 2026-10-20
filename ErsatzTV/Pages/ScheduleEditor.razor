@@ -10,57 +10,57 @@
 
 <MudForm @ref="_form" @bind-IsValid="@_success" Style="max-height: 100%">
     <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-6" OnClick="HandleSubmitAsync" StartIcon="@(IsEdit ? Icons.Material.Filled.Save : Icons.Material.Filled.Add)">@(IsEdit ? "Save Schedule" : "Add Schedule")</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-6" OnClick="HandleSubmitAsync" StartIcon="@(IsEdit ? Icons.Material.Filled.Save : Icons.Material.Filled.Add)">@(IsEdit ? "Enregistrer le planning" : "Ajouter le planning")</MudButton>
     </MudPaper>
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
-            <MudText Typo="Typo.h5" Class="mb-2">Schedule</MudText>
+            <MudText Typo="Typo.h5" Class="mb-2">Planning</MudText>
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Name</MudText>
+                    <MudText>Nom</MudText>
                 </div>
-                <MudTextField @bind-Value="_model.Name" For="@(() => _model.Name)" Required="true" RequiredError="Schedule name is required!"/>
+                <MudTextField @bind-Value="_model.Name" For="@(() => _model.Name)" Required="true" RequiredError="Le nom du planning est obligatoire !"/>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Keep Multi-Part Episodes Together</MudText>
+                    <MudText>Garder ensemble les épisodes en plusieurs parties</MudText>
                 </div>
                 <MudCheckBox @bind-Value="@_model.KeepMultiPartEpisodesTogether" For="@(() => _model.KeepMultiPartEpisodesTogether)" Dense="true">
-                    <MudText Typo="Typo.caption" Style="font-weight: normal">Group multi-part episodes when shuffling</MudText>
+                    <MudText Typo="Typo.caption" Style="font-weight: normal">Grouper les épisodes en plusieurs parties lors du mélange</MudText>
                 </MudCheckBox>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Treat Collections As Shows</MudText>
+                    <MudText>Traiter les collections comme des séries</MudText>
                 </div>
                 <MudCheckBox @bind-Value="@_model.TreatCollectionsAsShows"
                              Disabled="@(_model.KeepMultiPartEpisodesTogether == false)"
                              For="@(() => _model.TreatCollectionsAsShows)" Dense="true">
-                    <MudText Typo="Typo.caption" Style="font-weight: normal">This is useful for multi-part crossover episodes</MudText>
+                    <MudText Typo="Typo.caption" Style="font-weight: normal">Utile pour les épisodes croisés en plusieurs parties</MudText>
                 </MudCheckBox>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Shuffle Schedule Items</MudText>
+                    <MudText>Mélanger les éléments du planning</MudText>
                 </div>
                 <MudCheckBox @bind-Value="@_model.ShuffleScheduleItems" For="@(() => _model.ShuffleScheduleItems)" Dense="true">
-                    <MudText Typo="Typo.caption" Style="font-weight: normal">Note: this disables fixed start times and flood mode</MudText>
+                    <MudText Typo="Typo.caption" Style="font-weight: normal">Remarque : cela désactive les heures fixes et le mode continu</MudText>
                 </MudCheckBox>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Random Start Point</MudText>
+                    <MudText>Point de départ aléatoire</MudText>
                 </div>
                 <MudCheckBox @bind-Value="@_model.RandomStartPoint" For="@(() => _model.RandomStartPoint)" Dense="true"/>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Fixed Start Time Behavior</MudText>
+                    <MudText>Comportement à heure fixe</MudText>
                 </div>
                 <MudSelect @bind-Value="@_model.FixedStartTimeBehavior" For="@(() => _model.FixedStartTimeBehavior)">
-                    <MudSelectItem Value="FixedStartTimeBehavior.Strict">Strict - Wait For Exact Start Time</MudSelectItem>
-                    <MudSelectItem Value="FixedStartTimeBehavior.Flexible">Flexible - Start As Soon As Possible</MudSelectItem>
+                    <MudSelectItem Value="FixedStartTimeBehavior.Strict">Strict : attendre l'heure exacte</MudSelectItem>
+                    <MudSelectItem Value="FixedStartTimeBehavior.Flexible">Souple : démarrer dès que possible</MudSelectItem>
                 </MudSelect>
             </MudStack>
         </MudContainer>
@@ -110,7 +110,7 @@
             }
             else
             {
-                _model.Name = "New Schedule";
+                _model.Name = "Nouveau planning";
             }
         }
         catch (OperationCanceledException)

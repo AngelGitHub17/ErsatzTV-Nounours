@@ -9,12 +9,12 @@
 <MudForm @ref="_form" @bind-IsValid="@_success" Style="max-height: 100%">
     <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
         <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-6" OnClick="@HandleSubmitAsync" StartIcon="@Icons.Material.Filled.Save">
-            Save Trakt List
+            Enregistrer la liste Trakt
         </MudButton>
     </MudPaper>
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
-            <MudText Typo="Typo.h5" Class="mb-2">Trakt List</MudText>
+            <MudText Typo="Typo.h5" Class="mb-2">Liste Trakt</MudText>
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
@@ -24,18 +24,18 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Automatic Refresh</MudText>
+                    <MudText>Actualisation automatique</MudText>
                 </div>
                 <MudCheckBox @bind-Value="@_model.AutoRefresh" For="@(() => _model.AutoRefresh)" Dense="true">
-                    <MudText Typo="Typo.caption" Style="font-weight: normal">Update list from trakt.tv once each day</MudText>
+                    <MudText Typo="Typo.caption" Style="font-weight: normal">Mettre à jour la liste depuis trakt.tv chaque jour</MudText>
                 </MudCheckBox>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Generate Playlist</MudText>
+                    <MudText>Générer une playlist</MudText>
                 </div>
                 <MudCheckBox @bind-Value="@_model.GeneratePlaylist" For="@(() => _model.GeneratePlaylist)" Dense="true">
-                    <MudText Typo="Typo.caption" Style="font-weight: normal">Generate a playlist from the sorted trakt list items</MudText>
+                    <MudText Typo="Typo.caption" Style="font-weight: normal">Générer une playlist à partir des éléments triés de la liste Trakt</MudText>
                 </MudCheckBox>
             </MudStack>
         </MudContainer>

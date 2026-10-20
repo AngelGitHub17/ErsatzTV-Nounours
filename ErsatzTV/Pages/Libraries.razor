@@ -18,7 +18,7 @@
 <MudForm Style="max-height: 100%">
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
-            <MudText Typo="Typo.h5" Class="mb-2">Libraries</MudText>
+            <MudText Typo="Typo.h5" Class="mb-2">Bibliothèques</MudText>
             <MudDivider Class="mb-6"/>
             <MudTable Hover="true" Items="_libraries" Dense="true" Class="mb-5">
                 <ColGroup>
@@ -34,23 +34,23 @@
                     </MudHidden>
                 </ColGroup>
                 <HeaderContent>
-                    <MudTh>Library Kind</MudTh>
+                    <MudTh>Type de bibliothèque</MudTh>
                     @if (_showServerNames)
                     {
-                        <MudTh>Server Name</MudTh>
+                        <MudTh>Nom du serveur</MudTh>
                     }
-                    <MudTh>Library Name</MudTh>
-                    <MudTh>Media Kind</MudTh>
+                    <MudTh>Nom de la bibliothèque</MudTh>
+                    <MudTh>Type de média</MudTh>
                     <MudTh/>
                 </HeaderContent>
                 <RowTemplate>
-                    <MudTd DataLabel="Library Kind">@context.LibraryKind</MudTd>
+                    <MudTd DataLabel="Type de bibliothèque">@ErsatzTV.Nounours.Fr.Label(context.LibraryKind)</MudTd>
                     @if (_showServerNames)
                     {
-                        <MudTd DataLabel="Server Name">@context.MediaSourceName</MudTd>
+                        <MudTd DataLabel="Nom du serveur">@context.MediaSourceName</MudTd>
                     }
-                    <MudTd DataLabel="Library Name">@context.Name</MudTd>
-                    <MudTd DataLabel="Media Kind">
+                    <MudTd DataLabel="Nom de la bibliothèque">@context.Name</MudTd>
+                    <MudTd DataLabel="Type de média">
                         @switch (context.MediaKind)
                         {
                             case LibraryMediaKind.MusicVideos:
@@ -63,7 +63,7 @@
                                 @:Remote Streams
                                 break;
                             default:
-                                @(context.MediaKind)
+                                @ErsatzTV.Nounours.Fr.Label(context.MediaKind)
                                 break;
                         }
                     </MudTd>
@@ -87,7 +87,7 @@
                             {
                                 if (context is PlexLibraryViewModel or EmbyLibraryViewModel or JellyfinLibraryViewModel)
                                 {
-                                    <MudTooltip Text="Deep Scan Library">
+                                    <MudTooltip Text="Analyse approfondie de la bibliothèque">
                                         <MudIconButton Icon="@Icons.Material.Filled.FindReplace"
                                                        Disabled="@Locker.IsLibraryLocked(context.Id)"
                                                        OnClick="@(_ => ScanLibrary(context, true))">
@@ -99,14 +99,14 @@
                                     <div style="width: 48px"></div>
                                 }
 
-                                <MudTooltip Text="Scan Library">
+                                <MudTooltip Text="Analyser la bibliothèque">
                                     <MudIconButton Icon="@Icons.Material.Filled.Refresh"
                                                    Disabled="@Locker.IsLibraryLocked(context.Id)"
                                                    OnClick="@(_ => ScanLibrary(context))">
                                     </MudIconButton>
                                 </MudTooltip>
                             }
-                            <MudTooltip Text="Search Library">
+                            <MudTooltip Text="Rechercher dans la bibliothèque">
                                 <MudIconButton Icon="@Icons.Material.Filled.Search"
                                                Href="@($"search?query=library_id%3a{context.Id}")">
                                 </MudIconButton>
@@ -115,7 +115,7 @@
                     </MudTd>
                 </RowTemplate>
             </MudTable>
-            <MudText Typo="Typo.h5" Class="mt-10 mb-2">External Collections</MudText>
+            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Collections externes</MudText>
             <MudDivider Class="mb-6"/>
             @if (_externalCollections.Any())
             {
@@ -127,11 +127,11 @@
                         </MudHidden>
                     </ColGroup>
                     <HeaderContent>
-                        <MudTh>Library Kind</MudTh>
+                        <MudTh>Type de bibliothèque</MudTh>
                         <MudTh/>
                     </HeaderContent>
                     <RowTemplate>
-                        <MudTd>@context.LibraryKind</MudTd>
+                        <MudTd>@ErsatzTV.Nounours.Fr.Label(context.LibraryKind)</MudTd>
                         <MudTd>
                             <div style="align-items: center; display: flex;">
                                 <div style="width: 48px"></div>
@@ -145,7 +145,7 @@
                                 {
                                     if (context.LibraryKind is "Plex" or "Emby" or "Jellyfin")
                                     {
-                                        <MudTooltip Text="Deep Scan Collections">
+                                        <MudTooltip Text="Analyse approfondie des collections">
                                             <MudIconButton Icon="@Icons.Material.Filled.FindReplace"
                                                            Disabled="@AreCollectionsLocked(context.LibraryKind)"
                                                            OnClick="@(_ => ScanExternalCollections(context, true))">
@@ -156,7 +156,7 @@
                                     {
                                         <div style="width: 48px"></div>
                                     }
-                                    <MudTooltip Text="Scan Collections">
+                                    <MudTooltip Text="Analyser les collections">
                                         <MudIconButton Icon="@Icons.Material.Filled.Refresh"
                                                        Disabled="@AreCollectionsLocked(context.LibraryKind)"
                                                        OnClick="@(_ => ScanExternalCollections(context))">

@@ -15,7 +15,7 @@ public class DatabaseRequestCultureProvider(AcceptLanguageHeaderRequestCulturePr
         string configuredLanguage = await configElementRepository.GetValue<string>(
                 ConfigElementKey.PagesLanguage,
                 httpContext.RequestAborted)
-            .IfNoneAsync("en");
+            .IfNoneAsync("fr");
 
         if (defaultResult != null)
         {

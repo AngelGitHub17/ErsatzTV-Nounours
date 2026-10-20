@@ -1,4 +1,4 @@
-@page "/channels/numbers"
+﻿@page "/channels/numbers"
 @using ErsatzTV.Application.Channels
 @implements IDisposable
 @inject IMediator Mediator
@@ -11,24 +11,24 @@
         <div style="display: flex; flex-direction: row; margin-bottom: auto; margin-top: auto; width: 100%; align-items: center" class="ml-6 mr-6">
             <div class="d-none d-md-flex">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" OnClick="@SaveChannels">
-                    Save Channels
+                    Enregistrer les chaînes
                 </MudButton>
                 <MudButton Variant="Variant.Filled" Color="Color.Error" Class="ml-3" StartIcon="@Icons.Material.Filled.Undo" OnClick="@ReloadAllChannels">
-                    Reset Channels
+                    Réinitialiser les chaînes
                 </MudButton>
             </div>
             <div style="align-items: center; display: flex; margin-left: auto;" class="d-md-none">
                 <div class="flex-grow-1"></div>
                 <MudMenu Icon="@Icons.Material.Filled.MoreVert">
-                    <MudMenuItem Icon="@Icons.Material.Filled.Save" Label="Save Channels" OnClick="@SaveChannels"/>
-                    <MudMenuItem Icon="@Icons.Material.Filled.Undo" Label="Reset Channels" OnClick="@ReloadAllChannels"/>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Save" Label="Enregistrer les chaînes" OnClick="@SaveChannels"/>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Undo" Label="Réinitialiser les chaînes" OnClick="@ReloadAllChannels"/>
                 </MudMenu>
             </div>
         </div>
     </MudPaper>
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
-            <MudText Typo="Typo.h5" Class="mb-2">Edit Channel Numbers</MudText>
+            <MudText Typo="Typo.h5" Class="mb-2">Modifier la numérotation</MudText>
             <MudDivider Class="mb-6"/>
             <Sortable TItem="ChannelSortViewModel" Items="_channels" OnUpdate="OnUpdate">
                 <MudPaper Class="@($"pa-2 ma-2 ")"

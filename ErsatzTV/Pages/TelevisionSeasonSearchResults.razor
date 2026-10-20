@@ -17,14 +17,14 @@
                            Color="Color.Primary"
                            StartIcon="@Icons.Material.Filled.Add"
                            OnClick="@(_ => AddSelectionToCollection())">
-                    Add To Collection
+                    Ajouter à une collection
                 </MudButton>
                 <MudButton Class="ml-3"
                            Variant="Variant.Filled"
                            Color="Color.Secondary"
                            StartIcon="@Icons.Material.Filled.Check"
                            OnClick="@(_ => ClearSelection())">
-                    Clear Selection
+                    Effacer la sélection
                 </MudButton>
             </div>
         }
@@ -136,7 +136,7 @@
             var parameters = new DialogParameters { { "EntityType", "season" }, { "EntityName", season.Title } };
             var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-            IDialogReference dialog = await Dialog.ShowAsync<AddToCollectionDialog>("Add To Collection", parameters, options);
+            IDialogReference dialog = await Dialog.ShowAsync<AddToCollectionDialog>("Ajouter à une collection", parameters, options);
             DialogResult result = await dialog.Result;
             if (result is { Canceled: false, Data: MediaCollectionViewModel collection })
             {
@@ -145,10 +145,10 @@
                 addResult.Match(
                     Left: error =>
                     {
-                        Snackbar.Add($"Unexpected error adding season to collection: {error.Value}");
+                        Snackbar.Add($"Erreur lors de l'ajout de la saison à la collection : {error.Value}");
                         Logger.LogError("Unexpected error adding season to collection: {Error}", error.Value);
                     },
-                    Right: _ => Snackbar.Add($"Added {season.Title} to collection {collection.Name}", Severity.Success));
+                    Right: _ => Snackbar.Add($"« {season.Title} » ajoutée à la collection {collection.Name}", Severity.Success));
             }
         }
     }

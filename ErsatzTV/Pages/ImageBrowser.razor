@@ -21,7 +21,7 @@
                                     </div>
                                     <div style="display: flex; align-items: center; justify-self: end;">
                                         <span class="d-none d-sm-flex">@item.Value.EndText</span>
-                                        <MudTooltip Text="Edit Image Folder Duration" ShowOnHover="true" ShowOnClick="false" ShowOnFocus="false">
+                                        <MudTooltip Text="Modifier la durée du dossier d'images" ShowOnHover="true" ShowOnClick="false" ShowOnFocus="false">
                                             <MudIconButton Icon="@Icons.Material.Filled.Edit"
                                                            OnClick="@(_ => EditImageFolderDuration(item.Value))">
                                             </MudIconButton>
@@ -97,7 +97,7 @@
         var parameters = new DialogParameters { { "ImageFolderDuration", item.ImageFolderDuration } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraLarge };
 
-        IDialogReference dialog = await Dialog.ShowAsync<EditImageFolderDurationDialog>("Edit Image Folder Duration", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<EditImageFolderDurationDialog>("Modifier la durée du dossier d'images", parameters, options);
         DialogResult result = await dialog.Result;
         if (result is { Canceled: false })
         {

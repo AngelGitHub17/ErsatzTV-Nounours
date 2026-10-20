@@ -10,20 +10,20 @@
         <div style="display: flex; flex-direction: row; margin-bottom: auto; margin-top: auto; width: 100%" class="ml-6 mr-6">
             <div style="margin-right: auto" class="d-none d-md-flex">
                 <MudButton Class="ml-3" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PlaylistAdd" Href="media/multi-collections/add">
-                    Add Multi Collection
+                    Ajouter une multi-collection
                 </MudButton>
             </div>
             <div style="align-items: center; display: flex; margin-left: auto;" class="d-md-none">
                 <div class="flex-grow-1"></div>
                 <MudMenu Icon="@Icons.Material.Filled.MoreVert">
-                    <MudMenuItem Icon="@Icons.Material.Filled.PlaylistAdd" Label="Add Multi Collection" Href="media/multi-collections/add"/>
+                    <MudMenuItem Icon="@Icons.Material.Filled.PlaylistAdd" Label="Ajouter une multi-collection" Href="media/multi-collections/add"/>
                 </MudMenu>
             </div>
         </div>
     </MudPaper>
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
-            <MudText Typo="Typo.h5" Class="mb-2">Multi Collections</MudText>
+            <MudText Typo="Typo.h5" Class="mb-2">Multi-collections</MudText>
             <MudDivider Class="mb-6"/>
             <MudTable Hover="true"
                       @bind-RowsPerPage="@_multiCollectionsRowsPerPage"
@@ -39,22 +39,22 @@
                 <ToolBarContent>
                     <MudTextField T="string"
                                   ValueChanged="@(s => OnSearch(s))"
-                                  Placeholder="Search for multi collections"
+                                  Placeholder="Rechercher des multi-collections"
                                   Adornment="Adornment.Start"
                                   AdornmentIcon="@Icons.Material.Filled.FilterList"
                                   Clearable="true">
                     </MudTextField>
                 </ToolBarContent>
                 <RowTemplate>
-                    <MudTd DataLabel="Name">@context.Name</MudTd>
+                    <MudTd DataLabel="Nom">@context.Name</MudTd>
                     <MudTd>
                         <div style="align-items: center; display: flex;">
-                            <MudTooltip Text="Edit Collection">
+                            <MudTooltip Text="Modifier la collection">
                                 <MudIconButton Icon="@Icons.Material.Filled.Edit"
                                                Href="@($"media/multi-collections/{context.Id}/edit")">
                                 </MudIconButton>
                             </MudTooltip>
-                            <MudTooltip Text="Delete Collection">
+                            <MudTooltip Text="Supprimer la collection">
                                 <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                                OnClick="@(_ => DeleteMultiCollection(context))">
                                 </MudIconButton>
@@ -63,7 +63,7 @@
                     </MudTd>
                 </RowTemplate>
                 <PagerContent>
-                    <MudTablePager/>
+                    <MudTablePager InfoFormat="{first_item}-{last_item} sur {all_items}"/>
                 </PagerContent>
             </MudTable>
             <div class="mt-6"></div>
@@ -108,7 +108,7 @@
         var parameters = new DialogParameters { { "EntityType", "multi collection" }, { "EntityName", collection.Name } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        IDialogReference dialog = await Dialog.ShowAsync<DeleteDialog>("Delete Multi Collection", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<DeleteDialog>("Supprimer la multi-collection", parameters, options);
         DialogResult result = await dialog.Result;
         if (result is { Canceled: false })
         {

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+    <!--
+        Module d'exemple pour ErsatzTV (édition Nounours).
+        Compilation : dotnet build -c Release
+        Installation : copier bin/Release/net10.0/ErsatzTV.Plugin.Exemple.dll dans
+                       <dossier de config ErsatzTV>/plugins/Exemple/ puis redémarrer ErsatzTV.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <!-- les dépendances (ErsatzTV.Plugins, MudBlazor) sont fournies par ErsatzTV : on ne les copie pas -->
+        <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\ErsatzTV.Plugins\ErsatzTV.Plugins.csproj" Private="false" />
+        <PackageReference Include="MudBlazor" Version="9.4.0" ExcludeAssets="runtime" />
+    </ItemGroup>
+
+</Project>

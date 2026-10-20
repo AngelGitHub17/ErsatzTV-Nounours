@@ -18,21 +18,21 @@
                            Color="Color.Error"
                            StartIcon="@Icons.Material.Filled.Remove"
                            OnClick="@(_ => RemoveSelectionFromCollection(Id))">
-                    Remove From Collection
+                    Retirer de la collection
                 </MudButton>
                 <MudButton Class="ml-3"
                            Variant="Variant.Filled"
                            Color="Color.Secondary"
                            StartIcon="@Icons.Material.Filled.Check"
                            OnClick="@(_ => ClearSelection())">
-                    Clear Selection
+                    Effacer la sélection
                 </MudButton>
             </div>
             <div style="align-items: center; display: flex; margin-left: auto;" class="d-md-none">
                 <div class="flex-grow-1"></div>
                 <MudMenu Icon="@Icons.Material.Filled.MoreVert">
-                    <MudMenuItem Icon="@Icons.Material.Filled.Remove" Label="Remove From Collection" OnClick="@(_ => RemoveSelectionFromCollection(Id))"/>
-                    <MudMenuItem Icon="@Icons.Material.Filled.Check" Label="Clear Selection" OnClick="ClearSelection"/>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Remove" Label="Retirer de la collection" OnClick="@(_ => RemoveSelectionFromCollection(Id))"/>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Check" Label="Effacer la sélection" OnClick="ClearSelection"/>
                 </MudMenu>
             </div>
         }
@@ -99,7 +99,7 @@
                                    Value="@(_data?.UseCustomPlaybackOrder == true)"
                                    Color="Color.Primary"
                                    ValueChanged="@OnUseCustomOrderChanged"
-                                   Label="Use Custom Playback Order"/>
+                                   Label="Ordre de lecture personnalisé"/>
                     </div>
                 }
                 <div class="d-flex d-sm-none" style="margin-left: auto">
@@ -165,7 +165,7 @@
                      Typo="Typo.h4"
                      Style="scroll-margin-top: 160px"
                      UserAttributes="@(new Dictionary<string, object> { { "id", "seasons" } })">
-                Seasons
+                Saisons
             </MudText>
             <MudDivider Class="mb-6"/>
 
@@ -241,7 +241,7 @@
                      Typo="Typo.h4"
                      Style="scroll-margin-top: 160px"
                      UserAttributes="@(new Dictionary<string, object> { { "id", "music_videos" } })">
-                Music Videos
+                Clips
             </MudText>
             <MudDivider Class="mb-6"/>
 
@@ -266,7 +266,7 @@
                      Typo="Typo.h4"
                      Style="scroll-margin-top: 160px"
                      UserAttributes="@(new Dictionary<string, object> { { "id", "other_videos" } })">
-                Other Videos
+                Autres vidéos
             </MudText>
             <MudDivider Class="mb-6"/>
 
@@ -341,7 +341,7 @@
                      Typo="Typo.h4"
                      Style="scroll-margin-top: 160px"
                      UserAttributes="@(new Dictionary<string, object> { { "id", "remote_streams" } })">
-                Remote Streams
+                Flux distants
             </MudText>
             <MudDivider Class="mb-6"/>
 
@@ -573,7 +573,7 @@
         var parameters = new DialogParameters { { "EntityType", entityType }, { "EntityName", entityName } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        IDialogReference dialog = await Dialog.ShowAsync<RemoveFromCollectionDialog>("Remove From Collection", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<RemoveFromCollectionDialog>("Retirer de la collection", parameters, options);
         DialogResult result = await dialog.Result;
         if (result is { Canceled: false })
         {

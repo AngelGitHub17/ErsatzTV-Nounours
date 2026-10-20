@@ -14,7 +14,7 @@
 <MudForm @ref="_form" Validation="@(_validator.ValidateValue)" ValidationDelay="0" Style="max-height: 100%">
     <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
         <MudButton Class="ml-6" OnClick="@HandleSubmitAsync" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">
-            Add Playout
+            Ajouter un playout
         </MudButton>
     </MudPaper>
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
@@ -23,9 +23,9 @@
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Channel</MudText>
+                    <MudText>Chaîne</MudText>
                 </div>
-                <MudSelect T="ChannelViewModel" @bind-value="_model.Channel" HelperText="Disabled channels already have a playout">
+                <MudSelect T="ChannelViewModel" @bind-value="_model.Channel" HelperText="Les chaînes grisées ont déjà un playout">
                     @foreach (ChannelViewModel channel in _channels)
                     {
                         <MudSelectItem Disabled="@(channel.PlayoutCount > 0)" Value="@channel">
@@ -39,7 +39,7 @@
                 case PlayoutKind.ExternalJson:
                     <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                         <div class="d-flex">
-                            <MudText>JSON (dizqueTV) Schedule</MudText>
+                            <MudText>Planning JSON (dizqueTV)</MudText>
                         </div>
                         <MudTextField @bind-Value="_model.ScheduleFile" For="@(() => _model.ScheduleFile)"/>
                     </MudStack>
@@ -47,15 +47,15 @@
                 case PlayoutKind.Sequential:
                     <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                         <div class="d-flex">
-                            <MudText>Sequential Schedule</MudText>
+                            <MudText>Planning séquentiel</MudText>
                         </div>
-                        <MudTextField @bind-Value="_model.ScheduleFile" For="@(() => _model.ScheduleFile)" HelperText="The full path to the sequential schedule (YAML) file" />
+                        <MudTextField @bind-Value="_model.ScheduleFile" For="@(() => _model.ScheduleFile)" HelperText="Chemin complet du fichier de planning séquentiel (YAML)" />
                     </MudStack>
                     break;
                 case PlayoutKind.Scripted:
                     <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                         <div class="d-flex">
-                            <MudText>Scripted Schedule</MudText>
+                            <MudText>Planning scripté</MudText>
                         </div>
                         <MudTextField @bind-Value="_model.ScheduleFile" For="@(() => _model.ScheduleFile)"/>
                     </MudStack>
@@ -63,13 +63,13 @@
                 case PlayoutKind.Block:
                     <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                         <div class="d-flex"></div>
-                        <MudText Typo="Typo.caption" Style="font-weight: normal">Block templates are added later</MudText>
+                        <MudText Typo="Typo.caption" Style="font-weight: normal">Les modèles de blocs s'ajoutent ensuite</MudText>
                     </MudStack>
                     break;
                 default:
                     <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                         <div class="d-flex">
-                            <MudText>Classic Schedule</MudText>
+                            <MudText>Planning classique</MudText>
                         </div>
                         <MudSelect T="ProgramScheduleViewModel" @bind-value="_model.ProgramSchedule">
                             @foreach (ProgramScheduleViewModel schedule in _programSchedules)

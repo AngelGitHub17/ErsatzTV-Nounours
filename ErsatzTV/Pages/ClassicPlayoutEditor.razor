@@ -16,18 +16,18 @@
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Alternate Schedules</MudText>
+                    <MudText>Plannings alternatifs</MudText>
                 </div>
                 @if (_playoutMode is ChannelPlayoutMode.OnDemand)
                 {
                     <MudButton Disabled="@true" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit">
-                        Edit Alternate Schedules
+                        Modifier les plannings alternatifs
                     </MudButton>
                 }
                 else
                 {
                     <MudButton Disabled="@EntityLocker.IsPlayoutLocked(Id)" Variant="Variant.Filled" Color="Color.Primary" Href="@($"playouts/{Id}/alternate-schedules")" StartIcon="@Icons.Material.Filled.Edit">
-                        Edit Alternate Schedules
+                        Modifier les plannings alternatifs
                     </MudButton>
                 }
             </MudStack>
@@ -35,10 +35,10 @@
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Playout Items and History</MudText>
+                    <MudText>Éléments et historique du playout</MudText>
                 </div>
                 <MudButton Disabled="@EntityLocker.IsPlayoutLocked(Id)" Variant="Variant.Filled" Color="Color.Error" OnClick="@(_ => EraseItemsAndHistory())" StartIcon="@Icons.Material.Filled.Delete">
-                    Erase Items and History
+                    Effacer les éléments et l'historique
                 </MudButton>
             </MudStack>
         </MudContainer>
@@ -91,7 +91,7 @@
     private async Task EraseItemsAndHistory()
     {
         await Mediator.Send(new ErasePlayoutHistory(Id), _cts.Token);
-        Snackbar.Add("Erased playout items and history", Severity.Info);
+        Snackbar.Add("Éléments et historique du playout effacés", Severity.Info);
     }
 
 }

@@ -16,28 +16,28 @@
 
 <MudForm Model="@_model" @ref="@_form" Validation="@(_validator.ValidateValue)" ValidationDelay="0" Style="max-height: 100%">
     <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-6" OnClick="@HandleSubmitAsync" StartIcon="@(IsEdit ? Icons.Material.Filled.Save : Icons.Material.Filled.Add)">@(IsEdit ? "Save Filler Preset" : "Add Filler Preset")</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-6" OnClick="@HandleSubmitAsync" StartIcon="@(IsEdit ? Icons.Material.Filled.Save : Icons.Material.Filled.Add)">@(IsEdit ? "Enregistrer le préréglage" : "Ajouter le préréglage")</MudButton>
     </MudPaper>
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
-            <MudText Typo="Typo.h5" Class="mb-2">Filler Preset</MudText>
+            <MudText Typo="Typo.h5" Class="mb-2">Préréglage de remplissage</MudText>
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Name</MudText>
+                    <MudText>Nom</MudText>
                 </div>
                 <MudTextField @bind-Value="_model.Name" For="@(() => _model.Name)"/>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Kind</MudText>
+                    <MudText>Type</MudText>
                 </div>
                 <MudSelect @bind-Value="_model.FillerKind" For="@(() => _model.FillerKind)" Disabled="@IsEdit">
-                    <MudSelectItem Value="@(FillerKind.PreRoll)">Pre-Roll</MudSelectItem>
-                    <MudSelectItem Value="@(FillerKind.MidRoll)">Mid-Roll</MudSelectItem>
-                    <MudSelectItem Value="@(FillerKind.PostRoll)">Post-Roll</MudSelectItem>
-                    <MudSelectItem Value="@(FillerKind.Tail)">Tail</MudSelectItem>
-                    <MudSelectItem Value="@(FillerKind.Fallback)">Fallback</MudSelectItem>
+                    <MudSelectItem Value="@(FillerKind.PreRoll)">Avant le programme</MudSelectItem>
+                    <MudSelectItem Value="@(FillerKind.MidRoll)">Milieu de programme</MudSelectItem>
+                    <MudSelectItem Value="@(FillerKind.PostRoll)">Après le programme</MudSelectItem>
+                    <MudSelectItem Value="@(FillerKind.Tail)">Fin de créneau</MudSelectItem>
+                    <MudSelectItem Value="@(FillerKind.Fallback)">Secours</MudSelectItem>
                 </MudSelect>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
@@ -46,15 +46,15 @@
                 </div>
                 <MudSelect @bind-Value="_model.FillerMode" For="@(() => _model.FillerMode)"
                            Disabled="@(_model.FillerKind is FillerKind.Fallback or FillerKind.Tail || _model.CollectionType is CollectionType.Playlist)">
-                    <MudSelectItem Value="@(FillerMode.Duration)">Duration</MudSelectItem>
-                    <MudSelectItem Value="@(FillerMode.Count)">Count</MudSelectItem>
-                    <MudSelectItem Value="@(FillerMode.Pad)">Pad</MudSelectItem>
-                    <MudSelectItem Value="@(FillerMode.RandomCount)">Random Count</MudSelectItem>
+                    <MudSelectItem Value="@(FillerMode.Duration)">Durée</MudSelectItem>
+                    <MudSelectItem Value="@(FillerMode.Count)">Nombre</MudSelectItem>
+                    <MudSelectItem Value="@(FillerMode.Pad)">Compléter</MudSelectItem>
+                    <MudSelectItem Value="@(FillerMode.RandomCount)">Nombre aléatoire</MudSelectItem>
                 </MudSelect>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Duration</MudText>
+                    <MudText>Durée</MudText>
                 </div>
                 <MudTextField T="int"
                               @bind-Value="_model.DurationHours"
@@ -80,16 +80,16 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Count</MudText>
+                    <MudText>Nombre</MudText>
                 </div>
                 <MudTextField @bind-Value="@_model.Count" For="@(() => _model.Count)" Disabled="@(_model.FillerMode != FillerMode.Count && _model.FillerMode != FillerMode.RandomCount)"/>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Pad To Nearest Minute</MudText>
+                    <MudText>Compléter à la minute près</MudText>
                 </div>
                 <MudSelect @bind-Value="_model.PadToNearestMinute" For="@(() => _model.PadToNearestMinute)" Disabled="@(_model.FillerMode != FillerMode.Pad)">
-                    <MudSelectItem T="int?" Value="5">5 (:00, :05, :10, :15, :20, etc)</MudSelectItem>
+                    <MudSelectItem T="int?" Value="5">5 (:00, :05, :10, :15, :20, etc.)</MudSelectItem>
                     <MudSelectItem T="int?" Value="10">10 (:00, :10, :20, :30, :40, :50)</MudSelectItem>
                     <MudSelectItem T="int?" Value="15">15 (:00, :15, :30, :45)</MudSelectItem>
                     <MudSelectItem T="int?" Value="30">30 (:00, :30)</MudSelectItem>
@@ -97,21 +97,21 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Allow Watermarks</MudText>
+                    <MudText>Autoriser les filigranes</MudText>
                 </div>
                 <MudCheckBox @bind-Value="@_model.AllowWatermarks" For="@(() => _model.AllowWatermarks)" Dense="true"/>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Collection Type</MudText>
+                    <MudText>Type de collection</MudText>
                 </div>
                 <MudSelect @bind-Value="_model.CollectionType" For="@(() => _model.CollectionType)">
                     <MudSelectItem Value="CollectionType.Collection">Collection</MudSelectItem>
-                    <MudSelectItem Value="CollectionType.TelevisionShow">Television Show</MudSelectItem>
-                    <MudSelectItem Value="CollectionType.TelevisionSeason">Television Season</MudSelectItem>
-                    <MudSelectItem Value="CollectionType.Artist">Artist</MudSelectItem>
-                    <MudSelectItem Value="CollectionType.MultiCollection">Multi Collection</MudSelectItem>
-                    <MudSelectItem Value="CollectionType.SmartCollection">Smart Collection</MudSelectItem>
+                    <MudSelectItem Value="CollectionType.TelevisionShow">Série</MudSelectItem>
+                    <MudSelectItem Value="CollectionType.TelevisionSeason">Saison</MudSelectItem>
+                    <MudSelectItem Value="CollectionType.Artist">Artiste</MudSelectItem>
+                    <MudSelectItem Value="CollectionType.MultiCollection">Multi-collection</MudSelectItem>
+                    <MudSelectItem Value="CollectionType.SmartCollection">Collection intelligente</MudSelectItem>
                     @if (_model.FillerKind is not FillerKind.Fallback and not FillerKind.Tail)
                     {
                         <MudSelectItem Value="CollectionType.Playlist">Playlist</MudSelectItem>
@@ -136,7 +136,7 @@
             {
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Multi Collection</MudText>
+                        <MudText>Multi-collection</MudText>
                     </div>
                     <MudSelect T="MultiCollectionViewModel" @bind-value="_model.MultiCollection">
                         @foreach (MultiCollectionViewModel collection in _multiCollections)
@@ -150,7 +150,7 @@
             {
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Smart Collection</MudText>
+                        <MudText>Collection intelligente</MudText>
                     </div>
                     <MudSelect T="SmartCollectionViewModel" @bind-value="_model.SmartCollection">
                         @foreach (SmartCollectionViewModel collection in _smartCollections)
@@ -164,7 +164,7 @@
             {
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Television Show</MudText>
+                        <MudText>Série</MudText>
                     </div>
                     <MudSelect T="NamedMediaItemViewModel" @bind-value="_model.MediaItem">
                         @foreach (NamedMediaItemViewModel show in _televisionShows)
@@ -178,7 +178,7 @@
             {
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Television Season</MudText>
+                        <MudText>Saison</MudText>
                     </div>
                     <MudSelect T="NamedMediaItemViewModel" @bind-value="_model.MediaItem">
                         @foreach (NamedMediaItemViewModel season in _televisionSeasons)
@@ -192,7 +192,7 @@
             {
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Artist</MudText>
+                        <MudText>Artiste</MudText>
                     </div>
                     <MudSelect T="NamedMediaItemViewModel" @bind-value="_model.MediaItem">
                         @foreach (NamedMediaItemViewModel artist in _artists)
@@ -206,7 +206,7 @@
             {
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <div class="d-flex">
-                        <MudText>Playlist Group</MudText>
+                        <MudText>Groupe de playlists</MudText>
                     </div>
                     <MudSelect T="PlaylistGroupViewModel"
                                Value="@_selectedPlaylistGroup"
@@ -231,13 +231,13 @@
             }
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Use Chapters As Media Items</MudText>
+                    <MudText>Utiliser les chapitres comme éléments</MudText>
                 </div>
                 <MudCheckBox @bind-Value="@_model.UseChaptersAsMediaItems"
                              For="@(() => _model.UseChaptersAsMediaItems)"
                              Dense="true"
                              Disabled="@(_model.FillerKind is FillerKind.Fallback)">
-                    <MudText Typo="Typo.caption" Style="font-weight: normal">Schedule individual chapters instead of entire files</MudText>
+                    <MudText Typo="Typo.caption" Style="font-weight: normal">Programmer les chapitres un par un au lieu des fichiers entiers</MudText>
                 </MudCheckBox>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
@@ -247,7 +247,7 @@
                 <MudTextField @bind-Value="_model.Expression"
                               For="@(() => _model.Expression)"
                               Disabled="@(_model.FillerKind is not FillerKind.MidRoll)"
-                              HelperText="For mid-roll filler, only add filler when this expression evaluates to true for a given mid-roll point."/>
+                              HelperText="Pour le remplissage en milieu de programme : n'ajouter du remplissage que lorsque cette expression est vraie au point de coupure."/>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="gap-md-8 mb-5">
                 <div class="d-flex" style="width: 300px"></div>
@@ -363,7 +363,7 @@
             }
             else
             {
-                _model.Name = "New Filler Preset";
+                _model.Name = "Nouveau préréglage de remplissage";
                 _model.FillerKind = FillerKind.PreRoll;
                 _model.FillerMode = FillerMode.Duration;
             }

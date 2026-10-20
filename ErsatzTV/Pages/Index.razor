@@ -1,5 +1,4 @@
-﻿@page "/"
-@page "/system/health"
+﻿@page "/system/health"
 @using ErsatzTV.Application.Health
 @using ErsatzTV.Core.Health
 @implements IDisposable
@@ -14,12 +13,12 @@
                 <MudCard>
                     <MudCardHeader>
                         <CardHeaderContent>
-                            <MudText Typo="Typo.h4">Database is initializing</MudText>
+                            <MudText Typo="Typo.h4">Initialisation de la base de données</MudText>
                         </CardHeaderContent>
                     </MudCardHeader>
                     <MudCardContent>
-                        <MudText>Please wait, this may take a few minutes.</MudText>
-                        <MudText>This page will automatically refresh when the database is ready.</MudText>
+                        <MudText>Patientez, cela peut prendre quelques minutes.</MudText>
+                        <MudText>La page se rafraîchira automatiquement dès que la base sera prête.</MudText>
                     </MudCardContent>
                     <MudCardActions>
                         <MudProgressCircular Color="Color.Primary" Size="Size.Medium" Indeterminate="true"/>
@@ -31,12 +30,12 @@
                 <MudCard>
                     <MudCardHeader>
                         <CardHeaderContent>
-                            <MudText Typo="Typo.h4">Search Index is initializing</MudText>
+                            <MudText Typo="Typo.h4">Initialisation de l'index de recherche</MudText>
                         </CardHeaderContent>
                     </MudCardHeader>
                     <MudCardContent>
-                        <MudText>Please wait, this may take a few minutes.</MudText>
-                        <MudText>This page will automatically refresh when the search index is ready.</MudText>
+                        <MudText>Patientez, cela peut prendre quelques minutes.</MudText>
+                        <MudText>La page se rafraîchira automatiquement dès que l'index sera prêt.</MudText>
                     </MudCardContent>
                     <MudCardActions>
                         <MudProgressCircular Color="Color.Primary" Size="Size.Medium" Indeterminate="true"/>
@@ -45,15 +44,15 @@
             }
             else
             {
-                <MudText Typo="Typo.h5" Class="mb-2">Health Checks</MudText>
+                <MudText Typo="Typo.h5" Class="mb-2">État du système</MudText>
                 <MudDivider Class="mb-6"/>
                 <MudTable Hover="true"
                           Dense="true"
                           Breakpoint="Breakpoint.None"
                           ServerData="@(ServerReload)">
                     <HeaderContent>
-                        <MudTh>Check</MudTh>
-                        <MudTh>Message</MudTh>
+                        <MudTh>Vérification</MudTh>
+                        <MudTh>Résultat</MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd>

@@ -1,4 +1,4 @@
-@using System.Globalization
+﻿@using System.Globalization
 <div style="display: flex; flex-direction: row; margin-bottom: auto; margin-top: auto; width: 100%" class="ml-6 mr-6">
     @if (IsSelectMode())
     {
@@ -11,29 +11,29 @@
                            Color="Color.Primary"
                            StartIcon="@Icons.Material.Filled.Add"
                            OnClick="@(_ => AddSelectionToCollection())">
-                    Add To Collection
+                    Ajouter à une collection
                 </MudButton>
                 <MudButton Class="ml-3"
                            Variant="Variant.Filled"
                            Color="Color.Primary"
                            StartIcon="@Icons.Material.Filled.PlaylistAdd"
                            OnClick="@(_ => AddSelectionToPlaylist())">
-                    Add To Playlist
+                    Ajouter à une playlist
                 </MudButton>
                 <MudButton Class="ml-3"
                            Variant="Variant.Filled"
                            Color="Color.Secondary"
                            StartIcon="@Icons.Material.Filled.Check"
                            OnClick="@(_ => ClearSelection())">
-                    Clear Selection
+                    Effacer la sélection
                 </MudButton>
             </div>
             <div style="align-items: center; display: flex; margin-left: auto;" class="d-md-none">
                 <div class="flex-grow-1"></div>
                 <MudMenu Icon="@Icons.Material.Filled.MoreVert">
-                    <MudMenuItem Icon="@Icons.Material.Filled.Add" Label="Add To Collection" OnClick="@AddSelectionToCollection"/>
-                    <MudMenuItem Icon="@Icons.Material.Filled.PlaylistAdd" Label="Add To Playlist" OnClick="AddSelectionToPlaylist"/>
-                    <MudMenuItem Icon="@Icons.Material.Filled.Check" Label="Clear Selection" OnClick="ClearSelection"/>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Add" Label="Ajouter à une collection" OnClick="@AddSelectionToCollection"/>
+                    <MudMenuItem Icon="@Icons.Material.Filled.PlaylistAdd" Label="Ajouter à une playlist" OnClick="AddSelectionToPlaylist"/>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Check" Label="Effacer la sélection" OnClick="ClearSelection"/>
                 </MudMenu>
             </div>
         </div>
@@ -68,13 +68,13 @@
                                 StartIcon="@Icons.Material.Filled.SelectAll"
                                 Disabled="@(CanSelectAllOnPage is null || !CanSelectAllOnPage())"
                                 OnClick="@(_ => SelectAllOnPage?.Invoke())">
-                            Select All
+                            Tout sélectionner
                         </MudButton>
                     </div>
                     <div class="d-md-none" style="margin-left:auto; display:flex; align-items:center;">
                         <MudMenu Icon="@Icons.Material.Filled.MoreVert">
                             <MudMenuItem Icon="@Icons.Material.Filled.SelectAll"
-                                        Label="Select All"
+                                        Label="Tout sélectionner"
                                         Disabled="@(CanSelectAllOnPage is null || !CanSelectAllOnPage())"
                                         OnClick="@(_ => SelectAllOnPage?.Invoke())" />
                         </MudMenu>

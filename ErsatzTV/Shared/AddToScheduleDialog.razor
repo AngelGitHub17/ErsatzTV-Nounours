@@ -12,7 +12,7 @@
                                 Text="@FormatText()"
                                 HighlightedText="@EntityName"/>
             </MudContainer>
-            <MudSelect T="ProgramScheduleViewModel" Label="Schedule" @bind-Value="_selectedSchedule" Class="mb-6 mx-4">
+            <MudSelect T="ProgramScheduleViewModel" Label="Planning" @bind-Value="_selectedSchedule" Class="mb-6 mx-4">
                 @foreach (ProgramScheduleViewModel schedule in _schedules)
                 {
                     <MudSelectItem Value="@schedule">@schedule.Name</MudSelectItem>
@@ -20,9 +20,9 @@
             </MudSelect>
         </DialogContent>
         <DialogActions>
-            <MudButton OnClick="Cancel">Cancel</MudButton>
+            <MudButton OnClick="Cancel">Annuler</MudButton>
             <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_selectedSchedule == null)" OnClick="Submit">
-                Add To Schedule
+                Ajouter à un planning
             </MudButton>
         </DialogActions>
     </MudDialog>

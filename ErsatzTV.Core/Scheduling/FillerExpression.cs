@@ -1,4 +1,4 @@
-using ErsatzTV.Core.Domain;
+﻿using ErsatzTV.Core.Domain;
 using NCalc;
 
 namespace ErsatzTV.Core.Scheduling;
@@ -10,6 +10,7 @@ public static class FillerExpression
         List<MediaChapter> effectiveChapters,
         PlayoutItem playoutItem)
     {
+        fillerExpression = MidRollBreaks.StripDirective(fillerExpression);
         if (effectiveChapters.Count == 0 || string.IsNullOrWhiteSpace(fillerExpression))
         {
             return effectiveChapters;

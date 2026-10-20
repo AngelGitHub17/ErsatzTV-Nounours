@@ -1,0 +1,659 @@
+@page "/planning"
+@using System.Globalization
+@using System.Threading.Channels
+@using ErsatzTV.Application
+@using ErsatzTV.Application.Channels
+@using ErsatzTV.Application.Nounours
+@using ErsatzTV.Core.Domain.Filler
+@using ErsatzTV.Nounours
+@using Channel = ErsatzTV.Core.Domain.Channel
+@implements IDisposable
+@inject IMediator Mediator
+@inject IGuideService GuideService
+@inject IContentCatalog ContentCatalog
+@inject ChannelWizardService WizardService
+@inject ChannelWriter<IBackgroundServiceRequest> WorkerChannel
+@inject IJSRuntime JsRuntime
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+
+<PageTitle>Planning · ErsatzTV</PageTitle>
+
+<div class="n-page" style="max-width: none; height: 100%; overflow-y: auto">
+    <div class="n-page-header">
+        <div>
+            <h1>Planning des programmes</h1>
+            <p>@Title()</p>
+        </div>
+        <div class="d-flex gap-2 align-center flex-wrap">
+            <MudToggleGroup T="bool" Value="@_week" ValueChanged="@SetWeek" Outlined="true" Size="Size.Small" Color="Color.Primary">
+                <MudToggleItem Value="false" Text="Jour · toutes les chaînes"/>
+                <MudToggleItem Value="true" Text="Semaine · une chaîne"/>
+            </MudToggleGroup>
+            @if (_week)
+            {
+                <MudSelect T="int" Value="@_channelId" ValueChanged="@SetChannel" Label="Chaîne" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 220px">
+                    @foreach (ChannelViewModel channel in _channels)
+                    {
+                        <MudSelectItem Value="@channel.Id">@channel.Number · @channel.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+            <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small">
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" OnClick="@(() => Shift(-1))" aria-label="Précédent"/>
+                <MudButton OnClick="@Today">Aujourd'hui</MudButton>
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" OnClick="@(() => Shift(1))" aria-label="Suivant"/>
+            </MudButtonGroup>
+            <MudDatePicker Date="@_date" DateChanged="@SetDate" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 150px" DateFormat="dd/MM/yyyy" Culture="@Fr"/>
+            @if (!_week)
+            {
+                <MudSelect T="int" @bind-Value="_pxPerHour" Label="Zoom" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 110px">
+                    <MudSelectItem Value="120">Large</MudSelectItem>
+                    <MudSelectItem Value="240">Normal</MudSelectItem>
+                    <MudSelectItem Value="480">Détaillé</MudSelectItem>
+                </MudSelect>
+            }
+            <MudSwitch T="bool" Value="@_showFiller" ValueChanged="@SetFiller" Color="Color.Primary" Label="Intercalaires"/>
+        </div>
+    </div>
+
+    <div class="d-flex justify-space-between align-center mb-3 flex-wrap gap-2">
+        <div class="n-legend">
+            <span class="n-kind-movie">Film</span>
+            <span class="n-kind-episode">Épisode</span>
+            <span class="n-kind-musicvideo">Clip</span>
+            <span class="n-kind-othervideo">Autre vidéo</span>
+            <span class="n-kind-song">Musique</span>
+            <span class="n-kind-other">Autre</span>
+        </div>
+        @if (_loading)
+        {
+            <MudProgressCircular Size="Size.Small" Indeterminate="true"/>
+        }
+    </div>
+
+    @if (_channels.Count == 0 && !_loading)
+    {
+        <div class="n-empty">
+            <MudText Typo="Typo.h6">Aucune chaîne pour l'instant</MudText>
+            <MudButton Href="chaines/nouvelle" Variant="Variant.Filled" Color="Color.Primary">Créer une chaîne</MudButton>
+        </div>
+    }
+    else if (!_week)
+    {
+        double trackWidth = 24 * _pxPerHour;
+        <div class="n-epg">
+            <div class="n-epg-scroll" @ref="_scroller">
+                <div class="n-epg-row n-epg-head" style="width: @Px(trackWidth + 210)">
+                    <div class="n-epg-channel n-muted" style="font-size: .8rem">@_date?.ToString("dddd d MMMM", Fr)</div>
+                    <div class="n-epg-track" style="width: @Px(trackWidth)">
+                        @for (var h = 0; h < 24; h++)
+                        {
+                            <div class="n-epg-hour" style="left: @Px(h * _pxPerHour); width: @Px(_pxPerHour)">@($"{h:00}:00")</div>
+                        }
+                    </div>
+                </div>
+                @foreach (ChannelViewModel channel in _channels)
+                {
+                    List<GuideBlock> entries = _byChannel.GetValueOrDefault(channel.Id) ?? [];
+                    <div class="n-epg-row" style="width: @Px(trackWidth + 210)" @key="channel.Id">
+                        <div class="n-epg-channel">
+                            <img alt="" src="@LogoUrl(channel)"/>
+                            <div style="min-width: 0; flex: 1">
+                                <div class="n-channel-number">@channel.Number</div>
+                                <div style="font-size: .88rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">@channel.Name</div>
+                            </div>
+                            <MudTooltip Text="Ajouter un rendez-vous (programme à heure fixe)">
+                                <MudIconButton Icon="@Icons.Material.Filled.AddAlarm" Size="Size.Small" OnClick="@(() => OpenAdd(channel.Id, null))"/>
+                            </MudTooltip>
+                        </div>
+                        <div class="n-epg-track" style="width: @Px(trackWidth)">
+                            @for (var h = 0; h < 24; h++)
+                            {
+                                <div class="n-epg-hour" style="left: @Px(h * _pxPerHour); width: @Px(_pxPerHour); padding: 0"></div>
+                            }
+                            @if (entries.Count == 0)
+                            {
+                                <div class="n-muted" style="position: absolute; left: 12px; top: 22px; font-size: .85rem; position: sticky">
+                                    @(_playouts.ContainsKey(channel.Id) ? "Rien de programmé ce jour-là." : "Pas encore de programmation.")
+                                </div>
+                            }
+                            @foreach (GuideBlock entry in entries)
+                            {
+                                double left = Math.Max(0, (entry.Start - DayStart).TotalHours) * _pxPerHour;
+                                double right = Math.Min(24, (entry.Finish - DayStart).TotalHours) * _pxPerHour;
+                                double width = Math.Max(3, right - left - 2);
+                                <div class="n-epg-item @KindClass(entry) @(entry.IsFiller ? "is-filler" : "") @(entry.Kind == GuideEntryKind.Gap ? "is-gap" : "") @(IsNow(entry) ? "is-now" : "")"
+                                     style="left: @Px(left); width: @Px(width)"
+                                     title="@($"{entry.Start:HH:mm} – {entry.Finish:HH:mm} · {entry.DisplayTitle}")"
+                                     @onclick="@(() => _selected = entry)">
+                                    @if (width > 40)
+                                    {
+                                        <div class="n-epg-sticky">
+                                            <div class="n-epg-item-title">@entry.DisplayTitle@if (entry.Count > 1){<span class="n-epg-item-count">×@entry.Count</span>}</div>
+                                            <div class="n-epg-item-time">@entry.Start.ToString("HH:mm", Fr) – @entry.Finish.ToString("HH:mm", Fr)</div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            @if (IsToday)
+                            {
+                                <div class="n-epg-nowline" style="left: @Px((DateTimeOffset.Now - DayStart).TotalHours * _pxPerHour)"></div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        const int hourHeight = 52;
+        DateTimeOffset weekStart = WeekStart;
+        <div class="n-epg">
+            <div class="n-epg-scroll" @ref="_scroller">
+                <div class="n-week" style="min-width: 900px">
+                    <div class="n-week-dayhead"></div>
+                    @for (var d = 0; d < 7; d++)
+                    {
+                        DateTimeOffset day = weekStart.AddDays(d);
+                        <div class="n-week-dayhead" style="@(day.Date == DateTime.Today ? "color: var(--n-onair)" : "")">@day.ToString("ddd d", Fr)</div>
+                    }
+                    <div style="position: relative; height: @Px(24 * hourHeight)">
+                        @for (var h = 0; h < 24; h++)
+                        {
+                            <div class="n-week-hour" style="top: @Px(h * hourHeight)">@($"{h:00}h")</div>
+                        }
+                    </div>
+                    @for (var d = 0; d < 7; d++)
+                    {
+                        DateTimeOffset dayStart = weekStart.AddDays(d);
+                        DateTimeOffset dayEnd = dayStart.AddDays(1);
+                        <div class="n-week-col" style="height: @Px(24 * hourHeight)">
+                            @for (var h = 0; h < 24; h++)
+                            {
+                                int hour = h;
+                                <div class="n-week-hour" style="top: @Px(h * hourHeight); height: @Px(hourHeight); cursor: copy" title="Ajouter un rendez-vous à @($"{hour:00}:00")"
+                                     @ondblclick="@(() => OpenAdd(_channelId, new TimeSpan(hour, 0, 0)))"></div>
+                            }
+                            @foreach (GuideBlock entry in (_byChannel.GetValueOrDefault(_channelId) ?? []).Where(e => e.Finish > dayStart && e.Start < dayEnd))
+                            {
+                                double top = Math.Max(0, (entry.Start - dayStart).TotalHours) * hourHeight;
+                                double bottom = Math.Min(24, (entry.Finish - dayStart).TotalHours) * hourHeight;
+                                double height = Math.Max(2, bottom - top - 1);
+                                <div class="n-week-item @KindClass(entry) @(entry.IsFiller ? "is-filler" : "")" style="top: @Px(top); height: @Px(height); @(entry.IsFiller ? "opacity: .55" : "")"
+                                     title="@($"{entry.Start:HH:mm} – {entry.Finish:HH:mm} · {entry.DisplayTitle}")"
+                                     @onclick="@(() => _selected = entry)">
+                                    @if (height > 14)
+                                    {
+                                        <span class="n-week-sticky"><b>@entry.Start.ToString("HH:mm", Fr)</b> @entry.DisplayTitle @(entry.Count > 1 ? $"(×{entry.Count})" : "")</span>
+                                    }
+                                </div>
+                            }
+                            @if (dayStart.Date == DateTime.Today)
+                            {
+                                <div class="n-epg-nowline" style="height: 2px; width: auto; left: 0; right: 0; bottom: auto; top: @Px((DateTimeOffset.Now - dayStart).TotalHours * hourHeight)"></div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        <MudText Typo="Typo.caption" Class="n-muted mt-2 d-block">Astuce : double-cliquez sur une heure pour y programmer un rendez-vous quotidien.</MudText>
+    }
+</div>
+
+@* ---------- détail d'un programme ---------- *@
+@if (_selected is not null)
+{
+    ChannelViewModel channel = _channels.Find(c => c.Id == _selected.ChannelId);
+    _playouts.TryGetValue(_selected.ChannelId, out ChannelPlayoutInfo info);
+    <MudOverlay Visible="true" OnClick="@(() => _selected = null)" DarkBackground="true" ZIndex="1400"/>
+    <div class="n-card" style="position: fixed; right: 24px; top: 90px; width: 380px; max-width: calc(100vw - 48px); z-index: 1401; box-shadow: 0 20px 50px rgba(0,0,0,.45)">
+        <div class="d-flex justify-space-between align-start">
+            <div class="n-card-title @KindClass(_selected)" style="margin-bottom: 6px">
+                <span style="width: 10px; height: 10px; border-radius: 3px; background: var(--n-kind)"></span>@KindLabel(_selected)
+            </div>
+            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="@(() => _selected = null)"/>
+        </div>
+        <MudText Typo="Typo.h6" Style="line-height: 1.3">@_selected.DisplayTitle</MudText>
+        @if (_selected.Count > 1)
+        {
+            <MudText Typo="Typo.body2" Class="n-muted">@_selected.Count programmes à la suite</MudText>
+            <div style="max-height: 180px; overflow: auto; margin-top: 6px; font-size: .82rem">
+                @foreach (GuideEntry e in _selected.Items.Take(80))
+                {
+                    <div class="d-flex gap-2"><span class="n-muted" style="font-variant-numeric: tabular-nums">@e.Start.ToString("HH:mm", Fr)</span><span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">@e.DisplayTitle</span></div>
+                }
+            </div>
+        }
+        else if (_selected.Items[0].DisplayTitle != _selected.Items[0].Title)
+        {
+            <MudText Typo="Typo.body2" Class="n-muted">@_selected.Items[0].Title</MudText>
+        }
+        <MudText Class="mt-2">@_selected.Start.ToString("dddd d MMMM · HH:mm", Fr) – @_selected.Finish.ToString("HH:mm", Fr)
+            <span class="n-muted">(@Duration(_selected.Finish - _selected.Start))</span></MudText>
+        <MudText Typo="Typo.body2" Class="n-muted">@channel?.Number · @channel?.Name</MudText>
+        @if (_selected.IsFiller)
+        {
+            <MudChip T="string" Size="Size.Small" Class="mt-2 ml-0">Intercalaire : @FillerLabel(_selected.FillerKind)</MudChip>
+        }
+        <MudDivider Class="my-3"/>
+        <div class="d-flex flex-column gap-1">
+            @if (info?.ProgramScheduleId is not null)
+            {
+                <MudButton Href="@($"schedules/{info.ProgramScheduleId}/items")" StartIcon="@Icons.Material.Filled.EditCalendar" Variant="Variant.Text" Style="justify-content: flex-start">Modifier le planning « @info.ProgramScheduleName »</MudButton>
+                <MudButton OnClick="@(() => OpenAdd(_selected.ChannelId, new TimeSpan(_selected.Start.Hour, _selected.Start.Minute, 0)))" StartIcon="@Icons.Material.Filled.AddAlarm" Variant="Variant.Text" Style="justify-content: flex-start">Programmer autre chose à @_selected.Start.ToString("HH:mm", Fr)</MudButton>
+            }
+            <MudButton Href="playouts" StartIcon="@Icons.Material.Filled.List" Variant="Variant.Text" Style="justify-content: flex-start">Voir le détail du playout</MudButton>
+            <MudButton Href="@($"channels/{_selected.ChannelId}")" StartIcon="@Icons.Material.Filled.Settings" Variant="Variant.Text" Style="justify-content: flex-start">Réglages de la chaîne</MudButton>
+        </div>
+    </div>
+}
+
+@* ---------- ajout d'un rendez-vous ---------- *@
+@if (_adding is not null)
+{
+    ChannelViewModel channel = _channels.Find(c => c.Id == _addChannelId);
+    _playouts.TryGetValue(_addChannelId, out ChannelPlayoutInfo info);
+    <MudOverlay Visible="true" OnClick="@(() => _adding = null)" DarkBackground="true" ZIndex="1400"/>
+    <div class="n-card" style="position: fixed; left: 50%; top: 12vh; transform: translateX(-50%); width: 520px; max-width: calc(100vw - 32px); z-index: 1401; box-shadow: 0 20px 50px rgba(0,0,0,.45)">
+        <MudText Typo="Typo.h6">Nouveau rendez-vous sur @channel?.Name</MudText>
+        @if (info?.ProgramScheduleId is null)
+        {
+            <MudAlert Severity="Severity.Info" Class="mt-3">
+                Cette chaîne n'utilise pas un planning classique (ou n'en a pas encore).
+                <MudLink Href="@(info is null ? "playouts" : $"playouts")">Ouvrir les playouts</MudLink>
+            </MudAlert>
+        }
+        else
+        {
+            <MudText Class="n-muted mb-3" Typo="Typo.body2">Ajouté au planning « @info.ProgramScheduleName », tous les jours. La grille est ensuite reconstruite.</MudText>
+            <MudAutocomplete T="ContentChoice" Value="@_addChoice" ValueChanged="@(c => _addChoice = c)" SearchFunc="@SearchContent"
+                             ToStringFunc="@(c => c?.Label)" Label="Contenu" Variant="Variant.Outlined" MaxItems="60" Strict="false">
+                <ItemTemplate Context="c">
+                    <div>@c.Label</div>
+                    <div class="n-muted" style="font-size: .75rem">@c.Detail</div>
+                </ItemTemplate>
+            </MudAutocomplete>
+            <div class="d-flex gap-2 mt-3">
+                <MudTimePicker @bind-Time="_adding.StartTime" Label="Heure" Variant="Variant.Outlined" AmPm="false" Style="max-width: 130px"/>
+                <MudSelect T="WizardSlotMode" @bind-Value="_adding.Mode" Label="Quantité" Variant="Variant.Outlined">
+                    <MudSelectItem Value="WizardSlotMode.One">Un seul programme</MudSelectItem>
+                    <MudSelectItem Value="WizardSlotMode.Multiple">Plusieurs programmes</MudSelectItem>
+                    <MudSelectItem Value="WizardSlotMode.Duration">Pendant une durée</MudSelectItem>
+                    <MudSelectItem Value="WizardSlotMode.Flood">En continu jusqu'au rendez-vous suivant</MudSelectItem>
+                </MudSelect>
+                @if (_adding.Mode == WizardSlotMode.Multiple)
+                {
+                    <MudNumericField @bind-Value="_adding.Count" Label="Nombre" Min="1" Variant="Variant.Outlined" Style="max-width: 100px"/>
+                }
+                @if (_adding.Mode == WizardSlotMode.Duration)
+                {
+                    <MudNumericField @bind-Value="_adding.DurationMinutes" Label="Minutes" Min="1" Variant="Variant.Outlined" Style="max-width: 100px"/>
+                }
+            </div>
+            <MudSelect T="PlaybackOrder" @bind-Value="_adding.Order" Label="Ordre" Variant="Variant.Outlined" Class="mt-3">
+                <MudSelectItem Value="PlaybackOrder.Shuffle">Mélangé</MudSelectItem>
+                <MudSelectItem Value="PlaybackOrder.Chronological">Chronologique</MudSelectItem>
+                <MudSelectItem Value="PlaybackOrder.SeasonEpisode">Saison puis épisode</MudSelectItem>
+                <MudSelectItem Value="PlaybackOrder.Random">Aléatoire</MudSelectItem>
+            </MudSelect>
+            <MudTextField @bind-Value="_adding.CustomTitle" Label="Titre dans le guide (facultatif)" Variant="Variant.Outlined" Class="mt-3"/>
+        }
+        <div class="d-flex justify-end gap-2 mt-4">
+            <MudButton OnClick="@(() => _adding = null)">Annuler</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(info?.ProgramScheduleId is null || _addChoice is null || _saving)" OnClick="@SaveAdd">Programmer</MudButton>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
+
+    [SupplyParameterFromQuery(Name = "chaine")]
+    public int? ChannelQuery { get; set; }
+
+    private readonly CancellationTokenSource _cts = new();
+    private ElementReference _scroller;
+    private List<ChannelViewModel> _channels = [];
+    private Dictionary<int, List<GuideBlock>> _byChannel = new();
+    private Dictionary<int, ChannelPlayoutInfo> _playouts = new();
+    private List<ContentChoice> _choices = [];
+    private DateTime? _date = DateTime.Today;
+    private int _pxPerHour = 240;
+    private bool _week;
+    private int _channelId;
+    private bool _showFiller;
+    private bool _loading;
+    private bool _scrollPending = true;
+    private GuideBlock _selected;
+    private WizardSlot _adding;
+    private int _addChannelId;
+    private ContentChoice _addChoice;
+    private bool _saving;
+
+    private sealed record ContentChoice(ContentSourceKind Kind, int? Id, string Query, string Label, string Detail);
+
+    /// <summary>Programmes consécutifs d'un même ensemble (même série, même titre de guide) fusionnés pour rester lisibles.</summary>
+    private sealed record GuideBlock(int ChannelId, string DisplayTitle, DateTimeOffset Start, DateTimeOffset Finish, GuideEntryKind Kind, bool IsFiller, FillerKind FillerKind, List<GuideEntry> Items)
+    {
+        public int Count => Items.Count;
+    }
+
+    private static string GroupKey(GuideEntry e)
+    {
+        if (!string.IsNullOrWhiteSpace(e.CustomTitle))
+        {
+            return "c:" + e.CustomTitle;
+        }
+
+        if (e.Kind == GuideEntryKind.Episode)
+        {
+            int index = e.Title.IndexOf(" - s", StringComparison.Ordinal);
+            return "s:" + (index > 0 ? e.Title[..index] : e.Title);
+        }
+
+        // les morceaux d'un même programme coupé par des pubs ont le même titre : on les regroupe
+        return e.IsFiller ? "f:" + e.FillerKind : "t:" + e.DisplayTitle;
+    }
+
+    private static string BlockTitle(List<GuideEntry> items) =>
+        items.Count == 1 || !string.IsNullOrWhiteSpace(items[0].CustomTitle)
+            ? items[0].DisplayTitle
+            : GroupKey(items[0]) switch
+            {
+                var k when k.StartsWith("s:", StringComparison.Ordinal) => k[2..],
+                var k when k.StartsWith("f:", StringComparison.Ordinal) => "Intercalaires",
+                _ => items[0].DisplayTitle
+            };
+
+    private static List<GuideBlock> Merge(IEnumerable<GuideEntry> ordered)
+    {
+        var blocks = new List<GuideBlock>();
+        List<GuideEntry> current = [];
+        string currentKey = null;
+
+        void Flush()
+        {
+            if (current.Count == 0)
+            {
+                return;
+            }
+
+            GuideEntry first = current[0];
+            blocks.Add(new GuideBlock(first.ChannelId, BlockTitle(current), first.Start, current[^1].Finish, first.Kind, first.IsFiller, first.FillerKind, current));
+            current = [];
+        }
+
+        foreach (GuideEntry entry in ordered)
+        {
+            string key = GroupKey(entry);
+            // tolérance : les coupures pub masquées laissent quelques minutes entre deux morceaux
+            bool contiguous = current.Count > 0 && (entry.Start - current[^1].Finish).Duration() < TimeSpan.FromMinutes(entry.Kind == GuideEntryKind.Episode ? 1 : 10);
+            if (key != currentKey || !contiguous)
+            {
+                Flush();
+                currentKey = key;
+            }
+
+            current.Add(entry);
+        }
+
+        Flush();
+        return blocks;
+    }
+
+    private DateTimeOffset DayStart => new(_date ?? DateTime.Today);
+
+    private DateTimeOffset WeekStart
+    {
+        get
+        {
+            DateTime d = (_date ?? DateTime.Today).Date;
+            int offset = ((int)d.DayOfWeek + 6) % 7;
+            return new DateTimeOffset(d.AddDays(-offset));
+        }
+    }
+
+    private bool IsToday => (_date ?? DateTime.Today).Date == DateTime.Today;
+
+    protected override async Task OnInitializedAsync()
+    {
+        CancellationToken token = _cts.Token;
+        _channels = (await Mediator.Send(new GetAllChannels(), token))
+            .OrderBy(c => double.TryParse(c.Number, NumberStyles.Number, CultureInfo.InvariantCulture, out double n) ? n : 0)
+            .ToList();
+
+        string stored = await GetStorage("nounours.planning.zoom");
+        if (int.TryParse(stored, out int zoom) && zoom is 120 or 240 or 480)
+        {
+            _pxPerHour = zoom;
+        }
+
+        if (ChannelQuery.HasValue && _channels.Any(c => c.Id == ChannelQuery))
+        {
+            _week = true;
+            _channelId = ChannelQuery.Value;
+        }
+        else if (_channels.Count > 0)
+        {
+            _channelId = _channels[0].Id;
+        }
+
+        List<ContentOption> options = await ContentCatalog.GetAll(token);
+        _choices =
+        [
+            new ContentChoice(ContentSourceKind.Search, null, "type:movie", "Un film (au hasard dans la médiathèque)", "Préréglage"),
+            new ContentChoice(ContentSourceKind.Search, null, "type:episode", "Un épisode de série", "Préréglage"),
+            new ContentChoice(ContentSourceKind.Search, null, "type:music_video", "Des clips musicaux", "Préréglage"),
+            ..options.Select(o => new ContentChoice(o.Kind, o.Id, null, o.Name, o.Detail))
+        ];
+
+        await Load();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_scrollPending && !_loading && _channels.Count > 0)
+        {
+            _scrollPending = false;
+            try
+            {
+                if (_week)
+                {
+                    await JsRuntime.InvokeVoidAsync("nounours.scrollTopTo", _scroller, DateTime.Now.Hour * 52);
+                }
+                else if (IsToday)
+                {
+                    await JsRuntime.InvokeVoidAsync("nounours.scrollEpgTo", _scroller, (DateTimeOffset.Now - DayStart).TotalHours * _pxPerHour);
+                }
+            }
+            catch (JSException)
+            {
+                // ignore
+            }
+        }
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        try
+        {
+            CancellationToken token = _cts.Token;
+            _playouts = await GuideService.GetChannelPlayouts(token);
+
+            DateTimeOffset start = _week ? WeekStart : DayStart;
+            DateTimeOffset finish = start.AddDays(_week ? 7 : 1);
+            int[] ids = _week ? [_channelId] : [];
+            List<GuideEntry> entries = await GuideService.GetEntries(start, finish, ids, _showFiller, token);
+            _byChannel = entries.GroupBy(e => e.ChannelId).ToDictionary(g => g.Key, g => Merge(g.OrderBy(e => e.Start)));
+        }
+        catch (OperationCanceledException)
+        {
+            // page fermée
+        }
+        finally
+        {
+            _loading = false;
+            _scrollPending = true;
+        }
+    }
+
+    private async Task SetWeek(bool value)
+    {
+        _week = value;
+        await Load();
+    }
+
+    private async Task SetChannel(int id)
+    {
+        _channelId = id;
+        await Load();
+    }
+
+    private async Task SetFiller(bool value)
+    {
+        _showFiller = value;
+        await Load();
+    }
+
+    private async Task SetDate(DateTime? date)
+    {
+        _date = date ?? DateTime.Today;
+        await Load();
+    }
+
+    private async Task Shift(int direction)
+    {
+        _date = (_date ?? DateTime.Today).AddDays(direction * (_week ? 7 : 1));
+        await Load();
+    }
+
+    private async Task Today()
+    {
+        _date = DateTime.Today;
+        await Load();
+    }
+
+    private string Title() =>
+        _week
+            ? $"Semaine du {WeekStart.ToString("d MMMM", Fr)} · {_channels.Find(c => c.Id == _channelId)?.Name}"
+            : "Ce que diffusent toutes vos chaînes, heure par heure. Cliquez sur un programme pour le détail.";
+
+    private void OpenAdd(int channelId, TimeSpan? at)
+    {
+        _selected = null;
+        _addChannelId = channelId;
+        _addChoice = null;
+        _adding = new WizardSlot
+        {
+            FixedStart = true,
+            StartTime = at ?? new TimeSpan(20, 0, 0),
+            Mode = WizardSlotMode.One
+        };
+    }
+
+    private async Task SaveAdd()
+    {
+        if (_adding is null || _addChoice is null || !_playouts.TryGetValue(_addChannelId, out ChannelPlayoutInfo info) || info.ProgramScheduleId is null)
+        {
+            return;
+        }
+
+        _saving = true;
+        _adding.Kind = _addChoice.Kind;
+        _adding.ContentId = _addChoice.Id;
+        _adding.Query = _addChoice.Query;
+        _adding.ContentName = _addChoice.Kind == ContentSourceKind.Search ? $"{_channels.Find(c => c.Id == _addChannelId)?.Name} · {_addChoice.Label}" : _addChoice.Label;
+
+        Option<BaseError> error = await WizardService.AddSlotToChannel(info.PlayoutId, info.ProgramScheduleId.Value, _adding, WorkerChannel, _cts.Token);
+        _saving = false;
+
+        foreach (BaseError e in error)
+        {
+            Snackbar.Add($"Impossible d'ajouter le rendez-vous : {e.Value}", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Rendez-vous ajouté. La grille se reconstruit…", Severity.Success);
+        _adding = null;
+        await Task.Delay(2500);
+        await Load();
+    }
+
+    private Task<IEnumerable<ContentChoice>> SearchContent(string text, CancellationToken token) =>
+        Task.FromResult(
+            string.IsNullOrWhiteSpace(text)
+                ? _choices
+                : _choices.Where(c => c.Label.Contains(text, StringComparison.CurrentCultureIgnoreCase)));
+
+    private bool IsNow(GuideBlock entry) => entry.Start <= DateTimeOffset.Now && entry.Finish > DateTimeOffset.Now;
+
+    private static string Px(double value) => value.ToString("0.#", CultureInfo.InvariantCulture) + "px";
+
+    private static string KindClass(GuideBlock entry) =>
+        entry.Kind switch
+        {
+            GuideEntryKind.Movie => "n-kind-movie",
+            GuideEntryKind.Episode => "n-kind-episode",
+            GuideEntryKind.MusicVideo => "n-kind-musicvideo",
+            GuideEntryKind.OtherVideo => "n-kind-othervideo",
+            GuideEntryKind.Song => "n-kind-song",
+            _ => "n-kind-other"
+        };
+
+    private static string KindLabel(GuideBlock entry) =>
+        entry.Kind switch
+        {
+            GuideEntryKind.Movie => "Film",
+            GuideEntryKind.Episode => "Épisode",
+            GuideEntryKind.MusicVideo => "Clip",
+            GuideEntryKind.OtherVideo => "Vidéo",
+            GuideEntryKind.Song => "Musique",
+            GuideEntryKind.Image => "Image",
+            GuideEntryKind.RemoteStream => "Flux distant",
+            GuideEntryKind.Gap => "Hors antenne",
+            _ => "Programme"
+        };
+
+    private static string FillerLabel(FillerKind kind) =>
+        kind switch
+        {
+            FillerKind.PreRoll => "avant le programme",
+            FillerKind.MidRoll => "pendant le programme",
+            FillerKind.PostRoll => "après le programme",
+            FillerKind.Tail => "fin de créneau",
+            FillerKind.Fallback => "secours",
+            _ => kind.ToString()
+        };
+
+    private static string Duration(TimeSpan span) =>
+        span.TotalHours >= 1 ? $"{(int)span.TotalHours} h {span.Minutes:00}" : $"{Math.Max(1, (int)Math.Round(span.TotalMinutes))} min";
+
+    private static string LogoUrl(ChannelViewModel channel) =>
+        string.IsNullOrWhiteSpace(channel.Logo?.Path)
+            ? $"iptv/logos/gen?text={channel.WebEncodedName}"
+            : channel.Logo.UrlWithContentType;
+
+    private async Task<string> GetStorage(string key)
+    {
+        try
+        {
+            return await JsRuntime.InvokeAsync<string>("nounours.getStorage", key);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    public void Dispose()
+    {
+        _ = JsRuntime.InvokeVoidAsync("nounours.setStorage", "nounours.planning.zoom", _pxPerHour.ToString(CultureInfo.InvariantCulture)).AsTask().ContinueWith(_ => { }, TaskScheduler.Default);
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+
+}

@@ -1,4 +1,4 @@
-@page "/templates"
+﻿@page "/templates"
 @using ErsatzTV.Application.Scheduling
 @implements IDisposable
 @inject ILogger<Templates> Logger
@@ -10,25 +10,25 @@
 <MudForm Style="max-height: 100%">
     <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
-            <MudText Typo="Typo.h5" Class="mb-2">Template Groups</MudText>
+            <MudText Typo="Typo.h5" Class="mb-2">Groupes de modèles</MudText>
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Template Group Name</MudText>
+                    <MudText>Nom du groupe de modèles</MudText>
                 </div>
                 <MudTextField @bind-Value="_templateGroupName" For="@(() => _templateGroupName)"/>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex"></div>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(_ => AddTemplateGroup())" StartIcon="@Icons.Material.Filled.Add">
-                    Add Template Group
+                    Ajouter un groupe de modèles
                 </MudButton>
             </MudStack>
-            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Templates</MudText>
+            <MudText Typo="Typo.h5" Class="mt-10 mb-2">Modèles</MudText>
             <MudDivider Class="mb-6"/>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Template Group</MudText>
+                    <MudText>Groupe de modèles</MudText>
                 </div>
                 <MudSelect T="string" ValueChanged="@UpdateSelectedTemplateGroup">
                     @foreach (TemplateGroupViewModel templateGroup in _templateGroups)
@@ -39,14 +39,14 @@
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex">
-                    <MudText>Template Name</MudText>
+                    <MudText>Nom du modèle</MudText>
                 </div>
                 <MudTextField @bind-Value="_templateName" For="@(() => _templateName)"/>
             </MudStack>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <div class="d-flex"></div>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(_ => AddTemplate())" StartIcon="@Icons.Material.Filled.Add">
-                    Add Template
+                    Ajouter un modèle
                 </MudButton>
             </MudStack>
             <MudTable Hover="true"
@@ -67,7 +67,7 @@
                 <ToolBarContent>
                     <MudTextField T="string"
                                   ValueChanged="@(s => OnSearch(s))"
-                                  Placeholder="Search for templates"
+                                  Placeholder="Rechercher des modèles"
                                   Adornment="Adornment.Start"
                                   AdornmentIcon="@Icons.Material.Filled.FilterList"
                                   Clearable="true">
@@ -81,7 +81,7 @@
                         <div style="align-items: center; display: flex;">
                             <div style="width: 48px;"></div>
                             <div style="width: 48px;"></div>
-                            <MudTooltip Text="Delete Template Group">
+                            <MudTooltip Text="Supprimer le groupe de modèles">
                                 <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                                OnClick="@(_ => DeleteTemplateGroup(context.Items?.FirstOrDefault()))">
                                 </MudIconButton>
@@ -95,17 +95,17 @@
                         <div class="d-flex">
                             @if (context.Id >= 0)
                             {
-                                <MudTooltip Text="Edit Template">
+                                <MudTooltip Text="Modifier le modèle">
                                     <MudIconButton Icon="@Icons.Material.Filled.Edit"
                                                    Href="@($"templates/{context.Id}")">
                                     </MudIconButton>
                                 </MudTooltip>
-                                <MudTooltip Text="Copy Template">
+                                <MudTooltip Text="Copier le modèle">
                                     <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
                                                    OnClick="@(_ => CopyTemplate(context))">
                                     </MudIconButton>
                                 </MudTooltip>
-                                <MudTooltip Text="Delete Template">
+                                <MudTooltip Text="Supprimer le modèle">
                                     <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                                    OnClick="@(_ => DeleteTemplate(context))">
                                     </MudIconButton>
@@ -253,7 +253,7 @@
         var parameters = new DialogParameters { { "EntityType", "template group" }, { "EntityName", template.GroupName } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        IDialogReference dialog = await Dialog.ShowAsync<DeleteDialog>("Delete Template Group", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<DeleteDialog>("Supprimer le groupe de modèles", parameters, options);
         DialogResult result = await dialog.Result;
         if (result is not null && !result.Canceled)
         {
@@ -276,7 +276,7 @@
         var parameters = new DialogParameters { { "TemplateId", template.Id } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        IDialogReference dialog = await Dialog.ShowAsync<CopyTemplateDialog>("Copy Template", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<CopyTemplateDialog>("Copier le modèle", parameters, options);
         DialogResult dialogResult = await dialog.Result;
         if (dialogResult is { Canceled: false, Data: TemplateViewModel data })
         {
@@ -294,7 +294,7 @@
         var parameters = new DialogParameters { { "EntityType", "template" }, { "EntityName", template.Name } };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        IDialogReference dialog = await Dialog.ShowAsync<DeleteDialog>("Delete Template", parameters, options);
+        IDialogReference dialog = await Dialog.ShowAsync<DeleteDialog>("Supprimer le modèle", parameters, options);
         DialogResult result = await dialog.Result;
         if (result is not null && !result.Canceled)
         {

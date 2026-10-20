@@ -54,6 +54,11 @@ public static class FileSystemLayout
     public static readonly string GraphicsElementsScriptTemplatesFolder;
     public static readonly string GraphicsElementsSubtitleTemplatesFolder;
     public static readonly string GraphicsElementsMotionTemplatesFolder;
+    public static readonly string GraphicsElementsClockTemplatesFolder;
+    public static readonly string HabillageScenesFolder;
+    public static readonly string HabillageAssetsFolder;
+    public static readonly string ProgrammesFolder;
+    public static readonly string PluginsFolder;
 
     public static readonly string ScriptsFolder;
 
@@ -184,6 +189,13 @@ public static class FileSystemLayout
         GraphicsElementsScriptTemplatesFolder = Path.Combine(GraphicsElementsTemplatesFolder, "script");
         GraphicsElementsSubtitleTemplatesFolder = Path.Combine(GraphicsElementsTemplatesFolder, "subtitle");
         GraphicsElementsMotionTemplatesFolder = Path.Combine(GraphicsElementsTemplatesFolder, "motion");
+        GraphicsElementsClockTemplatesFolder = Path.Combine(GraphicsElementsTemplatesFolder, "clock");
+
+        HabillageScenesFolder = Path.Combine(TemplatesFolder, "habillages");
+        HabillageAssetsFolder = Path.Combine(HabillageScenesFolder, "assets");
+        ProgrammesFolder = Path.Combine(TemplatesFolder, "programmes");
+
+        PluginsFolder = Path.Combine(AppDataFolder, "plugins");
 
         ScriptsFolder = Path.Combine(AppDataFolder, "scripts");
 
