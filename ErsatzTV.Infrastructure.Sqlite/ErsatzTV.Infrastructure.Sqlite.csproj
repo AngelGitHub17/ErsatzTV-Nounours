@@ -16,6 +16,8 @@
         <PackageReference Include="EFCore.BulkExtensions.Sqlite" Version="[9.0.2,10)" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.15" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.15" />
+        <!-- corrige une faille connue de SQLite (dépendance indirecte) -->
+        <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.14" />
     </ItemGroup>
 
 
