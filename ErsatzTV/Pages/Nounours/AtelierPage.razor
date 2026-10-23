@@ -6,6 +6,7 @@
 @implements IDisposable
 @inject AtelierService Atelier
 @inject IGuideService GuideService
+@inject IAutomationService Automation
 @inject ISnackbar Snackbar
 
 <PageTitle>Atelier vidéo · ErsatzTV</PageTitle>
@@ -54,8 +55,10 @@
                             <MudTextField @bind-Value="_credits" Label="Lignes du générique" Lines="5" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"
                                           HelperText="Une ligne par crédit, « Rôle : Nom ». Elles apparaissent une à une." Immediate="true" DebounceInterval="500" @bind-Value:after="@Changed"/>
                         }
-                        <MudTextField @bind-Value="_jingle.ChannelName" Label="Nom de la chaîne (cartouche de fin, facultatif)" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"
+                        <MudTextField @bind-Value="_jingle.ChannelName" Label="Nom de la chaîne (cartouche, facultatif)" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"
                                       Immediate="true" DebounceInterval="400" @bind-Value:after="@Changed"/>
+                        <MudAutocomplete T="string" @bind-Value="_jingle.EndMessage" SearchFunc="@SearchEndMessages" CoerceValue="true" Strict="false" Label="Carton final sur fond noir (facultatif)"
+                                         Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" HelperText="Ex. SÉRIE DÉCONSEILLÉE AUX MOINS DE 12 ANS" @bind-Value:after="@Changed"/>
                     </div>
 
                     <div class="n-card">
@@ -65,7 +68,36 @@
                             <MudNumericField @bind-Value="_jingle.AudioStart" Label="Commencer à (s)" Min="0" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@string.IsNullOrEmpty(_jingle.AudioFile)" @bind-Value:after="@Changed"/>
                             <MudNumericField @bind-Value="_jingle.Duration" Label="@(string.IsNullOrEmpty(_jingle.AudioFile) ? "Durée (s)" : "Couper à (s), 0 = tout")" Min="0" Max="120" Variant="Variant.Outlined" Margin="Margin.Dense" @bind-Value:after="@Changed"/>
                         </div>
-                        <MudText Typo="Typo.body2" Class="n-muted mt-1">Les rectangles suivent les graves, les médiums et les aigus, et changent de place à chaque temps fort. Sans son : une pulsation régulière.</MudText>
+                        <MudText Typo="Typo.body2" Class="n-muted mt-1">Le quadrillage change de composition à chaque temps fort de la musique. Sans son : une pulsation régulière.</MudText>
+                    </div>
+
+                    <div class="n-card">
+                        <div class="n-card-title">Voix off (facultatif)</div>
+                        <MudSelect T="VoiceEngine" @bind-Value="_jingle.Voice.Engine" Label="Voix" Variant="Variant.Outlined" Margin="Margin.Dense">
+                            <MudSelectItem Value="@VoiceEngine.None">Pas de voix off</MudSelectItem>
+                            <MudSelectItem Value="@VoiceEngine.Windows">Voix de Windows (hors ligne)</MudSelectItem>
+                            <MudSelectItem Value="@VoiceEngine.Server">Serveur de synthèse (Chatterbox…)</MudSelectItem>
+                            <MudSelectItem Value="@VoiceEngine.File">Un son enregistré</MudSelectItem>
+                        </MudSelect>
+                        @if (_jingle.Voice.Engine is VoiceEngine.Windows or VoiceEngine.Server)
+                        {
+                            <MudTextField @bind-Value="_jingle.Voice.Text" Label="Texte lu" Placeholder="Tout de suite, Les Nounours !" Lines="2" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"/>
+                        }
+                        @if (_jingle.Voice.Engine == VoiceEngine.File)
+                        {
+                            <div class="mt-2"><SourcePicker Value="@_jingle.Voice.File" ValueChanged="@(v => _jingle.Voice.File = v)" EmptyLabel="Choisir la voix…"/></div>
+                        }
+                        @if (_jingle.Voice.Engine != VoiceEngine.None)
+                        {
+                            <div class="d-flex gap-2 align-center mt-2">
+                                <MudNumericField @bind-Value="_jingle.Voice.Start" Label="Début (s)" Min="0" Step="0.1" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 130px"/>
+                                <MudSwitch T="bool" @bind-Value="_jingle.Voice.Duck" Color="Color.Primary" Label="Baisser la musique pendant la voix"/>
+                            </div>
+                            @if (_jingle.Voice.Engine == VoiceEngine.Server)
+                            {
+                                <MudText Typo="Typo.caption" Class="n-muted">Adresse du serveur dans <MudLink Href="services" Typo="Typo.caption">Services</MudLink>.</MudText>
+                            }
+                        }
                     </div>
 
                     <div class="n-card">
@@ -180,6 +212,29 @@
             </div>
         </MudTabPanel>
 
+        @* ================================================================ SOUS-TITRES *@
+        <MudTabPanel Text="Sous-titres" Icon="@Icons.Material.Filled.ClosedCaption">
+            <div class="n-card" style="max-width: 820px">
+                <div class="n-card-title">Sous-titres automatiques</div>
+                <MudText Typo="Typo.body2" Class="mb-3">Choisissez un programme : son dialogue est transcrit par votre serveur de transcription (réglé dans <MudLink Href="services" Typo="Typo.body2">Services</MudLink>), et un fichier <code>.srt</code> est posé à côté de la vidéo. ErsatzTV le trouve à la prochaine analyse.</MudText>
+                <MudAutocomplete T="AtelierItem" Value="@_subtitleItem" ValueChanged="@(v => _subtitleItem = v)" SearchFunc="@SearchItems" ToStringFunc="@(i => i?.Title)" Label="Programme"
+                                 Variant="Variant.Outlined" Margin="Margin.Dense" DebounceInterval="300" MinCharacters="2">
+                    <ItemTemplate Context="item"><div><b>@item.Title</b> <span class="n-muted">· @item.Detail</span></div></ItemTemplate>
+                </MudAutocomplete>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-3" StartIcon="@Icons.Material.Filled.ClosedCaption" OnClick="@MakeSubtitles" Disabled="@(_subtitleItem is null || _subtitling)">
+                    @(_subtitling ? "Transcription en cours…" : "Fabriquer les sous-titres")
+                </MudButton>
+                @if (_subtitling)
+                {
+                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mt-2"/>
+                }
+                @if (!string.IsNullOrEmpty(_subtitleResult))
+                {
+                    <MudAlert Severity="@(_subtitleOk ? Severity.Success : Severity.Error)" Dense="true" Class="mt-3">@_subtitleResult</MudAlert>
+                }
+            </div>
+        </MudTabPanel>
+
         @* ================================================================ CRÉATIONS *@
         <MudTabPanel Text="Mes créations" Icon="@Icons.Material.Filled.VideoLibrary">
             @{
@@ -224,9 +279,9 @@
         (AtelierKind.FinPub, "Fin de pub", Icons.Material.Filled.Logout)
     ];
 
-    private static readonly string[] Labels = ["FILM", "SÉRIE", "CINÉMA", "SPORT", "DOCUMENTAIRE", "JEUNESSE", "MAGAZINE", "INFO", "MUSIQUE", "DESSIN ANIMÉ"];
+    private static readonly string[] Labels = ["SÉRIE", "FILM", "CINÉMA", "SPORT", "DOCUMENTAIRE", "JEUNESSE", "MAGAZINE", "INFO", "MUSIQUE", "DESSIN ANIMÉ"];
 
-    private readonly JingleSpec _jingle = new() { Label = "FILM", Title = "Le film du soir", Subtitle = "", Duration = 0 };
+    private readonly JingleSpec _jingle = new() { Label = "SÉRIE", Title = "Les Nounours", Subtitle = "", Duration = 0 };
     private readonly TrailerSpec _trailer = new() { Title = "Le film du soir", DateLine = "CE SOIR 20H40" };
     private string _credits = "Production : NounoursCorp\nRéalisation : \nMusique : ";
     private ImportRole _role = ImportRole.Jingles;
@@ -239,7 +294,7 @@
     private CancellationTokenSource _previewCts;
 
     private bool Running => _job is { State: AtelierJobState.Running };
-    private double PreviewMax => _jingle.Duration > 0 ? _jingle.Duration : string.IsNullOrEmpty(_jingle.AudioFile) ? 6 : 30;
+    private double PreviewMax => (_jingle.Duration > 0 ? _jingle.Duration : string.IsNullOrEmpty(_jingle.AudioFile) ? 6 : 30) + (string.IsNullOrWhiteSpace(_jingle.EndMessage) ? 0 : _jingle.EndSeconds);
 
     protected override async Task OnInitializedAsync()
     {
@@ -267,7 +322,7 @@
             var spec = new JingleSpec
             {
                 Kind = _jingle.Kind, Title = _jingle.Title, Subtitle = _jingle.Subtitle, Label = _jingle.Label, ChannelName = _jingle.ChannelName,
-                Credits = _jingle.Credits, AudioFile = _jingle.AudioFile, AudioStart = _jingle.AudioStart,
+                Credits = _jingle.Credits, AudioFile = _jingle.AudioFile, AudioStart = _jingle.AudioStart, EndMessage = _jingle.EndMessage, EndSeconds = _jingle.EndSeconds,
                 Duration = _jingle.Duration > 0 ? _jingle.Duration : string.IsNullOrEmpty(_jingle.AudioFile) ? 6 : 30, Style = _jingle.Style
             };
             _preview = await Atelier.PreviewJingle(spec, _previewAt, token);
@@ -297,6 +352,15 @@
 
         await Changed();
     }
+
+    private static readonly string[] EndMessages =
+    [
+        "SÉRIE DÉCONSEILLÉE AUX MOINS DE 10 ANS", "SÉRIE DÉCONSEILLÉE AUX MOINS DE 12 ANS", "SÉRIE DÉCONSEILLÉE AUX MOINS DE 16 ANS",
+        "FILM DÉCONSEILLÉ AUX MOINS DE 12 ANS", "FILM DÉCONSEILLÉ AUX MOINS DE 16 ANS", "TOUT DE SUITE", "À SUIVRE"
+    ];
+
+    private Task<IEnumerable<string>> SearchEndMessages(string text, CancellationToken token) =>
+        Task.FromResult(string.IsNullOrWhiteSpace(text) ? EndMessages.AsEnumerable() : EndMessages.Where(m => m.Contains(text, StringComparison.OrdinalIgnoreCase)).Append(text.ToUpperInvariant()).Distinct());
 
     private Task<IEnumerable<string>> SearchLabels(string text, CancellationToken token) =>
         Task.FromResult(string.IsNullOrWhiteSpace(text) ? Labels.AsEnumerable() : Labels.Where(l => l.Contains(text, StringComparison.OrdinalIgnoreCase)).Append(text.ToUpperInvariant()).Distinct());
@@ -373,6 +437,32 @@
     {
         double seconds = 2.4 + _trailer.Extracts.Sum(e => e.Length) + 3.2;
         return $"{seconds.ToString("0", Fr)} s au total";
+    }
+
+    private AtelierItem _subtitleItem;
+    private bool _subtitling;
+    private bool _subtitleOk;
+    private string _subtitleResult;
+
+    private async Task MakeSubtitles()
+    {
+        _subtitling = true;
+        _subtitleResult = null;
+        try
+        {
+            string path = await Automation.MakeSubtitles(_subtitleItem.MediaItemId, CancellationToken.None);
+            _subtitleOk = true;
+            _subtitleResult = $"Sous-titres enregistrés : {path}";
+        }
+        catch (Exception ex)
+        {
+            _subtitleOk = false;
+            _subtitleResult = ex.Message;
+        }
+        finally
+        {
+            _subtitling = false;
+        }
     }
 
     private void Delete(AtelierFile file)

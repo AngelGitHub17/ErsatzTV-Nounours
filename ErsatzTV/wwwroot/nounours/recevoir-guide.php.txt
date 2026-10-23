@@ -1,0 +1,38 @@
+<?php
+/*
+ * ErsatzTV – édition Nounours : réception du guide des programmes.
+ * À déposer sur votre site (ex. https://ntvbydidikaria.fr/guide/recevoir-guide.php).
+ * ErsatzTV y envoie le guide JSON toutes les X minutes (Services › Publication du guide).
+ * Le guide est enregistré dans guide.json, à côté de ce fichier.
+ */
+
+// Même jeton que dans ErsatzTV (Services › Publication du guide › Jeton)
+const JETON = 'CHANGEZ-MOI';
+
+header('Content-Type: text/plain; charset=utf-8');
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    exit('POST uniquement');
+}
+
+$jeton = $_SERVER['HTTP_X_NOUNOURS_TOKEN'] ?? '';
+if (!hash_equals(JETON, $jeton)) {
+    http_response_code(403);
+    exit('Jeton invalide');
+}
+
+$json = file_get_contents('php://input');
+$guide = json_decode($json, true);
+if (!is_array($guide) || !isset($guide['chaines'])) {
+    http_response_code(400);
+    exit('Guide illisible');
+}
+
+$fichier = __DIR__ . '/guide.json';
+if (file_put_contents($fichier . '.tmp', $json, LOCK_EX) === false || !rename($fichier . '.tmp', $fichier)) {
+    http_response_code(500);
+    exit('Écriture impossible (droits du dossier ?)');
+}
+
+echo 'OK ' . count($guide['chaines']) . ' chaîne(s)';

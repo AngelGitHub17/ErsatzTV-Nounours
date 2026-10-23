@@ -15,6 +15,16 @@
     }
 </div>
 <div class="d-flex gap-3 flex-wrap align-center mt-3">
+    <MudToggleGroup T="string" Value="@Style.Layout" ValueChanged="@(async v => { Style.Layout = v; await Changed.InvokeAsync(); })" Outlined="true" Size="Size.Small" Color="Color.Primary">
+        <MudToggleItem Value="@("grille")" Text="Quadrillage"/>
+        <MudToggleItem Value="@("libre")" Text="Rectangles libres"/>
+    </MudToggleGroup>
+    <MudToggleGroup T="string" Value="@Style.Format" ValueChanged="@(async v => { Style.Format = v; await Changed.InvokeAsync(); })" Outlined="true" Size="Size.Small" Color="Color.Primary">
+        <MudToggleItem Value="@("16/9")" Text="16/9"/>
+        <MudToggleItem Value="@("4/3")" Text="4/3 d'époque"/>
+    </MudToggleGroup>
+</div>
+<div class="d-flex gap-3 flex-wrap align-center mt-3">
     <MudColorPicker Value="@(new MudBlazor.Utilities.MudColor(Style.FrameColor))" ValueChanged="@(async c => { Style.FrameColor = c.Value[..7]; await Changed.InvokeAsync(); })"
                     Label="Couleur du cadre" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 190px"/>
     <MudSwitch T="bool" Value="@Style.Frame" ValueChanged="@(async v => { Style.Frame = v; await Changed.InvokeAsync(); })" Color="Color.Primary" Label="Cadre autour de l'image"/>
@@ -32,7 +42,9 @@
 
     private static readonly (string, string[])[] Palettes =
     [
-        ("Rétro 95", ["#F5B700", "#111111", "#FFFFFF", "#8A8A8A", "#1E9E4A", "#2D5BD7"]),
+        ("Rétro 95", ["#FF4000", "#C00000", "#43433B", "#FFFFFF", "#111111"]),
+        ("Jaune", ["#F5B700", "#2D5BD7", "#8A8A8A", "#FFFFFF", "#111111"]),
+        ("Vert", ["#1E9E4A", "#F5B700", "#43433B", "#FFFFFF", "#111111"]),
         ("Primaires", ["#E10600", "#FFD400", "#0047AB", "#111111", "#FFFFFF"]),
         ("Pastel", ["#F7B2BD", "#B5EAD7", "#C7CEEA", "#FFDAC1", "#E2F0CB", "#555555"]),
         ("Néon", ["#FF2BD6", "#00F0FF", "#B6FF00", "#FFE600", "#111111"]),

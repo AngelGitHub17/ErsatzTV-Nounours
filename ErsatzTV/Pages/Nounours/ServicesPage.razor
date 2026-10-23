@@ -1,0 +1,239 @@
+@page "/services"
+@using System.Globalization
+@using ErsatzTV.Application.Channels
+@using ErsatzTV.Application.Nounours
+@using ErsatzTV.Application.Nounours.Atelier
+@using ErsatzTV.Shared.Nounours
+@inject IAutomationService Automation
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+
+<PageTitle>Services automatiques · ErsatzTV</PageTitle>
+
+<div class="n-page" style="height: 100%; overflow-y: auto">
+    <div class="n-page-header">
+        <div>
+            <h1>Services automatiques</h1>
+            <p>Ce qu'ErsatzTV fait tout seul : publier le guide sur votre site, fabriquer le carton « Ce soir », supprimer les chaînes éphémères. Et les serveurs de voix off / sous-titres.</p>
+        </div>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" OnClick="@Save">Enregistrer</MudButton>
+    </div>
+
+    <MudGrid Spacing="3">
+        @* ------------------------------------------------ publication *@
+        <MudItem xs="12" lg="6">
+            <div class="n-card" style="height: 100%">
+                <div class="n-card-title">Publication du guide sur votre site</div>
+                <MudSwitch T="bool" @bind-Value="_s.Publish.Enabled" Color="Color.Primary" Label="Envoyer automatiquement le guide"/>
+                <MudTextField @bind-Value="_s.Publish.Url" Label="Adresse du script de réception" Placeholder="https://ntvbydidikaria.fr/guide/recevoir-guide.php" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"/>
+                <div class="d-flex gap-2 align-start mt-2">
+                    <MudTextField @bind-Value="_s.Publish.Token" Label="Jeton (le même que dans le script PHP)" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex: 1"/>
+                    <MudTooltip Text="Générer un jeton"><MudIconButton Icon="@Icons.Material.Filled.Key" OnClick="@NewToken" Style="margin-top: 4px"/></MudTooltip>
+                </div>
+                <div class="d-flex gap-2 mt-2">
+                    <MudNumericField @bind-Value="_s.Publish.IntervalMinutes" Label="Toutes les (minutes)" Min="5" Max="1440" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                    <MudNumericField @bind-Value="_s.Publish.Hours" Label="Heures de programme envoyées" Min="1" Max="336" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                </div>
+                <MudTextField @bind-Value="_s.PublicAddress" Label="Adresse d'ErsatzTV vue depuis Internet" Placeholder="http://mon-adresse:8409" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"
+                              HelperText="Sert aux logos et aux liens « regarder » du guide publié"/>
+                <div class="d-flex gap-2 align-center mt-3 flex-wrap">
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Send" OnClick="@PublishNow" Disabled="@_busy">Envoyer maintenant</MudButton>
+                    <a class="mud-button-root mud-button mud-button-text mud-button-text-default mud-button-text-size-medium" href="nounours/recevoir-guide.php.txt" download="recevoir-guide.php" style="padding: 6px 8px">recevoir-guide.php</a>
+                    <a class="mud-button-root mud-button mud-button-text mud-button-text-default mud-button-text-size-medium" href="nounours/guide.php.txt" download="guide.php" style="padding: 6px 8px">guide.php (page d'exemple)</a>
+                </div>
+                @if (!string.IsNullOrEmpty(_s.Publish.LastResult))
+                {
+                    <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Dernier envoi @_s.Publish.LastSent?.ToString("dd/MM HH:mm", Fr) : @_s.Publish.LastResult</MudText>
+                }
+                <MudText Typo="Typo.body2" Class="n-muted mt-2">Déposez <b>recevoir-guide.php</b> sur votre hébergement (OVH…), mettez-y le même jeton : il enregistre <code>guide.json</code>. <b>guide.php</b> en fait une page « programme TV ».</MudText>
+            </div>
+        </MudItem>
+
+        @* ------------------------------------------------ ce soir *@
+        <MudItem xs="12" lg="6">
+            <div class="n-card" style="height: 100%">
+                <div class="n-card-title">Carton « Ce soir », fabriqué chaque jour</div>
+                <MudSwitch T="bool" @bind-Value="_s.Tonight.Enabled" Color="Color.Primary" Label="Le fabriquer automatiquement"/>
+                <div class="d-flex gap-2 mt-2">
+                    <MudTextField @bind-Value="_s.Tonight.At" Label="Fabriqué à" Placeholder="17:00" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                    <MudTextField @bind-Value="_s.Tonight.From" Label="Soirée de" Placeholder="20:00" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                    <MudTextField @bind-Value="_s.Tonight.Until" Label="à" Placeholder="23:59" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                </div>
+                <div class="d-flex gap-1 flex-wrap mt-2 align-center">
+                    <span class="n-muted" style="font-size: .85rem">Chaînes :</span>
+                    @foreach (ChannelViewModel channel in _channels)
+                    {
+                        bool on = _s.Tonight.ChannelIds.Contains(channel.Id);
+                        <MudChip T="int" Size="Size.Small" Color="@(on ? Color.Primary : Color.Default)" Variant="@(on ? Variant.Filled : Variant.Outlined)"
+                                 OnClick="@(() => { if (!_s.Tonight.ChannelIds.Remove(channel.Id)) { _s.Tonight.ChannelIds.Add(channel.Id); } })">@channel.Number · @channel.Name</MudChip>
+                    }
+                </div>
+                <div class="d-flex gap-2 mt-2">
+                    <MudTextField @bind-Value="_s.Tonight.Title" Label="Titre" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                    <MudTextField @bind-Value="_s.Tonight.ChannelName" Label="Nom de la chaîne" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                    <MudNumericField @bind-Value="_s.Tonight.Seconds" Label="Durée (s)" Min="4" Max="60" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                </div>
+                <div class="mt-2"><SourcePicker Value="@_s.Tonight.Music" ValueChanged="@(v => _s.Tonight.Music = v)" EmptyLabel="Sans musique"/></div>
+                <div class="d-flex gap-2 align-center mt-3 flex-wrap">
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Preview" OnClick="@PreviewTonight">Voir la liste</MudButton>
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Movie" OnClick="@MakeTonight" Disabled="@_busy">Fabriquer maintenant</MudButton>
+                </div>
+                @if (_tonightRows is not null)
+                {
+                    <div class="mt-2" style="font-size: .9rem">
+                        @foreach ((string time, string title, string channel) in _tonightRows)
+                        {
+                            <div><b>@time</b> · @title @(channel is null ? "" : $"({channel})")</div>
+                        }
+                        @if (_tonightRows.Count == 0)
+                        {
+                            <div class="n-muted">Rien de programmé sur cette plage.</div>
+                        }
+                    </div>
+                }
+                <JobCard Job="@_job"/>
+                <MudText Typo="Typo.body2" Class="n-muted mt-2">Le carton est toujours le même fichier (« Bandes-annonces ») : mettez-le une fois dans un programme ou un créneau avant la soirée, il se met à jour tout seul chaque jour.</MudText>
+            </div>
+        </MudItem>
+
+        @* ------------------------------------------------ chaînes éphémères *@
+        <MudItem xs="12" lg="6">
+            <div class="n-card" style="height: 100%">
+                <div class="n-card-title">Chaînes éphémères</div>
+                <MudText Typo="Typo.body2" Class="n-muted mb-2">Une chaîne pour un week-end ou un événement : elle est supprimée toute seule à la date choisie (aussi réglable dans l'assistant de création).</MudText>
+                @foreach ((int id, DateTimeOffset when) in _s.EphemeralChannels.OrderBy(e => e.Value))
+                {
+                    ChannelViewModel channel = _channels.Find(c => c.Id == id);
+                    <div class="d-flex align-center gap-2 mb-1">
+                        <span style="flex: 1">@(channel is null ? $"Chaîne n° {id}" : $"{channel.Number} · {channel.Name}")</span>
+                        <span class="n-muted">supprimée le @when.ToString("dd/MM/yyyy HH:mm", Fr)</span>
+                        <MudTooltip Text="La garder"><MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="@(() => _s.EphemeralChannels.Remove(id))"/></MudTooltip>
+                    </div>
+                }
+                <div class="d-flex gap-2 align-start mt-2 flex-wrap">
+                    <MudSelect T="int" @bind-Value="_ephemeralChannel" Label="Chaîne" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 200px">
+                        @foreach (ChannelViewModel channel in _channels)
+                        {
+                            <MudSelectItem Value="@channel.Id">@channel.Number · @channel.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudDatePicker @bind-Date="_ephemeralDate" Label="Supprimer le" Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd/MM/yyyy" Culture="@Fr" MinDate="@DateTime.Today" Style="max-width: 170px"/>
+                    <MudButton Variant="Variant.Outlined" OnClick="@AddEphemeral" Disabled="@(_ephemeralChannel == 0 || _ephemeralDate is null)" Style="margin-top: 4px">Ajouter</MudButton>
+                </div>
+            </div>
+        </MudItem>
+
+        @* ------------------------------------------------ serveurs *@
+        <MudItem xs="12" lg="6">
+            <div class="n-card" style="height: 100%">
+                <div class="n-card-title">Serveurs de voix off et de sous-titres</div>
+                <MudText Typo="Typo.body2" Class="n-muted mb-2">Facultatifs. Compatibles avec l'API d'OpenAI : par exemple un serveur Chatterbox TTS (voix) et faster-whisper-server (sous-titres) sur votre Proxmox. Sous Windows, la voix intégrée marche sans serveur.</MudText>
+                <MudTextField @bind-Value="_s.Voice.Url" Label="Synthèse vocale : adresse (/v1/audio/speech)" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                <div class="d-flex gap-2 mt-2">
+                    <MudTextField @bind-Value="_s.Voice.Model" Label="Modèle" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                    <MudTextField @bind-Value="_s.Voice.VoiceName" Label="Voix" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                    <MudTextField @bind-Value="_s.Voice.ApiKey" Label="Clé (facultatif)" InputType="InputType.Password" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                </div>
+                <MudTextField @bind-Value="_s.Subtitles.Url" Label="Transcription : adresse (/v1/audio/transcriptions)" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-4"/>
+                <div class="d-flex gap-2 mt-2">
+                    <MudTextField @bind-Value="_s.Subtitles.Model" Label="Modèle" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                    <MudTextField @bind-Value="_s.Subtitles.Language" Label="Langue" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 90px"/>
+                    <MudTextField @bind-Value="_s.Subtitles.ApiKey" Label="Clé (facultatif)" InputType="InputType.Password" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                </div>
+                <MudText Typo="Typo.body2" Class="n-muted mt-2">Les sous-titres se fabriquent dans l'<MudLink Href="atelier" Typo="Typo.body2">Atelier vidéo</MudLink> (onglet « Sous-titres »).</MudText>
+            </div>
+        </MudItem>
+    </MudGrid>
+</div>
+
+@code {
+    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
+    private NounoursSettings _s = new();
+    private List<ChannelViewModel> _channels = [];
+    private List<(string Time, string Title, string Channel)> _tonightRows;
+    private AtelierJob _job;
+    private bool _busy;
+    private int _ephemeralChannel;
+    private DateTime? _ephemeralDate;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _s = NounoursSettings.Load();
+        _channels = (await Mediator.Send(new GetAllChannels()))
+            .OrderBy(c => double.TryParse(c.Number, NumberStyles.Number, CultureInfo.InvariantCulture, out double n) ? n : 0)
+            .ToList();
+    }
+
+    private void Save()
+    {
+        NounoursSettings current = _s;
+        NounoursSettings.Update(s =>
+        {
+            s.PublicAddress = current.PublicAddress;
+            s.Voice = current.Voice;
+            s.Subtitles = current.Subtitles;
+            DateTimeOffset? lastSent = s.Publish.LastSent;
+            string lastResult = s.Publish.LastResult;
+            s.Publish = current.Publish;
+            s.Publish.LastSent = lastSent;
+            s.Publish.LastResult = lastResult;
+            DateOnly? lastMade = s.Tonight.LastMade;
+            s.Tonight = current.Tonight;
+            s.Tonight.LastMade = lastMade;
+            s.EphemeralChannels = current.EphemeralChannels;
+        });
+        Snackbar.Add("Réglages enregistrés.", Severity.Success);
+    }
+
+    private void NewToken() => _s.Publish.Token = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
+
+    private async Task PublishNow()
+    {
+        Save();
+        _busy = true;
+        try
+        {
+            string result = await Automation.PublishGuide(CancellationToken.None);
+            _s = NounoursSettings.Load();
+            Snackbar.Add(result, result.StartsWith("Envoyé", StringComparison.Ordinal) ? Severity.Success : Severity.Warning);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task PreviewTonight() => _tonightRows = await Automation.TonightRows(_s.Tonight, CancellationToken.None);
+
+    private async Task MakeTonight()
+    {
+        Save();
+        _busy = true;
+        try
+        {
+            _job = await Automation.MakeTonight(CancellationToken.None);
+            _ = PollJob();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task PollJob()
+    {
+        while (_job is { State: AtelierJobState.Running })
+        {
+            await Task.Delay(1000);
+            await InvokeAsync(StateHasChanged);
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void AddEphemeral()
+    {
+        _s.EphemeralChannels[_ephemeralChannel] = new DateTimeOffset(_ephemeralDate!.Value.Date.AddDays(1).AddSeconds(-1));
+        Save();
+    }
+}

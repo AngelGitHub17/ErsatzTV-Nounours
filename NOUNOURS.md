@@ -128,6 +128,25 @@ Fabrique des vidéos au style « Rétro 95 » — un cadre clair, des **rectangl
 - Les vidéos sont rangées toutes seules dans les médias d'habillage (Jingles, Bandes-annonces, Pubs…) : elles sont tout de suite
   utilisables dans les programmes (segments Jingle, Bande-annonce…). Onglet « Mes créations » pour les revoir ou les supprimer.
 - Utilise le FFmpeg configuré dans ErsatzTV (encodeur libx264). Seuls les fichiers locaux peuvent servir d'extraits.
+- **Quadrillage** (par défaut) : l'écran est découpé en cases (3 × 3 en 4/3, 4 × 3 en 16/9) dans un cadre crème ; à chaque temps fort
+  les cases changent toutes d'un coup (damier, bloc d'angle, bande, colonne, cases éparses) en noir, blanc, orange, rouge, gris.
+  L'étiquette (SÉRIE, FILM…) s'affiche dans un bloc noir de 2 × 2 cases qui change de coin, puis vient le titre. « Rectangles libres »
+  garde l'ancien style. Format **« 4/3 d'époque »** : image 4/3 avec bandes noires sur les côtés.
+- **Carton de fin** sur fond noir (ex. « SÉRIE DÉCONSEILLÉE AUX MOINS DE 10 ANS »), durée réglable.
+- **Voix off** : texte lu par la voix de Windows (sans rien installer), par un serveur de synthèse compatible OpenAI (Chatterbox…)
+  ou un fichier enregistré ; la musique baisse toute seule pendant la voix.
+- Onglet **Sous-titres** : envoie l'audio d'un programme à un serveur de transcription (faster-whisper-server…) et range un
+  `.fr.srt` à côté de la vidéo (ErsatzTV le détecte au scan suivant).
+
+### Services automatiques (`/services`)
+Ce qu'ErsatzTV fait tout seul, vérifié chaque minute :
+- **Publication du guide sur votre site** : envoie le guide JSON (toutes les N minutes) à un petit script PHP à déposer sur votre
+  hébergement — `recevoir-guide.php` (protégé par un jeton) et `guide.php`, page « programme TV » d'exemple, téléchargeables depuis la page.
+- **Carton « Ce soir »** : fabriqué chaque jour à l'heure choisie avec les vrais programmes de la soirée (quadrillage, horaires, nom
+  de la chaîne) ; toujours le même fichier dans « Bandes-annonces », il se met à jour seul.
+- **Chaînes éphémères** : une chaîne pour un week-end ou un événement, supprimée automatiquement à la date choisie (aussi réglable
+  dans l'assistant de création).
+- Adresses des serveurs de voix off et de sous-titres (facultatifs). Réglages dans `nounours-reglages.json` (dossier de config).
 
 ### Mur de chaînes (`/mur`), grille à imprimer (`/grille`), sauvegarde (`/sauvegarde`)
 - **Mur de chaînes** : les chaînes en direct en mosaïque (2, 3 ou 4 colonnes), clic pour écouter, plein écran par vignette.

@@ -22,7 +22,13 @@ public enum AtelierKind
 public sealed class AtelierStyle
 {
     /// <summary>Couleur du cadre autour de l'image.</summary>
-    public string FrameColor { get; set; } = "#F2EFE4";
+    public string FrameColor { get; set; } = "#FFFFED";
+
+    /// <summary>« grille » : quadrillage de cases pleines qui changent à chaque temps fort (le look des années 90) ; « libre » : rectangles flottants.</summary>
+    public string Layout { get; set; } = "grille";
+
+    /// <summary>« 16/9 » ou « 4/3 » (image 4/3 au centre, bandes noires sur les côtés, comme à l'époque).</summary>
+    public string Format { get; set; } = "16/9";
 
     /// <summary>Encre des bandeaux (texte en blanc dessus).</summary>
     public string Ink { get; set; } = "#000000";
@@ -30,7 +36,8 @@ public sealed class AtelierStyle
     public string TextColor { get; set; } = "#FFFFFF";
 
     /// <summary>Couleurs des rectangles qui dansent.</summary>
-    public List<string> Palette { get; set; } = ["#F5B700", "#111111", "#FFFFFF", "#8A8A8A", "#1E9E4A", "#2D5BD7"];
+    /// <summary>En grille : 1re couleur = couleur vive principale, 2e = seconde couleur, 3e = gris ; noir et blanc sont toujours là.</summary>
+    public List<string> Palette { get; set; } = ["#FF4000", "#C00000", "#43433B", "#FFFFFF", "#111111"];
 
     /// <summary>Afficher le cadre clair autour de l'image.</summary>
     public bool Frame { get; set; } = true;
@@ -65,7 +72,43 @@ public sealed class JingleSpec
     /// <summary>Durée en secondes (sans son, ou pour couper le son plus tôt).</summary>
     public double Duration { get; set; } = 6;
 
+    /// <summary>Carton final sur fond noir (ex. « SÉRIE DÉCONSEILLÉE AUX MOINS DE 16 ANS »), vide = aucun.</summary>
+    public string EndMessage { get; set; } = string.Empty;
+
+    public double EndSeconds { get; set; } = 2.5;
+
+    /// <summary>Voix off : texte lu par une voix de synthèse, ou fichier son enregistré.</summary>
+    public VoiceOver Voice { get; set; } = new();
+
     public AtelierStyle Style { get; set; } = new();
+}
+
+public enum VoiceEngine
+{
+    /// <summary>Pas de voix off.</summary>
+    None,
+
+    /// <summary>Voix de Windows (hors ligne, ex. « Microsoft Hortense »).</summary>
+    Windows,
+
+    /// <summary>Serveur de synthèse compatible OpenAI (/v1/audio/speech), ex. Chatterbox TTS.</summary>
+    Server,
+
+    /// <summary>Un fichier son déjà enregistré (dans les sons de l'atelier).</summary>
+    File
+}
+
+public sealed class VoiceOver
+{
+    public VoiceEngine Engine { get; set; } = VoiceEngine.None;
+    public string Text { get; set; } = string.Empty;
+    public string File { get; set; } = string.Empty;
+
+    /// <summary>Début de la voix dans la vidéo, en secondes.</summary>
+    public double Start { get; set; } = 0.8;
+
+    /// <summary>Baisser la musique pendant que la voix parle.</summary>
+    public bool Duck { get; set; } = true;
 }
 
 public sealed class TrailerExtract

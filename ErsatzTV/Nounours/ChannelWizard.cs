@@ -58,6 +58,9 @@ public sealed class ChannelWizardModel
     public List<WizardSlot> Slots { get; set; } = [new()];
     public string HabillageSlug { get; set; } = string.Empty;
     public bool KeepMultiPartEpisodesTogether { get; set; } = true;
+
+    /// <summary>Chaîne éphémère : supprimée automatiquement à cette date (vide = permanente).</summary>
+    public DateTime? ExpireOn { get; set; }
 }
 
 public sealed record ChannelWizardResult(int ChannelId, int ScheduleId, int PlayoutId, List<string> Steps);
@@ -235,6 +238,14 @@ public sealed class ChannelWizardService(
                     await habillageService.Apply(scene.Slug, channelIds, cancellationToken);
                     Report($"Habillage « {scene.Name} » appliqué");
                 }
+            }
+
+            if (model.ExpireOn.HasValue)
+            {
+                var expire = new DateTimeOffset(model.ExpireOn.Value.Date.AddDays(1).AddSeconds(-1));
+                int id = channelId.Value;
+                ErsatzTV.Application.Nounours.NounoursSettings.Update(s => s.EphemeralChannels[id] = expire);
+                Report($"Chaîne éphémère : suppression automatique le {expire:dd/MM/yyyy}");
             }
 
             return new ChannelWizardResult(channelId.Value, scheduleId.Value, playoutId, steps);

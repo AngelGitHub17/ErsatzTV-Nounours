@@ -105,7 +105,8 @@ public sealed class AtelierService(
     {
         double duration = Math.Clamp(spec.Duration <= 0 ? 6 : spec.Duration, 1, 120);
         AudioAnalysis audio = await AnalysisFor(spec.AudioFile, spec.AudioStart, duration, cancellationToken);
-        int frames = Math.Max(1, (int)Math.Ceiling(audio.DurationSeconds * Fps));
+        double end = string.IsNullOrWhiteSpace(spec.EndMessage) ? 0 : Math.Clamp(spec.EndSeconds, 0.5, 10);
+        int frames = Math.Max(1, (int)Math.Ceiling((audio.DurationSeconds + end) * Fps));
         using var renderer = new RetroRenderer(spec.Style, audio, Fps, frames);
         using var bitmap = new SKBitmap(960, 540, SKColorType.Bgra8888, SKAlphaType.Premul);
         using (var canvas = new SKCanvas(bitmap))
@@ -161,7 +162,9 @@ public sealed class AtelierService(
         job.Step = hasAudio ? "Analyse du son…" : "Préparation…";
         AudioAnalysis audio = await AnalysisFor(spec.AudioFile, spec.AudioStart, max, cancellationToken);
         double duration = Math.Min(max, audio.DurationSeconds);
-        int frames = Math.Max(Fps, (int)Math.Ceiling(duration * Fps));
+        double end = string.IsNullOrWhiteSpace(spec.EndMessage) ? 0 : Math.Clamp(spec.EndSeconds, 0.5, 10);
+        double total = duration + end;
+        int frames = Math.Max(Fps, (int)Math.Ceiling(total * Fps));
 
         string output = OutputPath(role, spec.Title);
         string temp = TempPath(".mp4");
@@ -176,14 +179,33 @@ public sealed class AtelierService(
             args.AddRange(["-f", "lavfi", "-t", duration.ToString("0.###", Inv), "-i", "anullsrc=r=48000:cl=stereo"]);
         }
 
+        // la musique s'éteint à la fin du jingle ; le carton final (s'il y en a un) est silencieux
         double fadeStart = Math.Max(0, duration - 0.4);
-        args.AddRange(["-map", "0:v", "-map", "1:a", "-af", $"afade=t=out:st={fadeStart.ToString("0.###", Inv)}:d=0.4"]);
+        args.AddRange(["-map", "0:v", "-map", "1:a", "-af", $"aresample=48000,aformat=channel_layouts=stereo,afade=t=out:st={fadeStart.ToString("0.###", Inv)}:d=0.4,apad"]);
         args.AddRange(EncodeArgs());
-        args.AddRange(["-shortest", temp]);
+        args.AddRange(["-t", total.ToString("0.###", Inv), temp]);
 
         job.Step = "Fabrication des images…";
-        using var renderer = new RetroRenderer(spec.Style, audio, Fps, frames);
-        await Pipe(ffmpeg, args, frames, (canvas, frame) => renderer.DrawJingle(canvas, spec, frame), p => job.Progress = p * 0.95, cancellationToken);
+        using (var renderer = new RetroRenderer(spec.Style, audio, Fps, frames))
+        {
+            await Pipe(ffmpeg, args, frames, (canvas, frame) => renderer.DrawJingle(canvas, spec, frame), p => job.Progress = p * 0.85, cancellationToken);
+        }
+
+        if (spec.Voice is { Engine: not VoiceEngine.None })
+        {
+            job.Step = "Voix off…";
+            string voice = await MakeVoice(spec.Voice, cancellationToken);
+            string mixed = TempPath(".mp4");
+            await MixVoice(ffmpeg, temp, voice, spec.Voice, mixed, cancellationToken);
+            File.Delete(temp);
+            if (spec.Voice.Engine != VoiceEngine.File)
+            {
+                File.Delete(voice);
+            }
+
+            temp = mixed;
+            job.Progress = 0.95;
+        }
 
         await Finish(job, temp, output, role, cancellationToken);
     }
@@ -358,6 +380,48 @@ public sealed class AtelierService(
         }
     }
 
+    // ------------------------------------------------------------------ carton « Ce soir »
+
+    public const string TonightFile = FilePrefix + "ce-soir.mp4";
+
+    /// <summary>Fabrique (ou refait) le carton « Ce soir » d'après le guide ; toujours le même fichier, donc la même vidéo dans les programmes.</summary>
+    public AtelierJob StartTonight(TonightSettings settings, IReadOnlyList<(string Time, string Title, string Channel)> rows)
+    {
+        var job = new AtelierJob { Name = "Carton « Ce soir »" };
+        _jobs[job.Id] = job;
+        _ = Task.Run(() => Run(job, ct => RenderTonight(job, settings, rows, ct)));
+        return job;
+    }
+
+    private async Task RenderTonight(AtelierJob job, TonightSettings settings, IReadOnlyList<(string Time, string Title, string Channel)> rows, CancellationToken cancellationToken)
+    {
+        (string ffmpeg, _) = await Tools(cancellationToken);
+        double seconds = Math.Clamp(settings.Seconds, 4, 60);
+        string music = SourcePath(settings.Music);
+        bool hasMusic = music is not null && File.Exists(music);
+        AudioAnalysis audio = await AnalysisFor(settings.Music, 0, seconds, cancellationToken);
+        int frames = (int)Math.Ceiling(seconds * Fps);
+        string temp = TempPath(".mp4");
+        var args = new List<string> { "-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "bgra", "-s", $"{RetroRenderer.Width}x{RetroRenderer.Height}", "-r", Fps.ToString(Inv), "-i", "-" };
+        args.AddRange(hasMusic
+            ? ["-t", seconds.ToString("0.###", Inv), "-i", music]
+            : ["-f", "lavfi", "-t", seconds.ToString("0.###", Inv), "-i", "anullsrc=r=48000:cl=stereo"]);
+        args.AddRange(["-map", "0:v", "-map", "1:a", "-af", $"aresample=48000,aformat=channel_layouts=stereo,apad,afade=t=out:st={Math.Max(0, seconds - 1).ToString("0.###", Inv)}:d=1"]);
+        args.AddRange(EncodeArgs());
+        args.AddRange(["-t", seconds.ToString("0.###", Inv), temp]);
+
+        job.Step = "Fabrication des images…";
+        var style = new AtelierStyle();
+        using (var renderer = new RetroRenderer(style, audio, Fps, frames))
+        {
+            List<(string, string, string)> shown = rows.Take(6).ToList();
+            await Pipe(ffmpeg, args, frames, (canvas, frame) => renderer.DrawTonight(canvas, frame, settings.Title, shown, settings.ChannelName), p => job.Progress = p * 0.9, cancellationToken);
+        }
+
+        string output = Path.Combine(FileSystemLayout.ImportsFolder, FolderImportService.Label(ImportRole.BandesAnnonces), TonightFile);
+        await Finish(job, temp, output, ImportRole.BandesAnnonces, cancellationToken);
+    }
+
     // ------------------------------------------------------------------ programmes (pour les extraits)
 
     public async Task<List<AtelierItem>> SearchItems(string text, CancellationToken cancellationToken)
@@ -431,6 +495,98 @@ public sealed class AtelierService(
                ?? await db.Episodes.Where(m => m.Id == mediaItemId).SelectMany(m => m.MediaVersions).SelectMany(v => v.MediaFiles).Select(f => f.Path).FirstOrDefaultAsync(cancellationToken)
                ?? await db.OtherVideos.Where(m => m.Id == mediaItemId).SelectMany(m => m.MediaVersions).SelectMany(v => v.MediaFiles).Select(f => f.Path).FirstOrDefaultAsync(cancellationToken)
                ?? await db.MusicVideos.Where(m => m.Id == mediaItemId).SelectMany(m => m.MediaVersions).SelectMany(v => v.MediaFiles).Select(f => f.Path).FirstOrDefaultAsync(cancellationToken);
+    }
+
+    // ------------------------------------------------------------------ voix off
+
+    /// <summary>Fabrique la voix off (WAV) : voix de Windows, serveur de synthèse, ou fichier existant.</summary>
+    public static async Task<string> MakeVoice(VoiceOver voice, CancellationToken cancellationToken)
+    {
+        switch (voice.Engine)
+        {
+            case VoiceEngine.File:
+            {
+                string path = SourcePath(voice.File);
+                return path is not null && File.Exists(path) ? path : throw new InvalidOperationException("Fichier de voix off introuvable.");
+            }
+
+            case VoiceEngine.Windows:
+            {
+                if (!OperatingSystem.IsWindows())
+                {
+                    throw new InvalidOperationException("La voix de Windows n'est disponible que sous Windows : choisissez un serveur de synthèse ou un fichier.");
+                }
+
+                string text = TempPath(".txt");
+                string wav = TempPath(".wav");
+                await File.WriteAllTextAsync(text, voice.Text ?? string.Empty, Encoding.UTF8, cancellationToken);
+                string script =
+                    "Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+                    + "$v = $s.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Culture.Name -like 'fr*' } | Select-Object -First 1; "
+                    + "if ($v) { $s.SelectVoice($v.VoiceInfo.Name) }; "
+                    + $"$s.SetOutputToWaveFile('{wav.Replace("'", "''", StringComparison.Ordinal)}'); "
+                    + $"$s.Speak([IO.File]::ReadAllText('{text.Replace("'", "''", StringComparison.Ordinal)}', [Text.Encoding]::UTF8)); $s.Dispose()";
+                var psi = new ProcessStartInfo("powershell.exe") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true };
+                psi.ArgumentList.Add("-NoProfile");
+                psi.ArgumentList.Add("-Command");
+                psi.ArgumentList.Add(script);
+                using var process = Process.Start(psi)!;
+                string errors = await process.StandardError.ReadToEndAsync(cancellationToken);
+                await process.WaitForExitAsync(cancellationToken);
+                File.Delete(text);
+                return File.Exists(wav) && new FileInfo(wav).Length > 100
+                    ? wav
+                    : throw new InvalidOperationException($"Synthèse vocale Windows impossible : {errors.Trim()}");
+            }
+
+            case VoiceEngine.Server:
+            {
+                NounoursSettings settings = NounoursSettings.Load();
+                using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
+                if (!string.IsNullOrWhiteSpace(settings.Voice.ApiKey))
+                {
+                    http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", settings.Voice.ApiKey);
+                }
+
+                var body = new
+                {
+                    model = settings.Voice.Model,
+                    input = voice.Text ?? string.Empty,
+                    voice = settings.Voice.VoiceName,
+                    response_format = "wav"
+                };
+                using HttpResponseMessage response = await http.PostAsync(
+                    settings.Voice.Url,
+                    new StringContent(System.Text.Json.JsonSerializer.Serialize(body), Encoding.UTF8, "application/json"),
+                    cancellationToken);
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new InvalidOperationException($"Serveur de synthèse : {(int)response.StatusCode} {await response.Content.ReadAsStringAsync(cancellationToken)}");
+                }
+
+                string wav = TempPath(".wav");
+                await File.WriteAllBytesAsync(wav, await response.Content.ReadAsByteArrayAsync(cancellationToken), cancellationToken);
+                return wav;
+            }
+
+            default:
+                throw new InvalidOperationException("Pas de voix off demandée.");
+        }
+    }
+
+    /// <summary>Pose la voix sur la vidéo ; la musique baisse automatiquement quand la voix parle.</summary>
+    private static async Task MixVoice(string ffmpeg, string video, string voice, VoiceOver settings, string output, CancellationToken cancellationToken)
+    {
+        int delay = (int)(Math.Max(0, settings.Start) * 1000);
+        string voiceChain = $"[1:a]aresample=48000,aformat=channel_layouts=stereo,adelay={delay}|{delay},volume=1.5";
+        string filter = settings.Duck
+            ? voiceChain + ",asplit=2[v1][v2];[0:a][v1]sidechaincompress=threshold=0.02:ratio=8:attack=30:release=500[m];[m][v2]amix=inputs=2:duration=first:normalize=0[a]"
+            : voiceChain + "[v];[0:a][v]amix=inputs=2:duration=first:normalize=0[a]";
+        await RunFfmpeg(
+            ffmpeg,
+            ["-y", "-v", "error", "-i", video, "-i", voice, "-filter_complex", filter, "-map", "0:v", "-map", "[a]",
+                "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", output],
+            cancellationToken);
     }
 
     // ------------------------------------------------------------------ plomberie FFmpeg

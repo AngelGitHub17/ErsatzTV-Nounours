@@ -229,6 +229,11 @@
                             <MudSwitch T="bool" @bind-Value="_model.ShowInEpg" Color="Color.Primary" Label="Afficher dans le guide des programmes (XMLTV)"/>
                             <MudSwitch T="bool" @bind-Value="_model.KeepMultiPartEpisodesTogether" Color="Color.Primary" Label="Garder ensemble les épisodes en plusieurs parties"/>
                         </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudDatePicker @bind-Date="_model.ExpireOn" Label="Chaîne éphémère : la supprimer le… (facultatif)" Variant="Variant.Outlined" DateFormat="dd/MM/yyyy"
+                                           Culture="@System.Globalization.CultureInfo.GetCultureInfo("fr-FR")" MinDate="@DateTime.Today" Clearable="true"
+                                           HelperText="Pour une chaîne d'un week-end ou d'un événement : elle disparaît toute seule le soir venu"/>
+                        </MudItem>
                     </MudGrid>
                     @if (_model.StreamingMode == StreamingMode.HttpLiveStreamingDirect && (!string.IsNullOrEmpty(_model.HabillageSlug) || _model.WatermarkId.HasValue))
                     {
@@ -243,6 +248,10 @@
                         <tr><td class="n-muted" style="width: 220px">Chaîne</td><td><b>@_model.Number · @_model.Name</b> <span class="n-muted">(@_model.Group)</span></td></tr>
                         <tr><td class="n-muted">Profil</td><td>@(_profiles.Find(p => p.Id == _model.FFmpegProfileId)?.Name)</td></tr>
                         <tr><td class="n-muted">Habillage</td><td>@(string.IsNullOrEmpty(_model.HabillageSlug) ? "Aucun" : _scenes.Find(s => s.Slug == _model.HabillageSlug)?.Name)</td></tr>
+                        @if (_model.ExpireOn.HasValue)
+                        {
+                            <tr><td class="n-muted">Chaîne éphémère</td><td>supprimée le @_model.ExpireOn.Value.ToString("dd/MM/yyyy") à minuit</td></tr>
+                        }
                         @for (var i = 0; i < _model.Slots.Count; i++)
                         {
                             WizardSlot slot = _model.Slots[i];
