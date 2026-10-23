@@ -360,6 +360,7 @@ public class Startup
             FileSystemLayout.GraphicsElementsMotionTemplatesFolder,
             FileSystemLayout.GraphicsElementsClockTemplatesFolder,
             FileSystemLayout.GraphicsElementsTickerTemplatesFolder,
+            FileSystemLayout.GraphicsElementsGridTemplatesFolder,
             FileSystemLayout.HabillageScenesFolder,
             FileSystemLayout.HabillageAssetsFolder,
             FileSystemLayout.ProgrammesFolder,

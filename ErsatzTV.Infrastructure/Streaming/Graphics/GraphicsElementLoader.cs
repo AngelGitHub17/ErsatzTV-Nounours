@@ -101,6 +101,24 @@ public partial class GraphicsElementLoader(
 
                         break;
                     }
+                    case GraphicsElementKind.Grid:
+                    {
+                        Option<GridGraphicsElement> maybeElement = await GetTemplatedYaml(reference.GraphicsElement.Path, templateVariables)
+                            .BindT(FromYaml<GridGraphicsElement>);
+                        if (maybeElement.IsNone)
+                        {
+                            logger.LogWarning(
+                                "Failed to load grid graphics element from file {Path}; ignoring",
+                                reference.GraphicsElement.Path);
+                        }
+
+                        foreach (GridGraphicsElement element in maybeElement)
+                        {
+                            context.Elements.Add(new GridElementDataContext(element));
+                        }
+
+                        break;
+                    }
                     case GraphicsElementKind.Image:
                     {
                         Option<ImageGraphicsElement> maybeElement = await LoadImage(
@@ -239,7 +257,7 @@ public partial class GraphicsElementLoader(
         var epgEntries = 0;
 
         IEnumerable<PlayoutItemGraphicsElement> elementsWithEpg = elements.Where(e =>
-            e.GraphicsElement.Kind is GraphicsElementKind.Text or GraphicsElementKind.Clock or GraphicsElementKind.Ticker or GraphicsElementKind.Subtitle
+            e.GraphicsElement.Kind is GraphicsElementKind.Text or GraphicsElementKind.Clock or GraphicsElementKind.Ticker or GraphicsElementKind.Grid or GraphicsElementKind.Subtitle
                 or GraphicsElementKind.Motion or GraphicsElementKind.Script);
 
         foreach (var reference in elementsWithEpg)

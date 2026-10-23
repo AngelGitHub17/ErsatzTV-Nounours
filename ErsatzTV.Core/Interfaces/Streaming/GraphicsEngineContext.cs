@@ -32,6 +32,8 @@ public record ClockElementDataContext(ClockGraphicsElement ClockElement) : Graph
 
 public record TickerElementDataContext(TickerGraphicsElement TickerElement) : GraphicsElementContext;
 
+public record GridElementDataContext(GridGraphicsElement GridElement) : GraphicsElementContext;
+
 public record ImageElementContext(ImageGraphicsElement ImageElement) : GraphicsElementContext;
 
 public record MotionElementDataContext(MotionGraphicsElement MotionElement)

@@ -27,7 +27,13 @@ public enum HabillageItemKind
     Ticker,
 
     /// <summary>Signalétique jeunesse : rond « -10 / -12 / -16 / -18 » selon la classification du programme.</summary>
-    Rating
+    Rating,
+
+    /// <summary>Rideau quadrillé : des cases de couleur couvrent puis découvrent l'image au début et à la fin de chaque programme.</summary>
+    Curtain,
+
+    /// <summary>« Tout de suite » : bloc de cases avec le titre et l'heure du programme suivant, à la fin de chaque programme.</summary>
+    UpNext
 }
 
 public enum HabillageVisibility
@@ -100,6 +106,18 @@ public sealed class HabillageItem
     public double TickerSpeed { get; set; } = 140;
     public string TickerLabel { get; set; } = "INFO";
     public string LabelColor { get; set; } = "#F5B700";
+
+    // quadrillage (Kind = Curtain / UpNext) : couleurs des cases (#RRGGBB séparés par des virgules)
+    public string GridPalette { get; set; } = "#FF4000,#C00000,#43433B,#FFFFFF,#111111";
+    public string GridLineColor { get; set; } = "#FFFFED";
+    public double CurtainSeconds { get; set; } = 1.6;
+    public bool CurtainAtStart { get; set; } = true;
+    public bool CurtainAtEnd { get; set; } = true;
+
+    /// <summary>Ne pas jouer sur les programmes plus courts (jingles, pubs), en secondes.</summary>
+    public int MinProgramSeconds { get; set; } = 90;
+
+    public string UpNextLabel { get; set; } = "TOUT DE SUITE";
 
     // image
     public string ImagePath { get; set; } = string.Empty;
@@ -703,6 +721,12 @@ public sealed partial class HabillageService(
         return (first.GetProperty("name").GetString(), first.GetProperty("latitude").GetDouble(), first.GetProperty("longitude").GetDouble());
     }
 
+    public static List<string> GridColors(string palette) =>
+        (palette ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Where(c => SKColor.TryParse(c, out _))
+        .DefaultIfEmpty("#FF4000")
+        .ToList();
+
     public string GenerateYamlPreview(HabillageItem item) => BuildYaml(new HabillageScene { Name = "aperçu" }, item);
 
     // ------------------------------------------------------------------ YAML
@@ -719,7 +743,10 @@ public sealed partial class HabillageService(
         sb.AppendLine(CultureInfo.InvariantCulture, $"vertical_margin_percent: {Num(item.Y)}");
         sb.AppendLine(CultureInfo.InvariantCulture, $"z_index: {item.ZIndex}");
 
-        string opacityExpression = OpacityExpression(scene, item);
+        // le quadrillage gère lui-même ses moments d'apparition : seule la plage horaire de la scène s'applique
+        string opacityExpression = item.Kind is HabillageItemKind.Curtain or HabillageItemKind.UpNext
+            ? ScheduleGate(scene)
+            : OpacityExpression(scene, item);
         if (string.IsNullOrEmpty(opacityExpression))
         {
             sb.AppendLine(CultureInfo.InvariantCulture, $"opacity_percent: {Math.Clamp(item.Opacity, 0, 100)}");
@@ -731,6 +758,37 @@ public sealed partial class HabillageService(
 
         switch (item.Kind)
         {
+            case HabillageItemKind.Curtain:
+            case HabillageItemKind.UpNext:
+                sb.AppendLine(CultureInfo.InvariantCulture, $"mode: {(item.Kind == HabillageItemKind.Curtain ? "rideau" : "suivant")}");
+                sb.AppendLine("palette:");
+                foreach (string color in GridColors(item.GridPalette))
+                {
+                    sb.AppendLine(CultureInfo.InvariantCulture, $"  - {Quote(color)}");
+                }
+
+                sb.AppendLine(CultureInfo.InvariantCulture, $"line_color: {Quote(item.GridLineColor ?? string.Empty)}");
+                sb.AppendLine(CultureInfo.InvariantCulture, $"min_content_seconds: {Math.Max(0, item.MinProgramSeconds)}");
+                sb.AppendLine(CultureInfo.InvariantCulture, $"seed: {item.Id.Aggregate(7, (h, c) => (h * 31 + c) % 1000)}");
+                if (item.Kind == HabillageItemKind.Curtain)
+                {
+                    sb.AppendLine(CultureInfo.InvariantCulture, $"curtain_seconds: {Num(item.CurtainSeconds)}");
+                    sb.AppendLine(CultureInfo.InvariantCulture, $"at_start: {(item.CurtainAtStart ? "true" : "false")}");
+                    sb.AppendLine(CultureInfo.InvariantCulture, $"at_end: {(item.CurtainAtEnd ? "true" : "false")}");
+                }
+                else
+                {
+                    sb.AppendLine("epg_entries: 2");
+                    sb.AppendLine(CultureInfo.InvariantCulture, $"visible_seconds: {Math.Max(3, item.VisibleSeconds)}");
+                    sb.AppendLine(CultureInfo.InvariantCulture, $"label: {Quote(string.IsNullOrWhiteSpace(item.UpNextLabel) ? "TOUT DE SUITE" : item.UpNextLabel)}");
+                    sb.AppendLine(CultureInfo.InvariantCulture, $"width_percent: {Num(Math.Max(15, item.Width))}");
+                    // Epg[0] = le programme en cours, Epg[1] = le suivant
+                    sb.AppendLine("next_title: \"{{ if Epg.size > 1 }}{{ Epg[1].Title | string.replace '\\\"' '' }}{{ end }}\"");
+                    sb.AppendLine("next_time: \"{{ if Epg.size > 1 }}{{ format_datetime Epg[1].Start 'Europe/Paris' 'HH\\'H\\'mm' }}{{ end }}\"");
+                }
+
+                break;
+
             case HabillageItemKind.Rating:
                 // l'image dépend de la classification du programme (Scriban) ; rien n'est affiché sans classification
                 sb.AppendLine("image: \"{{ r = (MediaItem_ContentRating ?? MediaItem_ShowContentRating ?? '') | string.downcase }}"
@@ -1066,6 +1124,7 @@ public sealed partial class HabillageService(
         {
             HabillageItemKind.Clock => FileSystemLayout.GraphicsElementsClockTemplatesFolder,
             HabillageItemKind.Ticker => FileSystemLayout.GraphicsElementsTickerTemplatesFolder,
+            HabillageItemKind.Curtain or HabillageItemKind.UpNext => FileSystemLayout.GraphicsElementsGridTemplatesFolder,
             HabillageItemKind.Text => FileSystemLayout.GraphicsElementsTextTemplatesFolder,
             _ => FileSystemLayout.GraphicsElementsImageTemplatesFolder
         };
@@ -1079,7 +1138,9 @@ public sealed partial class HabillageService(
         [
             FileSystemLayout.GraphicsElementsClockTemplatesFolder,
             FileSystemLayout.GraphicsElementsTextTemplatesFolder,
-            FileSystemLayout.GraphicsElementsImageTemplatesFolder
+            FileSystemLayout.GraphicsElementsImageTemplatesFolder,
+            FileSystemLayout.GraphicsElementsTickerTemplatesFolder,
+            FileSystemLayout.GraphicsElementsGridTemplatesFolder
         ];
 
         return folders

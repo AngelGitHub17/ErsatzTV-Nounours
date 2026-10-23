@@ -138,6 +138,23 @@ Fabrique des vidéos au style « Rétro 95 » — un cadre clair, des **rectangl
 - Onglet **Sous-titres** : envoie l'audio d'un programme à un serveur de transcription (faster-whisper-server…) et range un
   `.fr.srt` à côté de la vidéo (ErsatzTV le détecte au scan suivant).
 
+- Onglet **Habillage complet** : un nom de chaîne + une musique → un jingle par genre (FILM, SÉRIE, CINÉMA, JEUNESSE… au choix),
+  les cartons « Publicité » / « Fin de la publicité » et 8 cartons de signalétique (-10 à -18, films et séries), chacun avec sa
+  propre chorégraphie. Noms de fichiers fixes : refaire le pack remplace les vidéos (les programmes qui les utilisent suivent).
+- **Programme annoncé** : en choisissant un film ou un épisode de la médiathèque, le titre, l'étiquette (FILM / SÉRIE) et le
+  **carton de signalétique** sont remplis d'après sa classification (ex. « fr/-12 » → « FILM DÉCONSEILLÉ AUX MOINS DE 12 ANS »).
+  Nouveau type **Carton** : un texte seul sur fond noir.
+- **Sons par ambiance** (Énergique, Calme, Suspense, Jeunesse, Cinéma, Pub) : filtre au-dessus du choix du son, classement de chaque
+  son. Six **boucles intégrées** sont fabriquées par le programme (synthétisées, sans droits) : Pulsation 95, Vitamine, Nuit calme,
+  Suspense, Grand écran, Coupure pub.
+
+### Quadrillage en direct (studio d'habillage)
+Deux nouveaux calques, aussi présents dans le modèle « Rétro 95 » :
+- **Rideau quadrillé** : à la fin de chaque programme, des cases de couleur couvrent l'image une à une ; au début du suivant, elles
+  la découvrent. Durée, ouverture / fermeture, couleurs et liserés réglables ; ignoré pour les programmes courts (jingles, pubs).
+- **Tout de suite** : dans les dernières secondes, un bloc de cases « TOUT DE SUITE » + titre et heure du programme suivant (guide).
+- Sous le capot : nouveau type d'élément graphique `quadrillage` (Kind 7, dossier `graphics-elements/quadrillage`).
+
 ### Services automatiques (`/services`)
 Ce qu'ErsatzTV fait tout seul, vérifié chaque minute :
 - **Publication du guide sur votre site** : envoie le guide JSON (toutes les N minutes) à un petit script PHP à déposer sur votre

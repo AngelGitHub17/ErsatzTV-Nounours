@@ -508,6 +508,13 @@ public sealed class RetroRenderer : IDisposable
     /// <summary>Une image complète d'un jingle / générique / carton.</summary>
     public void DrawJingle(SKCanvas canvas, JingleSpec spec, int frame)
     {
+        if (spec.Kind == AtelierKind.Carton)
+        {
+            DrawEndCard(canvas, spec.Title);
+            DrawFrameBorder(canvas, false);
+            return;
+        }
+
         int endFrames = string.IsNullOrWhiteSpace(spec.EndMessage) ? 0 : (int)Math.Round(Math.Clamp(spec.EndSeconds, 0.5, 10) * _fps);
         int main = Math.Max(1, _frames - endFrames);
         if (frame >= main)

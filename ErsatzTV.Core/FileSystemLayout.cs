@@ -56,6 +56,7 @@ public static class FileSystemLayout
     public static readonly string GraphicsElementsMotionTemplatesFolder;
     public static readonly string GraphicsElementsClockTemplatesFolder;
     public static readonly string GraphicsElementsTickerTemplatesFolder;
+    public static readonly string GraphicsElementsGridTemplatesFolder;
     public static readonly string HabillageScenesFolder;
     public static readonly string HabillageAssetsFolder;
     public static readonly string ProgrammesFolder;
@@ -196,6 +197,7 @@ public static class FileSystemLayout
         GraphicsElementsMotionTemplatesFolder = Path.Combine(GraphicsElementsTemplatesFolder, "motion");
         GraphicsElementsClockTemplatesFolder = Path.Combine(GraphicsElementsTemplatesFolder, "clock");
         GraphicsElementsTickerTemplatesFolder = Path.Combine(GraphicsElementsTemplatesFolder, "ticker");
+        GraphicsElementsGridTemplatesFolder = Path.Combine(GraphicsElementsTemplatesFolder, "quadrillage");
 
         HabillageScenesFolder = Path.Combine(TemplatesFolder, "habillages");
         HabillageAssetsFolder = Path.Combine(HabillageScenesFolder, "assets");

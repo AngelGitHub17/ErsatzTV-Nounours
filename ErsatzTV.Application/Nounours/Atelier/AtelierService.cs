@@ -146,7 +146,13 @@ public sealed class AtelierService(
 
     public AtelierJob StartJingle(JingleSpec spec, ImportRole role)
     {
-        var job = new AtelierJob { Name = $"{KindName(spec.Kind)} · {spec.Title}" };
+        string what = spec.Kind switch
+        {
+            AtelierKind.Jingle => $"Jingle {spec.Label} · {spec.Title}",
+            AtelierKind.DebutPub or AtelierKind.FinPub when string.IsNullOrWhiteSpace(spec.Title) => KindName(spec.Kind),
+            _ => $"{KindName(spec.Kind)} · {spec.Title}"
+        };
+        var job = new AtelierJob { Name = what };
         _jobs[job.Id] = job;
         _ = Task.Run(() => Run(job, ct => RenderJingle(job, spec, role, ct)));
         return job;
@@ -166,7 +172,9 @@ public sealed class AtelierService(
         double total = duration + end;
         int frames = Math.Max(Fps, (int)Math.Ceiling(total * Fps));
 
-        string output = OutputPath(role, spec.Title);
+        string output = string.IsNullOrWhiteSpace(spec.OutputName)
+            ? OutputPath(role, spec.Kind == AtelierKind.Jingle ? $"{spec.Label} {spec.Title}" : spec.Title)
+            : Path.Combine(FileSystemLayout.ImportsFolder, FolderImportService.Label(role), FilePrefix + Path.GetFileName(spec.OutputName));
         string temp = TempPath(".mp4");
 
         var args = new List<string> { "-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "bgra", "-s", $"{RetroRenderer.Width}x{RetroRenderer.Height}", "-r", Fps.ToString(Inv), "-i", "-" };
@@ -209,6 +217,65 @@ public sealed class AtelierService(
 
         await Finish(job, temp, output, role, cancellationToken);
     }
+
+    // ------------------------------------------------------------------ habillage complet
+
+    /// <summary>
+    ///     Tous les jingles d'une chaîne d'un coup : un jingle par étiquette (FILM, SÉRIE…), les cartons
+    ///     début / fin de pub et la signalétique. Noms de fichiers fixes : refaire le pack remplace les vidéos.
+    /// </summary>
+    public List<AtelierJob> StartPack(PackSpec pack)
+    {
+        string music = string.IsNullOrWhiteSpace(pack.Music) ? AtelierSounds.FirstOf("Énergique") : pack.Music;
+        string pubMusic = string.IsNullOrWhiteSpace(pack.PubMusic) ? AtelierSounds.FirstOf("Pub") : pack.PubMusic;
+        string slug = HabillageService.Slugify(string.IsNullOrWhiteSpace(pack.ChannelName) ? "chaine" : pack.ChannelName);
+        double seconds = Math.Clamp(pack.Seconds, 3, 30);
+        var specs = new List<(JingleSpec Spec, ImportRole Role)>();
+
+        int seed = pack.Style.Seed;
+        foreach (string label in pack.Labels.Where(l => !string.IsNullOrWhiteSpace(l)).Distinct())
+        {
+            AtelierStyle style = Clone(pack.Style);
+            style.Seed = seed++; // une chorégraphie différente par jingle
+            specs.Add((new JingleSpec
+            {
+                Kind = AtelierKind.Jingle, Label = label.Trim().ToUpperInvariant(), Title = pack.ChannelName, AudioFile = music,
+                Duration = seconds, Style = style, OutputName = $"pack-{slug}-{HabillageService.Slugify(label)}.mp4"
+            }, ImportRole.Jingles));
+        }
+
+        if (pack.Pubs)
+        {
+            foreach (AtelierKind kind in new[] { AtelierKind.DebutPub, AtelierKind.FinPub })
+            {
+                specs.Add((new JingleSpec
+                {
+                    Kind = kind, Title = string.Empty, ChannelName = pack.ChannelName, AudioFile = pubMusic, Duration = Math.Min(seconds, 5),
+                    Style = Clone(pack.Style), OutputName = $"pack-{slug}-{(kind == AtelierKind.DebutPub ? "debut-pub" : "fin-pub")}.mp4"
+                }, ImportRole.Pubs));
+            }
+        }
+
+        if (pack.Ratings)
+        {
+            foreach (string label in new[] { "FILM", "SÉRIE" })
+            {
+                foreach (int level in new[] { 10, 12, 16, 18 })
+                {
+                    specs.Add((new JingleSpec
+                    {
+                        Kind = AtelierKind.Carton, Title = Signaletique.Message(level, label), Duration = 3, Style = Clone(pack.Style),
+                        OutputName = $"pack-{slug}-signaletique-{HabillageService.Slugify(label)}-{level}.mp4"
+                    }, ImportRole.Jingles));
+                }
+            }
+        }
+
+        return specs.Select(s => StartJingle(s.Spec, s.Role)).ToList();
+    }
+
+    private static AtelierStyle Clone(AtelierStyle style) =>
+        System.Text.Json.JsonSerializer.Deserialize<AtelierStyle>(System.Text.Json.JsonSerializer.Serialize(style));
 
     // ------------------------------------------------------------------ bandes-annonces
 
@@ -437,6 +504,7 @@ public sealed class AtelierService(
         var movies = await db.Movies.AsNoTracking()
             .Where(m => m.MovieMetadata.Any(x => EF.Functions.Like(x.Title, pattern)))
             .Select(m => new { m.Id, Title = m.MovieMetadata.Select(x => x.Title).FirstOrDefault(), Year = m.MovieMetadata.Select(x => x.Year).FirstOrDefault(),
+                Rating = m.MovieMetadata.Select(x => x.ContentRating).FirstOrDefault(),
                 Path = m.MediaVersions.SelectMany(v => v.MediaFiles).Select(f => f.Path).FirstOrDefault(),
                 Duration = m.MediaVersions.Select(v => v.Duration).FirstOrDefault() })
             .Take(20).ToListAsync(cancellationToken);
@@ -445,6 +513,7 @@ public sealed class AtelierService(
             .Where(e => e.EpisodeMetadata.Any(x => EF.Functions.Like(x.Title, pattern)) ||
                         e.Season.Show.ShowMetadata.Any(x => EF.Functions.Like(x.Title, pattern)))
             .Select(e => new { e.Id, Show = e.Season.Show.ShowMetadata.Select(x => x.Title).FirstOrDefault(), Season = e.Season.SeasonNumber,
+                Rating = e.Season.Show.ShowMetadata.Select(x => x.ContentRating).FirstOrDefault(),
                 Number = e.EpisodeMetadata.Select(x => x.EpisodeNumber).FirstOrDefault(), Title = e.EpisodeMetadata.Select(x => x.Title).FirstOrDefault(),
                 Path = e.MediaVersions.SelectMany(v => v.MediaFiles).Select(f => f.Path).FirstOrDefault(),
                 Duration = e.MediaVersions.Select(v => v.Duration).FirstOrDefault() })
@@ -453,14 +522,15 @@ public sealed class AtelierService(
         var others = await db.OtherVideos.AsNoTracking()
             .Where(o => o.OtherVideoMetadata.Any(x => EF.Functions.Like(x.Title, pattern)))
             .Select(o => new { o.Id, Title = o.OtherVideoMetadata.Select(x => x.Title).FirstOrDefault(),
+                Rating = o.OtherVideoMetadata.Select(x => x.ContentRating).FirstOrDefault(),
                 Path = o.MediaVersions.SelectMany(v => v.MediaFiles).Select(f => f.Path).FirstOrDefault(),
                 Duration = o.MediaVersions.Select(v => v.Duration).FirstOrDefault() })
             .Take(20).ToListAsync(cancellationToken);
 
         var result = new List<AtelierItem>();
-        result.AddRange(movies.Select(m => new AtelierItem(m.Id, m.Title, $"Film{(m.Year.HasValue ? $" · {m.Year}" : "")} · {ContentCatalog.Format(m.Duration)}", m.Path, m.Duration.TotalSeconds)));
-        result.AddRange(episodes.Select(e => new AtelierItem(e.Id, e.Show ?? e.Title, $"S{e.Season:00}E{e.Number:00} · {e.Title} · {ContentCatalog.Format(e.Duration)}", e.Path, e.Duration.TotalSeconds)));
-        result.AddRange(others.Select(o => new AtelierItem(o.Id, o.Title, $"Vidéo · {ContentCatalog.Format(o.Duration)}", o.Path, o.Duration.TotalSeconds)));
+        result.AddRange(movies.Select(m => new AtelierItem(m.Id, m.Title, $"Film{(m.Year.HasValue ? $" · {m.Year}" : "")} · {ContentCatalog.Format(m.Duration)}", m.Path, m.Duration.TotalSeconds, "Film", m.Rating ?? "")));
+        result.AddRange(episodes.Select(e => new AtelierItem(e.Id, e.Show ?? e.Title, $"S{e.Season:00}E{e.Number:00} · {e.Title} · {ContentCatalog.Format(e.Duration)}", e.Path, e.Duration.TotalSeconds, "Série", e.Rating ?? "")));
+        result.AddRange(others.Select(o => new AtelierItem(o.Id, o.Title, $"Vidéo · {ContentCatalog.Format(o.Duration)}", o.Path, o.Duration.TotalSeconds, "Vidéo", o.Rating ?? "")));
         return result.Where(r => !string.IsNullOrWhiteSpace(r.Path)).ToList();
     }
 
@@ -770,6 +840,7 @@ public sealed class AtelierService(
             AtelierKind.Generique => "Générique",
             AtelierKind.DebutPub => "Début de pub",
             AtelierKind.FinPub => "Fin de pub",
+            AtelierKind.Carton => "Carton",
             _ => "Annonce"
         };
 }

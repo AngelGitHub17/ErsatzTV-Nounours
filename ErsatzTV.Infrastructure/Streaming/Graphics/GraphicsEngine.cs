@@ -56,6 +56,10 @@ public class GraphicsEngine(
                     elements.Add(new TickerElement(graphicsEngineFonts, tickerElementContext.TickerElement, logger));
                     break;
 
+                case GridElementDataContext gridElementContext:
+                    elements.Add(new GridElement(gridElementContext.GridElement));
+                    break;
+
                 case TextElementDataContext textElementContext:
                     elements.Add(new TextElement(graphicsEngineFonts, textElementContext.TextElement, logger));
                     break;

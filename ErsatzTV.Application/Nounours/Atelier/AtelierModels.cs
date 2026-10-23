@@ -15,7 +15,10 @@ public enum AtelierKind
     FinPub,
 
     /// <summary>Annonce simple : titre + date (« CE SOIR 20H40 »).</summary>
-    Annonce
+    Annonce,
+
+    /// <summary>Carton seul sur fond noir (signalétique « -12 », « À SUIVRE »…) : le titre est le texte affiché.</summary>
+    Carton
 }
 
 /// <summary>Le style « années 90 » : fond, encre, palette des rectangles.</summary>
@@ -79,6 +82,34 @@ public sealed class JingleSpec
 
     /// <summary>Voix off : texte lu par une voix de synthèse, ou fichier son enregistré.</summary>
     public VoiceOver Voice { get; set; } = new();
+
+    public AtelierStyle Style { get; set; } = new();
+
+    /// <summary>Nom de fichier fixe (sans dossier) : la vidéo est remplacée à chaque fabrication. Vide = nom daté.</summary>
+    public string OutputName { get; set; } = string.Empty;
+}
+
+/// <summary>Habillage complet en un clic : tous les jingles, les cartons pub et la signalétique d'une chaîne.</summary>
+public sealed class PackSpec
+{
+    public string ChannelName { get; set; } = "Ma chaîne";
+
+    /// <summary>Étiquettes des jingles avant programme (FILM, SÉRIE…).</summary>
+    public List<string> Labels { get; set; } = ["FILM", "SÉRIE", "CINÉMA", "JEUNESSE"];
+
+    public bool Pubs { get; set; } = true;
+
+    /// <summary>Cartons de signalétique (-10, -12, -16, -18) pour les films et les séries.</summary>
+    public bool Ratings { get; set; } = true;
+
+    /// <summary>Musique des jingles (vide = une boucle intégrée « Énergique »).</summary>
+    public string Music { get; set; } = string.Empty;
+
+    /// <summary>Musique des cartons pub (vide = boucle intégrée « Pub »).</summary>
+    public string PubMusic { get; set; } = string.Empty;
+
+    /// <summary>Durée de chaque jingle en secondes.</summary>
+    public double Seconds { get; set; } = 6;
 
     public AtelierStyle Style { get; set; } = new();
 }
@@ -166,4 +197,6 @@ public sealed record AtelierFile(string Name, string Path, ImportRole Role, long
 
 public sealed record AtelierSource(string Name, string Path, long Size);
 
-public sealed record AtelierItem(int MediaItemId, string Title, string Detail, string Path, double Duration);
+/// <param name="Kind">« Film », « Série » ou « Vidéo ».</param>
+/// <param name="Rating">Classification (champ « classification » de la médiathèque), peut être vide.</param>
+public sealed record AtelierItem(int MediaItemId, string Title, string Detail, string Path, double Duration, string Kind = "", string Rating = "");

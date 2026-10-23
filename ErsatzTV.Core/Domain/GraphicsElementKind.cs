@@ -8,5 +8,6 @@ public enum GraphicsElementKind
     Motion = 3,
     Script = 4,
     Clock = 5,
-    Ticker = 6
+    Ticker = 6,
+    Grid = 7
 }

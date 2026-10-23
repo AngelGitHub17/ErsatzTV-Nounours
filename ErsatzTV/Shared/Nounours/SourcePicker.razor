@@ -1,13 +1,25 @@
 @using ErsatzTV.Application.Nounours.Atelier
 @inject ISnackbar Snackbar
 
-@* Choix d'un son de l'atelier (déjà envoyé) ou envoi d'un nouveau fichier. *@
+@* Choix d'un son de l'atelier (rangés par ambiance, boucles intégrées comprises) ou envoi d'un nouveau fichier. *@
+@if (ShowAmbiances)
+{
+    <div class="d-flex gap-1 flex-wrap mb-2">
+        <MudChip T="string" Size="Size.Small" Variant="@(_filter == null ? Variant.Filled : Variant.Outlined)" Color="@(_filter == null ? Color.Primary : Color.Default)" OnClick="@(() => _filter = null)">Toutes</MudChip>
+        @foreach (string ambiance in AtelierSounds.Ambiances)
+        {
+            string a = ambiance;
+            <MudChip T="string" Size="Size.Small" Variant="@(_filter == a ? Variant.Filled : Variant.Outlined)" Color="@(_filter == a ? Color.Primary : Color.Default)" OnClick="@(() => _filter = a)">@a</MudChip>
+        }
+    </div>
+}
 <div class="d-flex gap-2 align-center flex-wrap">
     <MudSelect T="string" Value="@Value" ValueChanged="@Select" Label="Son" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex: 1; min-width: 200px">
         <MudSelectItem Value="@string.Empty">@EmptyLabel</MudSelectItem>
-        @foreach (AtelierSource source in _sources)
+        @foreach (AtelierSource source in Visible())
         {
-            <MudSelectItem Value="@source.Name">@source.Name</MudSelectItem>
+            string ambiance = _tags.GetValueOrDefault(source.Name);
+            <MudSelectItem Value="@source.Name">@AtelierSounds.DisplayName(source.Name)@(string.IsNullOrEmpty(ambiance) ? "" : $"  ·  {ambiance}")</MudSelectItem>
         }
     </MudSelect>
     <label class="d-inline-flex" style="cursor: pointer">
@@ -19,7 +31,19 @@
 </div>
 @if (!string.IsNullOrEmpty(Value))
 {
-    <audio src="@($"nounours/atelier/son?name={Uri.EscapeDataString(Value)}")" controls preload="none" style="width: 100%; margin-top: 8px; height: 36px"></audio>
+    <div class="d-flex gap-2 align-center mt-2">
+        <audio src="@($"nounours/atelier/son?name={Uri.EscapeDataString(Value)}")" controls preload="none" style="flex: 1; height: 36px"></audio>
+        @if (ShowAmbiances)
+        {
+            <MudSelect T="string" Value="@_tags.GetValueOrDefault(Value, string.Empty)" ValueChanged="@SetAmbiance" Label="Ambiance" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 150px">
+                <MudSelectItem Value="@string.Empty">Aucune</MudSelectItem>
+                @foreach (string ambiance in AtelierSounds.Ambiances)
+                {
+                    <MudSelectItem Value="@ambiance">@ambiance</MudSelectItem>
+                }
+            </MudSelect>
+        }
+    </div>
 }
 
 @code {
@@ -32,12 +56,47 @@
     [Parameter]
     public string EmptyLabel { get; set; } = "Aucun (pulsation régulière)";
 
+    /// <summary>Filtre par ambiance et classement du son choisi (désactivé pour la voix off).</summary>
+    [Parameter]
+    public bool ShowAmbiances { get; set; } = true;
+
     private List<AtelierSource> _sources = [];
+    private Dictionary<string, string> _tags = [];
+    private string _filter;
     private bool _uploading;
 
-    protected override void OnInitialized() => _sources = AtelierService.Sources();
+    protected override void OnInitialized()
+    {
+        try
+        {
+            AtelierSounds.EnsureBuiltins();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Boucles intégrées indisponibles : {ex.Message}", Severity.Warning);
+        }
+
+        Reload();
+    }
+
+    private void Reload()
+    {
+        _sources = AtelierService.Sources();
+        _tags = AtelierSounds.AllTags();
+    }
+
+    private IEnumerable<AtelierSource> Visible() =>
+        _filter is null
+            ? _sources
+            : _sources.Where(s => _tags.GetValueOrDefault(s.Name) == _filter || s.Name == Value);
 
     private Task Select(string value) => ValueChanged.InvokeAsync(value ?? string.Empty);
+
+    private void SetAmbiance(string ambiance)
+    {
+        AtelierSounds.SetAmbiance(Value, ambiance);
+        _tags = AtelierSounds.AllTags();
+    }
 
     private async Task Upload(InputFileChangeEventArgs e)
     {
@@ -46,7 +105,12 @@
         {
             await using Stream stream = e.File.OpenReadStream(300L * 1024 * 1024);
             string name = await AtelierService.SaveSource(e.File.Name, stream, CancellationToken.None);
-            _sources = AtelierService.Sources();
+            if (_filter is not null)
+            {
+                AtelierSounds.SetAmbiance(name, _filter);
+            }
+
+            Reload();
             await ValueChanged.InvokeAsync(name);
             Snackbar.Add($"« {name} » est prêt.", Severity.Success);
         }

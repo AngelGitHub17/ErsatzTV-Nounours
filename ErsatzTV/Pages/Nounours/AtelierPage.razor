@@ -33,6 +33,21 @@
                                          Icon="@icon" OnClick="@(() => SetKind(kind))">@label</MudChip>
                             }
                         </div>
+                        @if (_jingle.Kind is AtelierKind.Jingle or AtelierKind.Annonce or AtelierKind.Carton)
+                        {
+                            <MudAutocomplete T="AtelierItem" Value="@_linked" ValueChanged="@LinkProgramme" SearchFunc="@SearchItems" ToStringFunc="@(i => i?.Title)" Label="Programme annoncé (facultatif)"
+                                             Variant="Variant.Outlined" Margin="Margin.Dense" DebounceInterval="300" MinCharacters="2" Class="mt-3" Clearable="true"
+                                             HelperText="Remplit le titre, l'étiquette et la signalétique d'après la médiathèque">
+                                <ItemTemplate Context="item"><div><b>@item.Title</b> <span class="n-muted">· @item.Detail@(string.IsNullOrWhiteSpace(item.Rating) ? "" : $" · {item.Rating}")</span></div></ItemTemplate>
+                            </MudAutocomplete>
+                            @if (_linked is not null)
+                            {
+                                int level = Signaletique.Level(_linked.Rating);
+                                <MudText Typo="Typo.caption" Class="n-muted d-block">
+                                    @(level > 0 ? $"Classification « {_linked.Rating} » : carton -{level} ajouté automatiquement." : string.IsNullOrWhiteSpace(_linked.Rating) ? "Pas de classification dans la médiathèque : aucun carton de signalétique." : $"Classification « {_linked.Rating} » : tous publics, pas de carton.")
+                                </MudText>
+                            }
+                        }
                         @if (_jingle.Kind == AtelierKind.Jingle)
                         {
                             <MudAutocomplete T="string" @bind-Value="_jingle.Label" SearchFunc="@SearchLabels" CoerceValue="true" Strict="false" Label="Étiquette" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-3"
@@ -43,7 +58,7 @@
                             <MudTextField @bind-Value="_jingle.Label" Label="Étiquette" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-3" Immediate="true" DebounceInterval="400" @bind-Value:after="@Changed"
                                           HelperText="Ex. CE SOIR, PROCHAINEMENT, À L'AFFICHE"/>
                         }
-                        <MudTextField @bind-Value="_jingle.Title" Label="@(_jingle.Kind is AtelierKind.DebutPub or AtelierKind.FinPub ? "Texte (vide = PUBLICITÉ / FIN DE LA PUBLICITÉ)" : "Titre")" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-3"
+                        <MudTextField @bind-Value="_jingle.Title" Label="@(_jingle.Kind is AtelierKind.DebutPub or AtelierKind.FinPub ? "Texte (vide = PUBLICITÉ / FIN DE LA PUBLICITÉ)" : _jingle.Kind == AtelierKind.Carton ? "Texte du carton" : "Titre")" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-3"
                                       Immediate="true" DebounceInterval="400" @bind-Value:after="@Changed"/>
                         @if (_jingle.Kind is AtelierKind.Jingle or AtelierKind.Annonce)
                         {
@@ -55,10 +70,13 @@
                             <MudTextField @bind-Value="_credits" Label="Lignes du générique" Lines="5" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"
                                           HelperText="Une ligne par crédit, « Rôle : Nom ». Elles apparaissent une à une." Immediate="true" DebounceInterval="500" @bind-Value:after="@Changed"/>
                         }
+                        @if (_jingle.Kind != AtelierKind.Carton)
+                        {
                         <MudTextField @bind-Value="_jingle.ChannelName" Label="Nom de la chaîne (cartouche, facultatif)" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"
                                       Immediate="true" DebounceInterval="400" @bind-Value:after="@Changed"/>
                         <MudAutocomplete T="string" @bind-Value="_jingle.EndMessage" SearchFunc="@SearchEndMessages" CoerceValue="true" Strict="false" Label="Carton final sur fond noir (facultatif)"
                                          Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" HelperText="Ex. SÉRIE DÉCONSEILLÉE AUX MOINS DE 12 ANS" @bind-Value:after="@Changed"/>
+                        }
                     </div>
 
                     <div class="n-card">
@@ -85,7 +103,7 @@
                         }
                         @if (_jingle.Voice.Engine == VoiceEngine.File)
                         {
-                            <div class="mt-2"><SourcePicker Value="@_jingle.Voice.File" ValueChanged="@(v => _jingle.Voice.File = v)" EmptyLabel="Choisir la voix…"/></div>
+                            <div class="mt-2"><SourcePicker Value="@_jingle.Voice.File" ValueChanged="@(v => _jingle.Voice.File = v)" EmptyLabel="Choisir la voix…" ShowAmbiances="false"/></div>
                         }
                         @if (_jingle.Voice.Engine != VoiceEngine.None)
                         {
@@ -132,6 +150,84 @@
                         </div>
                     </div>
                     <JobCard Job="@_job"/>
+                </div>
+            </div>
+        </MudTabPanel>
+
+        @* ================================================================ HABILLAGE COMPLET *@
+        <MudTabPanel Text="Habillage complet" Icon="@Icons.Material.Filled.AutoAwesome">
+            <div class="n-atelier">
+                <div class="d-flex flex-column gap-3">
+                    <div class="n-card">
+                        <div class="n-card-title">Tout l'habillage de votre chaîne en un clic</div>
+                        <MudText Typo="Typo.body2" Class="mb-2">Un nom, une musique : l'atelier fabrique un jingle par genre, les cartons de pub et la signalétique, tous dans le même style. Refaire le pack remplace les anciennes vidéos.</MudText>
+                        <MudTextField @bind-Value="_pack.ChannelName" Label="Nom de la chaîne" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                        <MudText Typo="Typo.caption" Class="n-muted d-block mt-3">Jingles avant programme</MudText>
+                        <div class="d-flex gap-1 flex-wrap">
+                            @foreach (string label in Labels)
+                            {
+                                string l = label;
+                                bool on = _pack.Labels.Contains(l);
+                                <MudChip T="string" Size="Size.Small" Variant="@(on ? Variant.Filled : Variant.Outlined)" Color="@(on ? Color.Primary : Color.Default)"
+                                         OnClick="@(() => { if (on) _pack.Labels.Remove(l); else _pack.Labels.Add(l); })">@l</MudChip>
+                            }
+                        </div>
+                        <MudSwitch T="bool" @bind-Value="_pack.Pubs" Color="Color.Primary" Label="Cartons « Publicité » et « Fin de la publicité »" Class="mt-2"/>
+                        <MudSwitch T="bool" @bind-Value="_pack.Ratings" Color="Color.Primary" Label="Cartons de signalétique (-10, -12, -16, -18 · films et séries)"/>
+                        <MudNumericField @bind-Value="_pack.Seconds" Label="Durée d'un jingle (s)" Min="3" Max="30" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" Style="max-width: 200px"/>
+                    </div>
+                    <div class="n-card">
+                        <div class="n-card-title">La musique</div>
+                        <MudText Typo="Typo.caption" Class="n-muted d-block">Jingles</MudText>
+                        <SourcePicker Value="@_pack.Music" ValueChanged="@(v => _pack.Music = v)" EmptyLabel="Automatique : une musique « Énergique »"/>
+                        @if (_pack.Pubs)
+                        {
+                            <MudText Typo="Typo.caption" Class="n-muted d-block mt-3">Cartons pub</MudText>
+                            <SourcePicker Value="@_pack.PubMusic" ValueChanged="@(v => _pack.PubMusic = v)" EmptyLabel="Automatique : une musique « Pub »"/>
+                        }
+                    </div>
+                    <div class="n-card">
+                        <div class="n-card-title">Le style</div>
+                        <StylePicker Style="@_pack.Style"/>
+                    </div>
+                </div>
+                <div class="d-flex flex-column gap-3">
+                    <div class="n-card">
+                        <div class="n-card-title">Ce qui sera fabriqué · @PackCount() vidéos</div>
+                        <ul style="margin: 0 0 0 18px">
+                            @foreach (string label in _pack.Labels)
+                            {
+                                <li>Jingle <b>@label</b> · @_pack.ChannelName</li>
+                            }
+                            @if (_pack.Pubs)
+                            {
+                                <li>Début et fin de pub</li>
+                            }
+                            @if (_pack.Ratings)
+                            {
+                                <li>8 cartons de signalétique (ex. « @Signaletique.Message(12, "SÉRIE") »)</li>
+                            }
+                        </ul>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" Class="mt-3" StartIcon="@Icons.Material.Filled.AutoAwesome"
+                                   OnClick="@CreatePack" Disabled="@(PackRunning || PackCount() == 0 || string.IsNullOrWhiteSpace(_pack.ChannelName))">Fabriquer tout l'habillage</MudButton>
+                        <MudText Typo="Typo.body2" Class="n-muted mt-1">Les vidéos se fabriquent l'une après l'autre (quelques secondes chacune) et sont rangées dans Jingles et Pubs.</MudText>
+                    </div>
+                    @if (_packJobs.Count > 0)
+                    {
+                        <div class="n-card">
+                            <div class="n-card-title">Avancement · @_packJobs.Count(j => j.State == AtelierJobState.Done) / @_packJobs.Count</div>
+                            <MudProgressLinear Color="Color.Primary" Value="@(_packJobs.Sum(j => j.State == AtelierJobState.Running ? j.Progress : 1) * 100 / _packJobs.Count)" Class="mb-2"/>
+                            @foreach (AtelierJob job in _packJobs)
+                            {
+                                <div class="d-flex align-center gap-2" style="font-size: .85rem">
+                                    <MudIcon Size="Size.Small" Icon="@(job.State switch { AtelierJobState.Done => Icons.Material.Filled.CheckCircle, AtelierJobState.Failed => Icons.Material.Filled.Error, _ => Icons.Material.Filled.HourglassTop })"
+                                             Color="@(job.State switch { AtelierJobState.Done => Color.Success, AtelierJobState.Failed => Color.Error, _ => Color.Default })"/>
+                                    <span style="flex: 1">@job.Name</span>
+                                    <span class="n-muted">@(job.State == AtelierJobState.Failed ? job.Error : job.Step)</span>
+                                </div>
+                            }
+                        </div>
+                    }
                 </div>
             </div>
         </MudTabPanel>
@@ -276,7 +372,8 @@
         (AtelierKind.Generique, "Générique", Icons.Material.Filled.Subtitles),
         (AtelierKind.Annonce, "Annonce", Icons.Material.Filled.Campaign),
         (AtelierKind.DebutPub, "Début de pub", Icons.Material.Filled.Login),
-        (AtelierKind.FinPub, "Fin de pub", Icons.Material.Filled.Logout)
+        (AtelierKind.FinPub, "Fin de pub", Icons.Material.Filled.Logout),
+        (AtelierKind.Carton, "Carton (signalétique…)", Icons.Material.Filled.Rectangle)
     ];
 
     private static readonly string[] Labels = ["SÉRIE", "FILM", "CINÉMA", "SPORT", "DOCUMENTAIRE", "JEUNESSE", "MAGAZINE", "INFO", "MUSIQUE", "DESSIN ANIMÉ"];
@@ -323,7 +420,7 @@
             {
                 Kind = _jingle.Kind, Title = _jingle.Title, Subtitle = _jingle.Subtitle, Label = _jingle.Label, ChannelName = _jingle.ChannelName,
                 Credits = _jingle.Credits, AudioFile = _jingle.AudioFile, AudioStart = _jingle.AudioStart, EndMessage = _jingle.EndMessage, EndSeconds = _jingle.EndSeconds,
-                Duration = _jingle.Duration > 0 ? _jingle.Duration : string.IsNullOrEmpty(_jingle.AudioFile) ? 6 : 30, Style = _jingle.Style
+                Duration = _jingle.Kind == AtelierKind.Carton ? 3 : _jingle.Duration > 0 ? _jingle.Duration : string.IsNullOrEmpty(_jingle.AudioFile) ? 6 : 30, Style = _jingle.Style
             };
             _preview = await Atelier.PreviewJingle(spec, _previewAt, token);
         }
@@ -337,9 +434,45 @@
         }
     }
 
+    private AtelierItem _linked;
+
+    /// <summary>Programme choisi : titre, étiquette FILM / SÉRIE et carton de signalétique d'après sa classification.</summary>
+    private async Task LinkProgramme(AtelierItem item)
+    {
+        _linked = item;
+        if (item is null)
+        {
+            return;
+        }
+
+        string label = item.Kind switch { "Film" => "FILM", "Série" => "SÉRIE", _ => "PROGRAMME" };
+        string message = Signaletique.Message(Signaletique.Level(item.Rating), label);
+        if (_jingle.Kind == AtelierKind.Carton)
+        {
+            _jingle.Title = string.IsNullOrEmpty(message) ? _jingle.Title : message;
+        }
+        else
+        {
+            _jingle.Title = item.Title;
+            if (_jingle.Kind == AtelierKind.Jingle && label != "PROGRAMME")
+            {
+                _jingle.Label = label;
+            }
+
+            _jingle.EndMessage = message;
+        }
+
+        await Changed();
+    }
+
     private async Task SetKind(AtelierKind kind)
     {
         _jingle.Kind = kind;
+        if (kind == AtelierKind.Carton && (string.IsNullOrWhiteSpace(_jingle.Title) || _jingle.Title == "Les Nounours"))
+        {
+            _jingle.Title = "SÉRIE DÉCONSEILLÉE AUX MOINS DE 12 ANS";
+        }
+
         _role = kind is AtelierKind.DebutPub or AtelierKind.FinPub ? ImportRole.Pubs : ImportRole.Jingles;
         if (kind == AtelierKind.Annonce && Labels.Contains(_jingle.Label))
         {
@@ -371,7 +504,26 @@
             ? (_credits ?? string.Empty).Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Where(l => !l.EndsWith(':')).ToList()
             : [];
         var spec = System.Text.Json.JsonSerializer.Deserialize<JingleSpec>(System.Text.Json.JsonSerializer.Serialize(_jingle));
+        if (spec.Kind == AtelierKind.Carton)
+        {
+            spec.Duration = spec.Duration is > 0 and <= 10 ? spec.Duration : 3;
+            spec.AudioFile = string.Empty;
+            spec.EndMessage = string.Empty;
+        }
+
         _job = Atelier.StartJingle(spec, _role);
+    }
+
+    private readonly PackSpec _pack = new() { ChannelName = "Nounours TV" };
+    private List<AtelierJob> _packJobs = [];
+    private bool PackRunning => _packJobs.Any(j => j.State == AtelierJobState.Running);
+
+    private int PackCount() => _pack.Labels.Count + (_pack.Pubs ? 2 : 0) + (_pack.Ratings ? 8 : 0);
+
+    private void CreatePack()
+    {
+        var spec = System.Text.Json.JsonSerializer.Deserialize<PackSpec>(System.Text.Json.JsonSerializer.Serialize(_pack));
+        _packJobs = Atelier.StartPack(spec);
     }
 
     private void CreateTrailer()
