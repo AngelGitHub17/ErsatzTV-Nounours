@@ -1,0 +1,125 @@
+@page "/grille"
+@using System.Globalization
+@using ErsatzTV.Application.Channels
+@using ErsatzTV.Application.Nounours
+@inject IMediator Mediator
+@inject IGuideService GuideService
+@inject IJSRuntime Js
+@inject NavigationManager Navigation
+
+<PageTitle>Grille des programmes · ErsatzTV</PageTitle>
+
+<div class="n-page n-print" style="height: 100%; overflow-y: auto">
+    <div class="n-page-header n-noprint">
+        <div>
+            <h1>Grille à imprimer</h1>
+            <p>Le programme de vos chaînes jour par jour, prêt à imprimer ou à enregistrer en PDF (et à mettre sur votre site).</p>
+        </div>
+        <div class="d-flex gap-2 align-center flex-wrap">
+            <MudDatePicker Date="@_from" DateChanged="@(async d => { _from = d ?? DateTime.Today; await Load(); })" Label="À partir du" Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd/MM/yyyy" Culture="@Fr" Style="max-width: 160px"/>
+            <MudSelect T="int" Value="@_days" ValueChanged="@(async v => { _days = v; await Load(); })" Label="Durée" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 130px">
+                <MudSelectItem Value="1">1 jour</MudSelectItem>
+                <MudSelectItem Value="3">3 jours</MudSelectItem>
+                <MudSelectItem Value="7">1 semaine</MudSelectItem>
+            </MudSelect>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Print" OnClick="@(() => Js.InvokeVoidAsync("nounours.print"))">Imprimer / PDF</MudButton>
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.DataObject" Href="@($"{Navigation.BaseUri}iptv/nounours/epg.json?heures={_days * 24}")" Target="_blank">Guide JSON</MudButton>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 flex-wrap mb-4 n-noprint">
+        @foreach (ChannelViewModel channel in _channels)
+        {
+            bool on = !_hidden.Contains(channel.Id);
+            <MudChip T="int" Size="Size.Small" Color="@(on ? Color.Primary : Color.Default)" Variant="@(on ? Variant.Filled : Variant.Outlined)"
+                     OnClick="@(() => { if (!_hidden.Remove(channel.Id)) { _hidden.Add(channel.Id); } })">@channel.Number · @channel.Name</MudChip>
+        }
+    </div>
+
+    @if (_entries is null)
+    {
+        <MudProgressLinear Indeterminate="true"/>
+    }
+    else
+    {
+        <div class="n-print-title">Programmes du @_from.ToString("dddd d MMMM", Fr)@(_days > 1 ? $" au {_from.AddDays(_days - 1).ToString("dddd d MMMM yyyy", Fr)}" : _from.ToString(" yyyy", Fr))</div>
+        @for (int d = 0; d < _days; d++)
+        {
+            DateTime day = _from.AddDays(d);
+            <div class="n-print-day">
+                <h2>@Fr.TextInfo.ToTitleCase(day.ToString("dddd d MMMM", Fr))</h2>
+                <div class="n-print-channels">
+                    @foreach (ChannelViewModel channel in _channels.Where(c => !_hidden.Contains(c.Id)))
+                    {
+                        List<(DateTimeOffset Start, string Title, int Count)> rows = Rows(channel.Id, day);
+                        <div class="n-print-channel">
+                            <h3>@channel.Number · @channel.Name</h3>
+                            @if (rows.Count == 0)
+                            {
+                                <div class="n-muted">Pas de programme.</div>
+                            }
+                            @foreach ((DateTimeOffset start, string title, int count) in rows)
+                            {
+                                <div class="n-print-row"><b>@start.ToString("HH:mm", Fr)</b><span>@title@(count > 1 ? $" ({count} épisodes)" : "")</span></div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
+    private List<ChannelViewModel> _channels = [];
+    private readonly System.Collections.Generic.HashSet<int> _hidden = [];
+    private List<GuideEntry> _entries;
+    private DateTime _from = DateTime.Today;
+    private int _days = 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _channels = (await Mediator.Send(new GetAllChannels()))
+            .Where(c => c.PlayoutCount > 0)
+            .OrderBy(c => double.TryParse(c.Number, NumberStyles.Number, CultureInfo.InvariantCulture, out double n) ? n : 0)
+            .ToList();
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _entries = null;
+        var start = new DateTimeOffset(_from.Date);
+        _entries = await GuideService.GetEntries(start, start.AddDays(_days), [], includeFiller: false, CancellationToken.None);
+    }
+
+    // programmes consécutifs du même titre regroupés (« Les Nounours (6 épisodes) »)
+    private List<(DateTimeOffset, string, int)> Rows(int channelId, DateTime day)
+    {
+        var result = new List<(DateTimeOffset, string, int)>();
+        foreach (GuideEntry entry in _entries
+                     .Where(e => e.ChannelId == channelId && e.Kind != GuideEntryKind.Gap && e.Start.ToLocalTime().Date == day.Date)
+                     .OrderBy(e => e.Start))
+        {
+            string title = GroupTitle(entry);
+            if (result.Count > 0 && result[^1].Item2 == title)
+            {
+                result[^1] = (result[^1].Item1, title, result[^1].Item3 + 1);
+            }
+            else
+            {
+                result.Add((entry.Start.ToLocalTime(), title, 1));
+            }
+        }
+
+        return result;
+    }
+
+    private static string GroupTitle(GuideEntry entry)
+    {
+        string title = entry.DisplayTitle ?? string.Empty;
+        int dash = title.IndexOf(" - ", StringComparison.Ordinal);
+        return entry.Kind == GuideEntryKind.Episode && dash > 0 ? title[..dash] : title;
+    }
+}

@@ -83,6 +83,24 @@ public partial class GraphicsElementLoader(
 
                         break;
                     }
+                    case GraphicsElementKind.Ticker:
+                    {
+                        Option<TickerGraphicsElement> maybeElement = await GetTemplatedYaml(reference.GraphicsElement.Path, templateVariables)
+                            .BindT(FromYaml<TickerGraphicsElement>);
+                        if (maybeElement.IsNone)
+                        {
+                            logger.LogWarning(
+                                "Failed to load ticker graphics element from file {Path}; ignoring",
+                                reference.GraphicsElement.Path);
+                        }
+
+                        foreach (TickerGraphicsElement element in maybeElement)
+                        {
+                            context.Elements.Add(new TickerElementDataContext(element));
+                        }
+
+                        break;
+                    }
                     case GraphicsElementKind.Image:
                     {
                         Option<ImageGraphicsElement> maybeElement = await LoadImage(
@@ -221,7 +239,7 @@ public partial class GraphicsElementLoader(
         var epgEntries = 0;
 
         IEnumerable<PlayoutItemGraphicsElement> elementsWithEpg = elements.Where(e =>
-            e.GraphicsElement.Kind is GraphicsElementKind.Text or GraphicsElementKind.Clock or GraphicsElementKind.Subtitle
+            e.GraphicsElement.Kind is GraphicsElementKind.Text or GraphicsElementKind.Clock or GraphicsElementKind.Ticker or GraphicsElementKind.Subtitle
                 or GraphicsElementKind.Motion or GraphicsElementKind.Script);
 
         foreach (var reference in elementsWithEpg)

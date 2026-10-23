@@ -1,0 +1,24 @@
+@page "/sauvegarde"
+
+<PageTitle>Sauvegarde · ErsatzTV</PageTitle>
+
+<div class="n-page" style="height: 100%; overflow-y: auto">
+    <div class="n-page-header">
+        <div>
+            <h1>Sauvegarde</h1>
+            <p>Tout votre travail dans un seul fichier : chaînes, plannings, programmes, habillages, réglages, statistiques d'audience et sons de l'atelier.</p>
+        </div>
+    </div>
+    <div class="n-card" style="max-width: 760px">
+        <div class="n-card-title">Télécharger une sauvegarde</div>
+        <MudText Typo="Typo.body2" Class="mb-3">La sauvegarde se fait sans arrêter ErsatzTV. Les vidéos elles-mêmes ne sont pas incluses : elles restent dans vos dossiers.</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Download" Href="nounours/sauvegarde.zip" Target="_blank">Télécharger (.zip)</MudButton>
+        <div class="n-card-title mt-6">Restaurer</div>
+        <ol style="padding-left: 20px; line-height: 1.7">
+            <li>Arrêtez ErsatzTV (menu Démarrer › « Arrêter ErsatzTV Nounours »).</li>
+            <li>Décompressez le fichier dans le dossier de configuration : <code>%LOCALAPPDATA%\ersatztv</code> sous Windows, en remplaçant les fichiers.</li>
+            <li>Relancez ErsatzTV.</li>
+        </ol>
+        <MudText Typo="Typo.body2" Class="n-muted">Pour passer sur un autre PC : installez l'édition Nounours, restaurez la sauvegarde, et placez vos vidéos aux mêmes emplacements (ou modifiez les dossiers dans « Ajouter des médias »).</MudText>
+    </div>
+</div>

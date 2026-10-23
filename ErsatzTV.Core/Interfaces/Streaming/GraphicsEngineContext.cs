@@ -30,6 +30,8 @@ public record TextElementDataContext(TextGraphicsElement TextElement) : Graphics
 
 public record ClockElementDataContext(ClockGraphicsElement ClockElement) : GraphicsElementContext;
 
+public record TickerElementDataContext(TickerGraphicsElement TickerElement) : GraphicsElementContext;
+
 public record ImageElementContext(ImageGraphicsElement ImageElement) : GraphicsElementContext;
 
 public record MotionElementDataContext(MotionGraphicsElement MotionElement)

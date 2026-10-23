@@ -2,6 +2,30 @@
 window.nounours = (function () {
     "use strict";
 
+    // Mur de chaînes : un lecteur HLS par vignette (muet par défaut)
+    const players = new Map();
+    function playHls(video, url) {
+        if (!video) { return; }
+        stopHls(video);
+        if (window.Hls && Hls.isSupported()) {
+            const hls = new Hls({ liveSyncDurationCount: 3, maxBufferLength: 20 });
+            hls.loadSource(url);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => { }));
+            players.set(video, hls);
+        } else {
+            video.src = url;
+            video.play().catch(() => { });
+        }
+    }
+    function stopHls(video) {
+        const hls = players.get(video);
+        if (hls) { hls.destroy(); players.delete(video); }
+    }
+    function stopAllHls() { for (const v of [...players.keys()]) { stopHls(v); } }
+    function setMuted(video, muted) { if (video) { video.muted = muted; if (!muted) { video.play().catch(() => { }); } } }
+    function fullscreen(el) { if (el && el.requestFullscreen) { el.requestFullscreen(); } }
+
     const stages = new WeakMap();
 
     function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
@@ -131,5 +155,6 @@ window.nounours = (function () {
         try { window.localStorage.setItem(key, value); } catch { /* stockage indisponible */ }
     }
 
-    return { initStage, loadFonts, scrollEpgTo, scrollTopTo, getStorage, setStorage };
+    return {
+        playHls, stopHls, stopAllHls, setMuted, fullscreen, print: () => window.print(), initStage, loadFonts, scrollEpgTo, scrollTopTo, getStorage, setStorage };
 })();

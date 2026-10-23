@@ -359,6 +359,7 @@ public class Startup
             FileSystemLayout.GraphicsElementsSubtitleTemplatesFolder,
             FileSystemLayout.GraphicsElementsMotionTemplatesFolder,
             FileSystemLayout.GraphicsElementsClockTemplatesFolder,
+            FileSystemLayout.GraphicsElementsTickerTemplatesFolder,
             FileSystemLayout.HabillageScenesFolder,
             FileSystemLayout.HabillageAssetsFolder,
             FileSystemLayout.ProgrammesFolder,
@@ -366,6 +367,7 @@ public class Startup
             FileSystemLayout.AudienceFolder,
             FileSystemLayout.ImportsFolder,
             FileSystemLayout.RegieFolder,
+            FileSystemLayout.AtelierFolder,
             FileSystemLayout.ScriptsFolder,
             FileSystemLayout.MultiEpisodeShuffleTemplatesFolder,
             FileSystemLayout.AudioStreamSelectorScriptsFolder,
@@ -719,6 +721,7 @@ public class Startup
         services.AddScoped<ErsatzTV.Application.Nounours.IWeekTemplateService, ErsatzTV.Application.Nounours.WeekTemplateService>();
         services.AddScoped<ErsatzTV.Application.Nounours.IFolderImportService, ErsatzTV.Application.Nounours.FolderImportService>();
         services.AddScoped<ErsatzTV.Application.Nounours.IRegieService, ErsatzTV.Application.Nounours.RegieService>();
+        services.AddSingleton<ErsatzTV.Application.Nounours.Atelier.AtelierService>();
         services.AddScoped<ErsatzTV.Nounours.ChannelWizardService>();
         services.AddScoped<ErsatzTV.Nounours.UiPreferences>();
 

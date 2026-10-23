@@ -55,6 +55,7 @@ public static class FileSystemLayout
     public static readonly string GraphicsElementsSubtitleTemplatesFolder;
     public static readonly string GraphicsElementsMotionTemplatesFolder;
     public static readonly string GraphicsElementsClockTemplatesFolder;
+    public static readonly string GraphicsElementsTickerTemplatesFolder;
     public static readonly string HabillageScenesFolder;
     public static readonly string HabillageAssetsFolder;
     public static readonly string ProgrammesFolder;
@@ -62,6 +63,7 @@ public static class FileSystemLayout
     public static readonly string AudienceFolder;
     public static readonly string ImportsFolder;
     public static readonly string RegieFolder;
+    public static readonly string AtelierFolder;
 
     public static readonly string ScriptsFolder;
 
@@ -193,6 +195,7 @@ public static class FileSystemLayout
         GraphicsElementsSubtitleTemplatesFolder = Path.Combine(GraphicsElementsTemplatesFolder, "subtitle");
         GraphicsElementsMotionTemplatesFolder = Path.Combine(GraphicsElementsTemplatesFolder, "motion");
         GraphicsElementsClockTemplatesFolder = Path.Combine(GraphicsElementsTemplatesFolder, "clock");
+        GraphicsElementsTickerTemplatesFolder = Path.Combine(GraphicsElementsTemplatesFolder, "ticker");
 
         HabillageScenesFolder = Path.Combine(TemplatesFolder, "habillages");
         HabillageAssetsFolder = Path.Combine(HabillageScenesFolder, "assets");
@@ -202,6 +205,7 @@ public static class FileSystemLayout
         AudienceFolder = Path.Combine(AppDataFolder, "audience");
         ImportsFolder = Path.Combine(AppDataFolder, "medias-importes");
         RegieFolder = Path.Combine(AppDataFolder, "regie");
+        AtelierFolder = Path.Combine(AppDataFolder, "atelier");
 
         ScriptsFolder = Path.Combine(AppDataFolder, "scripts");
 

@@ -228,7 +228,7 @@ public sealed class ChannelWizardService(
                 {
                     List<HabillageChannelTarget> targets = await habillageService.GetTargets(cancellationToken);
                     var channelIds = targets
-                        .Where(t => scene.DecoId.HasValue && t.CurrentDecoId == scene.DecoId)
+                        .Where(t => t.Scenes.Contains(scene.Slug))
                         .Select(t => t.ChannelId)
                         .Append(channelId.Value)
                         .ToList();

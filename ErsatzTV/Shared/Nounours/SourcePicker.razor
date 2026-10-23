@@ -1,0 +1,62 @@
+@using ErsatzTV.Application.Nounours.Atelier
+@inject ISnackbar Snackbar
+
+@* Choix d'un son de l'atelier (déjà envoyé) ou envoi d'un nouveau fichier. *@
+<div class="d-flex gap-2 align-center flex-wrap">
+    <MudSelect T="string" Value="@Value" ValueChanged="@Select" Label="Son" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex: 1; min-width: 200px">
+        <MudSelectItem Value="@string.Empty">@EmptyLabel</MudSelectItem>
+        @foreach (AtelierSource source in _sources)
+        {
+            <MudSelectItem Value="@source.Name">@source.Name</MudSelectItem>
+        }
+    </MudSelect>
+    <label class="d-inline-flex" style="cursor: pointer">
+        <InputFile OnChange="@Upload" accept="@string.Join(',', AtelierService.AudioExtensions)" style="display: none"/>
+        <span class="mud-button-root mud-button mud-button-outlined mud-button-outlined-default mud-button-outlined-size-medium" style="padding: 6px 12px">
+            <MudIcon Icon="@Icons.Material.Filled.Upload" Size="Size.Small" Class="mr-1"/>@(_uploading ? "Envoi…" : "Envoyer un son")
+        </span>
+    </label>
+</div>
+@if (!string.IsNullOrEmpty(Value))
+{
+    <audio src="@($"nounours/atelier/son?name={Uri.EscapeDataString(Value)}")" controls preload="none" style="width: 100%; margin-top: 8px; height: 36px"></audio>
+}
+
+@code {
+    [Parameter]
+    public string Value { get; set; }
+
+    [Parameter]
+    public EventCallback<string> ValueChanged { get; set; }
+
+    [Parameter]
+    public string EmptyLabel { get; set; } = "Aucun (pulsation régulière)";
+
+    private List<AtelierSource> _sources = [];
+    private bool _uploading;
+
+    protected override void OnInitialized() => _sources = AtelierService.Sources();
+
+    private Task Select(string value) => ValueChanged.InvokeAsync(value ?? string.Empty);
+
+    private async Task Upload(InputFileChangeEventArgs e)
+    {
+        _uploading = true;
+        try
+        {
+            await using Stream stream = e.File.OpenReadStream(300L * 1024 * 1024);
+            string name = await AtelierService.SaveSource(e.File.Name, stream, CancellationToken.None);
+            _sources = AtelierService.Sources();
+            await ValueChanged.InvokeAsync(name);
+            Snackbar.Add($"« {name} » est prêt.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Envoi impossible : {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _uploading = false;
+        }
+    }
+}

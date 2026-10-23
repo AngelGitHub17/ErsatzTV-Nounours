@@ -52,6 +52,9 @@ public class GraphicsEngine(
                 case ClockElementDataContext clockElementContext:
                     elements.Add(new ClockElement(graphicsEngineFonts, clockElementContext.ClockElement, logger));
                     break;
+                case TickerElementDataContext tickerElementContext:
+                    elements.Add(new TickerElement(graphicsEngineFonts, tickerElementContext.TickerElement, logger));
+                    break;
 
                 case TextElementDataContext textElementContext:
                     elements.Add(new TextElement(graphicsEngineFonts, textElementContext.TextElement, logger));

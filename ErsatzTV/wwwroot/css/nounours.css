@@ -237,3 +237,48 @@ div.ersatztv-light.nounours {
 .n-template-matinale .c::before, .n-template-matinale .c::after { background: #fff; border-radius: 2px; content: ""; left: 50%; position: absolute; top: 50%; transform-origin: 50% 100%; width: 3px; }
 .n-template-matinale .c::before { height: 28%; transform: translate(-50%, -100%) rotate(210deg); }
 .n-template-matinale .c::after { height: 40%; transform: translate(-50%, -100%) rotate(250deg); }
+
+/* ---------- atelier ---------- */
+.n-atelier { display: grid; gap: 16px; grid-template-columns: minmax(300px, 440px) 1fr; }
+@media (max-width: 1000px) { .n-atelier { grid-template-columns: 1fr; } }
+.n-atelier-preview { align-items: center; aspect-ratio: 16 / 9; background: #000; border-radius: 8px; display: flex; justify-content: center; overflow: hidden; }
+.n-atelier-preview img { display: block; height: 100%; width: 100%; }
+.n-palette { border: 2px solid transparent; border-radius: 10px; cursor: pointer; display: flex; flex-wrap: wrap; gap: 2px; padding: 4px; width: 96px; }
+.n-palette span { border-radius: 2px; height: 16px; width: 14px; }
+.n-palette small { color: var(--n-muted); width: 100%; }
+.n-palette.is-active { border-color: var(--n-accent); }
+.n-extract { align-items: flex-start; border-top: 1px solid var(--n-border); display: flex; gap: 12px; padding: 10px 0; }
+.n-extract img { aspect-ratio: 16 / 9; background: #000; border-radius: 6px; flex: none; object-fit: cover; width: 160px; }
+
+/* ---------- studio : bandeau défilant et signalétique ---------- */
+.n-ticker { align-items: center; display: flex; overflow: hidden; white-space: nowrap; width: 100%; }
+.n-ticker-label { align-items: center; color: #000; display: flex; flex: none; height: 100%; padding: 0 .6em; }
+.n-ticker-text { flex: 1; overflow: hidden; }
+.n-ticker-text > span { animation: n-ticker 18s linear infinite; display: inline-block; padding-left: 100%; }
+@keyframes n-ticker { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+.n-rating { align-items: center; aspect-ratio: 1; background: #fff; border: .45cqw solid #000; border-radius: 50%; color: #000; display: flex; font-family: Roboto, sans-serif; font-size: 1.9cqw; font-weight: 900; justify-content: center; width: 100%; }
+
+/* ---------- mur de chaînes ---------- */
+.n-wall { display: grid; gap: 10px; }
+.n-wall-tile { aspect-ratio: 16 / 9; background: #000; border: 2px solid transparent; border-radius: 10px; overflow: hidden; position: relative; }
+.n-wall-tile.is-audible { border-color: var(--n-onair); }
+.n-wall-tile video { cursor: pointer; display: block; height: 100%; object-fit: contain; width: 100%; }
+.n-wall-info { background: linear-gradient(transparent, rgba(0,0,0,.85)); bottom: 0; color: #fff; display: flex; flex-direction: column; font-size: .8rem; left: 0; padding: 18px 10px 6px; pointer-events: none; position: absolute; right: 0; }
+.n-wall-info span { opacity: .8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.n-wall-actions { display: flex; position: absolute; right: 4px; top: 4px; }
+
+/* ---------- grille imprimable ---------- */
+.n-print-title { font-size: 1.4rem; font-weight: 800; margin-bottom: 12px; }
+.n-print-day { break-inside: avoid-page; margin-bottom: 24px; }
+.n-print-day h2 { border-bottom: 2px solid var(--n-border); font-size: 1.15rem; margin: 0 0 10px; padding-bottom: 4px; }
+.n-print-channels { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.n-print-channel h3 { font-size: .95rem; margin: 0 0 6px; }
+.n-print-row { display: flex; font-size: .88rem; gap: 10px; padding: 2px 0; }
+.n-print-row b { flex: none; font-variant-numeric: tabular-nums; width: 44px; }
+@media print {
+    .mud-appbar, .mud-drawer, .n-noprint, .mud-snackbar-provider { display: none !important; }
+    .mud-main-content { padding: 0 !important; margin: 0 !important; }
+    .n-print { color: #000 !important; background: #fff !important; height: auto !important; overflow: visible !important; }
+    body, .mud-layout { background: #fff !important; }
+    .n-print-day h2 { border-color: #000; }
+}

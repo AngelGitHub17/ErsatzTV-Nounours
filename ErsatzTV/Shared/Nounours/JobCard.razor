@@ -1,0 +1,28 @@
+@using ErsatzTV.Application.Nounours.Atelier
+
+@* Suivi d'une fabrication de l'atelier, puis lecture du résultat. *@
+@if (Job is not null)
+{
+    <div class="n-card">
+        <div class="n-card-title">@Job.Name</div>
+        @if (Job.State == AtelierJobState.Running)
+        {
+            <MudProgressLinear Value="@(Job.Progress * 100)" Color="Color.Primary" Rounded="true" Size="Size.Medium"/>
+            <MudText Typo="Typo.body2" Class="n-muted mt-1">@Job.Step · @((int)(Job.Progress * 100)) %</MudText>
+        }
+        else if (Job.State == AtelierJobState.Failed)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true">@Job.Error</MudAlert>
+        }
+        else
+        {
+            <video src="@($"nounours/atelier/video?path={Uri.EscapeDataString(Job.Output)}")" controls autoplay style="width: 100%; border-radius: 8px; background: #000"></video>
+            <MudText Typo="Typo.body2" Class="n-muted mt-1">@Job.Step</MudText>
+        }
+    </div>
+}
+
+@code {
+    [Parameter]
+    public AtelierJob Job { get; set; }
+}

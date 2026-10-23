@@ -1,0 +1,162 @@
+@page "/mur"
+@using System.Globalization
+@using ErsatzTV.Application.Channels
+@using ErsatzTV.Application.Nounours
+@using ErsatzTV.Core.FFmpeg
+@implements IAsyncDisposable
+@inject IMediator Mediator
+@inject IGuideService GuideService
+@inject IJSRuntime Js
+@inject NavigationManager Navigation
+
+<PageTitle>Mur de chaînes · ErsatzTV</PageTitle>
+
+<div class="n-page" style="height: 100%; overflow-y: auto">
+    <div class="n-page-header">
+        <div>
+            <h1>Mur de chaînes</h1>
+            <p>Toutes vos chaînes en direct, comme les écrans d'une régie. Cliquez sur une image pour l'écouter.</p>
+        </div>
+        <div class="d-flex gap-2 align-center flex-wrap">
+            <MudToggleGroup T="int" Value="@_columns" ValueChanged="@(v => _columns = v)" Outlined="true" Size="Size.Small" Color="Color.Primary">
+                <MudToggleItem Value="2" Text="2"/>
+                <MudToggleItem Value="3" Text="3"/>
+                <MudToggleItem Value="4" Text="4"/>
+            </MudToggleGroup>
+        </div>
+    </div>
+
+    @if (_channels is null)
+    {
+        <MudProgressLinear Indeterminate="true"/>
+    }
+    else
+    {
+        <div class="d-flex gap-2 flex-wrap mb-3 align-center">
+            <span class="n-muted" style="font-size: .85rem">Chaînes affichées :</span>
+            @foreach (ChannelViewModel channel in _channels)
+            {
+                bool on = _shown.Contains(channel.Id);
+                <MudChip T="int" Size="Size.Small" Color="@(on ? Color.Primary : Color.Default)" Variant="@(on ? Variant.Filled : Variant.Outlined)"
+                         OnClick="@(() => Toggle(channel))">@channel.Number · @channel.Name</MudChip>
+            }
+        </div>
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">Chaque image lance une diffusion (transcodage) sur le serveur : n'affichez que les chaînes à surveiller.</MudAlert>
+
+        <div class="n-wall" style="grid-template-columns: repeat(@_columns, 1fr)">
+            @foreach (ChannelViewModel channel in _channels.Where(c => _shown.Contains(c.Id)))
+            {
+                <div class="n-wall-tile @(channel.Id == _audible ? "is-audible" : "")" @key="channel.Id" id="@($"tile-{channel.Id}")">
+                    <video id="@($"wall-{channel.Id}")" muted playsinline @onclick="@(() => Listen(channel))"></video>
+                    <div class="n-wall-info">
+                        <b>@channel.Number · @channel.Name</b>
+                        <span>@NowPlaying(channel)</span>
+                    </div>
+                    <div class="n-wall-actions">
+                        <MudIconButton Icon="@(channel.Id == _audible ? Icons.Material.Filled.VolumeUp : Icons.Material.Filled.VolumeOff)" Size="Size.Small" Style="color: #fff" OnClick="@(() => Listen(channel))"/>
+                        <MudIconButton Icon="@Icons.Material.Filled.Fullscreen" Size="Size.Small" Style="color: #fff" OnClick="@(() => Fullscreen(channel))"/>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<ChannelViewModel> _channels;
+    private readonly System.Collections.Generic.HashSet<int> _shown = [];
+    private readonly System.Collections.Generic.HashSet<int> _started = [];
+    private Dictionary<int, NowNext> _nowNext = [];
+    private int _columns = 3;
+    private int? _audible;
+    private Timer _timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _channels = (await Mediator.Send(new GetAllChannels()))
+            .Where(c => c.IsEnabled && c.PlayoutCount > 0 && c.StreamingMode is not (StreamingMode.HttpLiveStreamingDirect or StreamingMode.TransportStream))
+            .OrderBy(c => double.TryParse(c.Number, NumberStyles.Number, CultureInfo.InvariantCulture, out double n) ? n : 0)
+            .ToList();
+        foreach (ChannelViewModel channel in _channels.Take(4))
+        {
+            _shown.Add(channel.Id);
+        }
+
+        _nowNext = await GuideService.GetNowNext(CancellationToken.None);
+        _timer = new Timer(_ => InvokeAsync(async () => { _nowNext = await GuideService.GetNowNext(CancellationToken.None); StateHasChanged(); }), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_channels is null)
+        {
+            return;
+        }
+
+        foreach (ChannelViewModel channel in _channels.Where(c => _shown.Contains(c.Id) && !_started.Contains(c.Id)))
+        {
+            _started.Add(channel.Id);
+            string uri = $"{Navigation.BaseUri}iptv/channel/{channel.Number}.m3u8?mode=segmenter";
+            if (JwtHelper.IsEnabled)
+            {
+                uri += $"&access_token={JwtHelper.GenerateToken()}";
+            }
+
+            await Js.InvokeVoidAsync("eval", $"nounours.playHls(document.getElementById('wall-{channel.Id}'), '{uri}')");
+        }
+    }
+
+    private async Task Toggle(ChannelViewModel channel)
+    {
+        if (!_shown.Remove(channel.Id))
+        {
+            _shown.Add(channel.Id);
+            return;
+        }
+
+        _started.Remove(channel.Id);
+        await Js.InvokeVoidAsync("eval", $"nounours.stopHls(document.getElementById('wall-{channel.Id}'))");
+        if (_audible == channel.Id)
+        {
+            _audible = null;
+        }
+    }
+
+    private async Task Listen(ChannelViewModel channel)
+    {
+        _audible = _audible == channel.Id ? null : channel.Id;
+        foreach (int id in _shown)
+        {
+            await Js.InvokeVoidAsync("eval", $"nounours.setMuted(document.getElementById('wall-{id}'), {(id == _audible ? "false" : "true")})");
+        }
+    }
+
+    private Task Fullscreen(ChannelViewModel channel) =>
+        Js.InvokeVoidAsync("eval", $"nounours.fullscreen(document.getElementById('tile-{channel.Id}'))").AsTask();
+
+    private string NowPlaying(ChannelViewModel channel)
+    {
+        if (_nowNext.TryGetValue(channel.Id, out NowNext info))
+        {
+            foreach (GuideEntry entry in info.Now)
+            {
+                return entry.IsFiller ? "(intercalaires)" : entry.DisplayTitle;
+            }
+        }
+
+        return "—";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _timer?.Dispose();
+        try
+        {
+            await Js.InvokeVoidAsync("nounours.stopAllHls");
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or InvalidOperationException)
+        {
+            // page fermée ou rendu sans navigateur
+        }
+    }
+}

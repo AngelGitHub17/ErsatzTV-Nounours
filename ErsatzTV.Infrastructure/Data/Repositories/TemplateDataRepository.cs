@@ -360,7 +360,9 @@ public class TemplateDataRepository(IFileSystem fileSystem, IDbContextFactory<Tv
                     [MediaItemTemplateDataKey.Genres] = (metadata.Genres ?? []).Map(g => g.Name).OrderBy(identity),
                     [MediaItemTemplateDataKey.Resolution] = new Resolution
                         { Height = headVersion.Height, Width = headVersion.Width },
-                    [MediaItemTemplateDataKey.Duration] = headVersion.Duration
+                    [MediaItemTemplateDataKey.Duration] = headVersion.Duration,
+                    // édition Nounours : la signalétique jeunesse marche aussi pour les autres vidéos
+                    [MediaItemTemplateDataKey.ContentRating] = metadata.ContentRating
                 };
 
                 foreach (var version in otherVideo.MediaVersions.HeadOrNone())

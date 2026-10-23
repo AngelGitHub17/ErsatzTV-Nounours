@@ -53,6 +53,8 @@
                         <div class="n-tool" @onclick="@(() => Add("banner"))"><MudIcon Icon="@Icons.Material.Filled.CropLandscape"/>Bandeau</div>
                         <div class="n-tool" @onclick="@(() => Add("lowerthird"))"><MudIcon Icon="@Icons.Material.Filled.ViewDay"/>Bas d'écran</div>
                         <div class="n-tool" @onclick="@(() => Add("frame"))"><MudIcon Icon="@Icons.Material.Filled.CropFree"/>Cadre</div>
+                        <div class="n-tool" @onclick="@(() => Add("ticker"))"><MudIcon Icon="@Icons.Material.Filled.ViewStream"/>Bandeau défilant</div>
+                        <div class="n-tool" @onclick="@(() => Add("rating"))"><MudIcon Icon="@Icons.Material.Filled.ChildCare"/>Signalétique</div>
                     </div>
                 </div>
                 <div class="n-card" style="padding: 12px">
@@ -112,6 +114,18 @@
                                 case HabillageItemKind.Frame:
                                     @FramePreview(item)
                                     break;
+                                case HabillageItemKind.Ticker:
+                                    <div class="n-ticker" style="@TickerStyle(item)">
+                                        @if (!string.IsNullOrWhiteSpace(item.TickerLabel))
+                                        {
+                                            <span class="n-ticker-label" style="background: @item.LabelColor">@item.TickerLabel</span>
+                                        }
+                                        <span class="n-ticker-text"><span>@TickerPreview(item)</span></span>
+                                    </div>
+                                    break;
+                                case HabillageItemKind.Rating:
+                                    <div class="n-rating">-12</div>
+                                    break;
                                 case HabillageItemKind.Image:
                                     @if (string.IsNullOrWhiteSpace(item.ImagePath))
                                     {
@@ -126,7 +140,7 @@
                                     <div style="@BannerStyle(item)"></div>
                                     break;
                             }
-                            @if (item.Id == _selectedId && (item.Kind is HabillageItemKind.Image or HabillageItemKind.Banner || item.Analog && item.Kind == HabillageItemKind.Clock))
+                            @if (item.Id == _selectedId && (item.Kind is HabillageItemKind.Image or HabillageItemKind.Banner or HabillageItemKind.Ticker or HabillageItemKind.Rating || item.Analog && item.Kind == HabillageItemKind.Clock))
                             {
                                 <div class="n-layer-handle"></div>
                             }
@@ -161,6 +175,12 @@
                     <MudTextField @bind-Value="_scene.Description" Label="Description" Variant="Variant.Outlined" Lines="2" Margin="Margin.Dense" @bind-Value:after="@MarkDirty"/>
                     <MudSwitch T="bool" @bind-Value="_scene.UseDuringFiller" @bind-Value:after="@MarkDirty" Color="Color.Primary" Label="Afficher aussi pendant les intercalaires" Class="mt-3"/>
                     <MudSwitch T="bool" @bind-Value="_scene.MergeWithSchedule" @bind-Value:after="@MarkDirty" Color="Color.Primary" Label="Garder les éléments prévus par les plannings" Class="mt-1"/>
+                    <MudText Typo="Typo.caption" Class="n-muted d-block mt-3">Afficher seulement de… à… (vide = toute la journée)</MudText>
+                    <div class="d-flex gap-2">
+                        <MudTextField @bind-Value="_scene.ShowFrom" Placeholder="06:00" Label="De" Variant="Variant.Outlined" Margin="Margin.Dense" Mask="@(new PatternMask("00:00"))" @bind-Value:after="@MarkDirty"/>
+                        <MudTextField @bind-Value="_scene.ShowUntil" Placeholder="09:00" Label="À" Variant="Variant.Outlined" Margin="Margin.Dense" Mask="@(new PatternMask("00:00"))" @bind-Value:after="@MarkDirty"/>
+                    </div>
+                    <MudText Typo="Typo.caption" Class="n-muted">Une chaîne peut avoir plusieurs habillages : « Matinale » de 06:00 à 09:00, « Rétro 95 » de 20:00 à 23:59…</MudText>
                     <MudText Typo="Typo.body2" Class="n-muted mt-4">Sélectionnez un calque sur la scène ou dans la liste pour modifier ses réglages.</MudText>
                 }
                 else
@@ -210,6 +230,31 @@
                                     <MudSelectItem Value="@("UTC")">UTC</MudSelectItem>
                                     <MudSelectItem Value="@string.Empty">Celui du serveur</MudSelectItem>
                                 </MudSelect>
+                            }
+                            else if (item.Kind == HabillageItemKind.Ticker)
+                            {
+                                <MudTextField @bind-Value="item.TickerMessages" Label="Phrases (une par ligne)" Lines="3" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" @bind-Value:after="@MarkDirty"/>
+                                <MudTextField @bind-Value="item.RssUrl" Label="Flux RSS (titres de l'actu, facultatif)" Placeholder="https://…/rss.xml" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" @bind-Value:after="@MarkDirty"/>
+                                <div class="d-flex gap-2 align-start mt-2">
+                                    <MudTextField @bind-Value="item.WeatherCity" Label="Météo de la ville (facultatif)" Placeholder="Saintes" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex: 1"
+                                                  HelperText="@(item.WeatherLatitude.HasValue ? $"Trouvée : {Num(item.WeatherLatitude.Value)}, {Num(item.WeatherLongitude ?? 0)}" : "Cliquez sur la loupe pour la trouver")"/>
+                                    <MudIconButton Icon="@Icons.Material.Filled.TravelExplore" OnClick="@(() => FindCity(item))" Style="margin-top: 4px"/>
+                                </div>
+                                <MudTextField @bind-Value="item.TickerLabel" Label="Étiquette à gauche (vide = aucune)" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" Immediate="true" @bind-Value:after="@MarkDirty"/>
+                                <div class="d-flex gap-2 mt-2">
+                                    <MudColorPicker Value="@(new MudBlazor.Utilities.MudColor(item.LabelColor))" ValueChanged="@(c => { item.LabelColor = c.Value[..7]; MarkDirty(); })" Label="Étiquette" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                                    <MudColorPicker Value="@(new MudBlazor.Utilities.MudColor(item.BackgroundColor))" ValueChanged="@(c => { item.BackgroundColor = c.Value; MarkDirty(); })" Label="Fond" Variant="Variant.Outlined" Margin="Margin.Dense" ShowAlpha="true"/>
+                                </div>
+                                <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Vitesse : @Num(item.TickerSpeed) px/s</MudText>
+                                <MudSlider T="double" @bind-Value="item.TickerSpeed" Min="40" Max="400" Step="10" Color="Color.Primary" @bind-Value:after="@MarkDirty"/>
+                                <MudText Typo="Typo.caption" Class="n-muted d-block">Hauteur : @Num(item.Height) %</MudText>
+                                <MudSlider T="double" @bind-Value="item.Height" Min="3" Max="15" Step="0.5" Color="Color.Primary" @bind-Value:after="@MarkDirty"/>
+                                <MudText Typo="Typo.body2" Class="n-muted">Le RSS et la météo sont mis à jour toutes les 15 minutes. La police et la couleur du texte se règlent dans l'onglet Style.</MudText>
+                            }
+                            else if (item.Kind == HabillageItemKind.Rating)
+                            {
+                                <MudText Typo="Typo.body2">Affiche le rond <b>-10</b>, <b>-12</b>, <b>-16</b> ou <b>-18</b> selon la classification du programme (champ « classification » de vos films et séries). Rien ne s'affiche si le programme n'est pas classé.</MudText>
+                                <MudText Typo="Typo.body2" Class="n-muted mt-2">Réglez la durée dans l'onglet Apparition (par défaut : la première minute de chaque programme). Taille : poignée bleue.</MudText>
                             }
                             else if (item.Kind == HabillageItemKind.Frame)
                             {
@@ -302,7 +347,7 @@
                             }
                         </MudTabPanel>
 
-                        @if (item.Kind is HabillageItemKind.Clock or HabillageItemKind.Text && !item.Analog)
+                        @if (item.Kind is HabillageItemKind.Clock or HabillageItemKind.Text or HabillageItemKind.Ticker && !item.Analog)
                         {
                             <MudTabPanel Text="Style">
                                 <MudAutocomplete T="string" Value="@item.FontFamily" ValueChanged="@(v => { item.FontFamily = v; MarkDirty(); })" SearchFunc="@SearchFonts"
@@ -393,7 +438,7 @@
     <MudOverlay Visible="true" OnClick="@(() => _applyOpen = false)" DarkBackground="true" ZIndex="1400"/>
     <div class="n-card" style="position: fixed; left: 50%; top: 10vh; transform: translateX(-50%); width: 520px; max-width: calc(100vw - 32px); max-height: 75vh; overflow: auto; z-index: 1401">
         <MudText Typo="Typo.h6">Appliquer « @_scene.Name »</MudText>
-        <MudText Typo="Typo.body2" Class="n-muted mb-3">L'habillage devient la « deco par défaut » des chaînes cochées. Il s'affiche dès le prochain programme.</MudText>
+        <MudText Typo="Typo.body2" Class="n-muted mb-3">L'habillage s'ajoute aux chaînes cochées (avec ses horaires, s'il en a). Il s'affiche dès le prochain programme.</MudText>
         @if (_targets.Count == 0)
         {
             <MudAlert Severity="Severity.Info">Aucune chaîne n'a encore de playout. Créez une chaîne avec l'assistant d'abord.</MudAlert>
@@ -403,7 +448,14 @@
             <div class="d-flex align-center">
                 <MudCheckBox T="bool" Value="@_checked.Contains(target.ChannelId)" ValueChanged="@(v => Toggle(target.ChannelId, v))" Color="Color.Primary"
                              Label="@($"{target.Number} · {target.Name}")"/>
-                @if (target.CurrentDecoId.HasValue && target.CurrentDecoId != _scene.DecoId)
+                @{
+                    var others = target.Scenes.Where(s => s != _scene.Slug).ToList();
+                }
+                @if (others.Count > 0)
+                {
+                    <MudText Typo="Typo.caption" Class="n-muted">avec : @string.Join(", ", others)</MudText>
+                }
+                else if (target.CurrentDecoId.HasValue && target.Scenes.Count == 0)
                 {
                     <MudText Typo="Typo.caption" Color="Color.Warning">remplacera « @target.CurrentDecoName »</MudText>
                 }
@@ -546,7 +598,7 @@
     private async Task RefreshTargets()
     {
         _targets = await HabillageService.GetTargets(CancellationToken.None);
-        _targetsUsing = _scene?.DecoId is null ? [] : _targets.Where(t => t.CurrentDecoId == _scene.DecoId).ToList();
+        _targetsUsing = _scene is null ? [] : _targets.Where(t => t.Scenes.Contains(_scene.Slug)).ToList();
     }
 
     // ------------------------------------------------ interactions JS
@@ -766,6 +818,16 @@
                 Kind = HabillageItemKind.Clock, Analog = true, Label = "Horloge à aiguilles", X = 4, Y = 5, Width = 7, FontSize = 40,
                 Color = "#FFFFFF", HaloColor = "#000000", HaloWidth = 2, AnalogTicks = "dots", AnalogOutline = 6
             },
+            "ticker" => new HabillageItem
+            {
+                Kind = HabillageItemKind.Ticker, Label = "Bandeau défilant", X = 0, Y = 93, Width = 100, Height = 6, FontSize = 36, FontWeight = 700,
+                BackgroundColor = "#000000E0", HaloWidth = 0, TickerLabel = "INFO", LabelColor = "#F5B700",
+                TickerMessages = "Bienvenue sur votre chaîne\nRetrouvez tous les programmes dans le guide"
+            },
+            "rating" => new HabillageItem
+            {
+                Kind = HabillageItemKind.Rating, Label = "Signalétique", X = 91, Y = 82, Width = 5, Visibility = HabillageVisibility.ProgramStart, VisibleSeconds = 60
+            },
             "frame" => new HabillageItem
             {
                 Kind = HabillageItemKind.Frame, Label = "Cadre", X = 0, Y = 0, Width = 100, Height = 100, ZIndex = 1,
@@ -983,7 +1045,7 @@
             return $"left: 0; top: 0; width: 100%; height: 100%; z-index: {item.ZIndex}; opacity: {Num(Math.Clamp(item.Opacity, 0, 100) / 100.0)};";
         }
 
-        if (item.Kind is HabillageItemKind.Image or HabillageItemKind.Banner || item.Kind == HabillageItemKind.Clock && item.Analog)
+        if (item.Kind is HabillageItemKind.Image or HabillageItemKind.Banner or HabillageItemKind.Ticker or HabillageItemKind.Rating || item.Kind == HabillageItemKind.Clock && item.Analog)
         {
             css += $" width: {Num(item.Width)}%;";
         }
@@ -1125,6 +1187,49 @@
         return builder => builder.AddMarkupContent(0, svg);
     }
 
+    private static string TickerStyle(HabillageItem item) =>
+        $"background: {item.BackgroundColor}; height: {Num(item.Height * 0.5625)}cqw; color: {item.Color}; "
+        + $"font-family: '{item.FontFamily}', Roboto, sans-serif; font-weight: {item.FontWeight}; font-size: {Num(item.Height * 0.326)}cqw;"
+        + (item.Italic ? " font-style: italic;" : string.Empty);
+
+    private static string TickerPreview(HabillageItem item)
+    {
+        var parts = (item.TickerMessages ?? string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        if (!string.IsNullOrWhiteSpace(item.WeatherCity))
+        {
+            parts.Add($"Météo {item.WeatherCity} : 14 °C, éclaircies");
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.RssUrl))
+        {
+            parts.Add("Titres du flux RSS…");
+        }
+
+        return string.Join("  •  ", parts.DefaultIfEmpty("…"));
+    }
+
+    private async Task FindCity(HabillageItem item)
+    {
+        try
+        {
+            var found = await ErsatzTV.Application.Nounours.HabillageService.FindCity(item.WeatherCity, CancellationToken.None);
+            if (found is null)
+            {
+                Snackbar.Add("Ville introuvable.", Severity.Warning);
+                return;
+            }
+
+            item.WeatherCity = found.Value.Name;
+            item.WeatherLatitude = found.Value.Latitude;
+            item.WeatherLongitude = found.Value.Longitude;
+            MarkDirty();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Recherche impossible : {ex.Message}", Severity.Error);
+        }
+    }
+
     private static string BannerStyle(HabillageItem item) =>
         $"background: {item.BackgroundColor}; border-radius: {Num(item.CornerRadius * 100 / 1920)}cqw; aspect-ratio: {Num(Math.Max(0.01, item.Width * 16))} / {Num(Math.Max(0.01, item.Height * 9))}; width: 100%";
 
@@ -1188,6 +1293,8 @@
             HabillageItemKind.Image => Icons.Material.Filled.Image,
             HabillageItemKind.Banner => Icons.Material.Filled.CropLandscape,
             HabillageItemKind.Frame => Icons.Material.Filled.CropFree,
+            HabillageItemKind.Ticker => Icons.Material.Filled.ViewStream,
+            HabillageItemKind.Rating => Icons.Material.Filled.ChildCare,
             _ => Icons.Material.Filled.TextFields
         };
 
@@ -1198,6 +1305,8 @@
             HabillageItemKind.Image => "Image",
             HabillageItemKind.Banner => "Bandeau",
             HabillageItemKind.Frame => "Cadre",
+            HabillageItemKind.Ticker => "Bandeau défilant",
+            HabillageItemKind.Rating => "Signalétique",
             _ => "Texte"
         };
 

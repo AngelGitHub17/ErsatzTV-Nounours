@@ -69,6 +69,14 @@ Composez ce qui s'affiche par-dessus les programmes, en glisser-déposer sur une
   - **Rétro 95** — cadre clair, cartouche « MA CHAÎNE », bandeaux noirs en capitales italiques (titre au début, « À SUIVRE · 20H40 · TITRE » à la fin),
     bloc de couleur ; remplacez le cartouche par votre logo ;
   - **Matinale** — horloge à aiguilles et titre empilé en haut à gauche, date et heure en bas.
+- **Bandeau défilant** (nouveau dans le moteur) : phrases fixes, titres d'un **flux RSS** et **météo** d'une ville (Open-Meteo, gratuit,
+  sans clé ; la ville se cherche avec la loupe), étiquette colorée à gauche (« INFO »), vitesse, hauteur, fond. Mis à jour toutes les 15 min.
+  Le défilement est calé sur l'heure : il ne saute pas d'un programme à l'autre.
+- **Signalétique jeunesse** : rond **-10 / -12 / -16 / -18** choisi automatiquement selon la classification du programme
+  (films, épisodes via la série, autres vidéos), rien si le programme n'est pas classé. Par défaut pendant la première minute.
+- **Plusieurs habillages par chaîne, avec horaires** : chaque habillage peut avoir une plage « de… à… » (ex. Matinale 06:00 → 09:00,
+  Rétro 95 20:00 → 23:59, passage de minuit géré). Appliquer un habillage l'**ajoute** à la chaîne : s'il y en a plusieurs, ils sont
+  réunis dans une deco « Habillage combiné · numéro », mise à jour à chaque enregistrement.
 - Mettre un texte en capitales : `{{ MediaItem_Title | string.upcase }}`. Les graisses Medium, Bold, Black et les italiques de Roboto sont fournies.
 
 « Enregistrer » génère les fichiers YAML du moteur graphique d'ErsatzTV et une **déco** « Habillage : nom » (groupe « Habillages ») ;
@@ -104,6 +112,30 @@ et un préréglage de remplissage « milieu de programme » « Coupure : nom ».
 `@coupures toutes=15 debut=10 fin=5` (ou `@coupures nombre=2 fin=5`) crée des points de coupure virtuels, en minutes.
 Les éléments plus courts que le premier point ne sont pas coupés (et le remplissage n'est pas converti en « après »).
 Une expression classique peut suivre après `;`. Utilisable aussi à la main depuis Collections › Préréglages de remplissage.
+
+### Atelier vidéo — jingles, génériques, bandes-annonces (`/atelier`)
+Fabrique des vidéos au style « Rétro 95 » — un cadre clair, des **rectangles de couleur qui bougent au rythme du son**
+(graves, médiums et aigus les font grandir, chaque temps fort les fait changer de place), des bandeaux noirs en capitales italiques.
+- **Jingle avant programme** (étiquette FILM / SÉRIE / CINÉMA… puis le titre), **Générique** (lignes « Rôle : Nom » qui apparaissent
+  une à une), **Annonce** (« CE SOIR » + titre + horaire), **Début de pub** / **Fin de pub**.
+- On **envoie un son** (mp3, wav, ogg…), on tape le titre : l'aperçu se met à jour, « Créer la vidéo » fabrique le MP4 (1080p, 25 i/s).
+  Sans son : une pulsation régulière. Palettes prêtes (Rétro 95, Primaires, Pastel, Néon, Mono), couleur du cadre, énergie du mouvement,
+  « Autre chorégraphie ».
+- **Bande-annonce** : on ajoute un ou plusieurs programmes (films, épisodes, vidéos) ; chacun donne 3 extraits répartis, réglables
+  (début, durée) avec une **vignette** de l'image. Résultat : ouverture « À L'AFFICHE » + titre → extraits dans le cadre clair avec le
+  bandeau titre / diffusion → fermeture avec la date. Bouton pour retrouver la **prochaine diffusion** dans le guide.
+  Musique au choix (avec ou sans le son des extraits en fond).
+- Les vidéos sont rangées toutes seules dans les médias d'habillage (Jingles, Bandes-annonces, Pubs…) : elles sont tout de suite
+  utilisables dans les programmes (segments Jingle, Bande-annonce…). Onglet « Mes créations » pour les revoir ou les supprimer.
+- Utilise le FFmpeg configuré dans ErsatzTV (encodeur libx264). Seuls les fichiers locaux peuvent servir d'extraits.
+
+### Mur de chaînes (`/mur`), grille à imprimer (`/grille`), sauvegarde (`/sauvegarde`)
+- **Mur de chaînes** : les chaînes en direct en mosaïque (2, 3 ou 4 colonnes), clic pour écouter, plein écran par vignette.
+  Chaque vignette lance une diffusion : n'affichez que celles à surveiller.
+- **Grille à imprimer** : le programme jour par jour (1, 3 ou 7 jours), épisodes regroupés, choix des chaînes, « Imprimer / PDF »
+  (mise en page propre à l'impression) et lien vers le guide JSON.
+- **Sauvegarde** : un .zip avec la base (copie cohérente sans arrêter ErsatzTV), les habillages, programmes, éléments graphiques,
+  l'audience et les sons de l'atelier (pas les vidéos). La restauration est expliquée sur la page.
 
 ### Semaine type (`/semaine-type`)
 Un planning différent selon le jour de la semaine : mercredi jeunesse, samedi cinéma, week-end plus calme…
@@ -212,7 +244,9 @@ et les préférences utilisent la table de configuration existante. Les nouveaux
 | `plugins/` | modules externes (un sous-dossier par module) |
 | `audience/` | relevés d'audience (un `.json` par jour) |
 | `regie/` | prises d'antenne en cours (programmes mis de côté) |
-| `medias-importes/` | vidéos envoyées depuis la page d'import |
+| `medias-importes/` | vidéos envoyées depuis la page d'import, et créations de l'atelier |
+| `atelier/sources/` | sons envoyés dans l'atelier |
+| `templates/graphics-elements/ticker/` | bandeaux défilants |
 
 ## Où sont les changements
 
@@ -226,6 +260,9 @@ et les préférences utilisent la table de configuration existante. Les nouveaux
 | Semaine type · import · régie | `ErsatzTV.Application/Nounours/WeekTemplate.cs`, `FolderImport.cs`, `Regie.cs` · pages `WeekTemplatePage.razor`, `ImportPage.razor`, `RegiePage.razor` |
 | Audience | `ErsatzTV/Nounours/Audience/` (comptage, relevés), `ErsatzTV/Nounours/Modules/Audience/` (page, carte) |
 | Guide JSON | `ErsatzTV/Controllers/NounoursEpgController.cs` |
+| Atelier vidéo | `ErsatzTV.Application/Nounours/Atelier/` (analyse du son, rendu, FFmpeg), `Pages/Nounours/AtelierPage.razor`, `Shared/Nounours/{SourcePicker,StylePicker,JobCard}.razor` |
+| Bandeau défilant | `ErsatzTV.Core/Graphics/TickerGraphicsElement.cs`, `ErsatzTV.Infrastructure/Streaming/Graphics/Text/TickerElement.cs` |
+| Mur, grille, sauvegarde | `Pages/Nounours/{WallPage,PrintGuidePage,BackupPage}.razor`, `Controllers/NounoursBackupController.cs` |
 | Interface | `Shared/MainLayout.razor`, `App.razor`, `Pages/_Host.cshtml`, `wwwroot/css/nounours.css`, `wwwroot/js/nounours.js`, `Controllers/NounoursController.cs` |
 | Traduction | toutes les pages de `Pages/` et `Shared/`, `Locals/**/*.fr.resx`, `Localization.cs`, vérifications de santé (`ErsatzTV.Infrastructure/Health/Checks/`) |
 

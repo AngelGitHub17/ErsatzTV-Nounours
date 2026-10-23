@@ -1,0 +1,399 @@
+@page "/atelier"
+@using System.Globalization
+@using ErsatzTV.Application.Nounours
+@using ErsatzTV.Application.Nounours.Atelier
+@using ErsatzTV.Shared.Nounours
+@implements IDisposable
+@inject AtelierService Atelier
+@inject IGuideService GuideService
+@inject ISnackbar Snackbar
+
+<PageTitle>Atelier vidéo · ErsatzTV</PageTitle>
+
+<div class="n-page" style="height: 100%; overflow-y: auto">
+    <div class="n-page-header">
+        <div>
+            <h1>Atelier vidéo</h1>
+            <p>Fabriquez vos jingles, génériques, cartons pub et bandes-annonces au style « Rétro 95 » : des rectangles de couleur qui bougent au rythme de votre musique. Ils sont rangés tout seuls dans vos médias d'habillage.</p>
+        </div>
+    </div>
+
+    <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" TabPanelsClass="pt-4" @bind-ActivePanelIndex="_tab">
+        @* ================================================================ JINGLES *@
+        <MudTabPanel Text="Jingle · générique · pub" Icon="@Icons.Material.Filled.MusicNote">
+            <div class="n-atelier">
+                <div class="d-flex flex-column gap-3">
+                    <div class="n-card">
+                        <div class="n-card-title">1. Quoi</div>
+                        <div class="d-flex gap-2 flex-wrap">
+                            @foreach ((AtelierKind kind, string label, string icon) in Kinds)
+                            {
+                                <MudChip T="AtelierKind" Color="@(_jingle.Kind == kind ? Color.Primary : Color.Default)" Variant="@(_jingle.Kind == kind ? Variant.Filled : Variant.Outlined)"
+                                         Icon="@icon" OnClick="@(() => SetKind(kind))">@label</MudChip>
+                            }
+                        </div>
+                        @if (_jingle.Kind == AtelierKind.Jingle)
+                        {
+                            <MudAutocomplete T="string" @bind-Value="_jingle.Label" SearchFunc="@SearchLabels" CoerceValue="true" Strict="false" Label="Étiquette" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-3"
+                                             HelperText="Le mot affiché en grand au début : FILM, SÉRIE, CINÉMA, SPORT…" @bind-Value:after="@Changed"/>
+                        }
+                        @if (_jingle.Kind == AtelierKind.Annonce)
+                        {
+                            <MudTextField @bind-Value="_jingle.Label" Label="Étiquette" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-3" Immediate="true" DebounceInterval="400" @bind-Value:after="@Changed"
+                                          HelperText="Ex. CE SOIR, PROCHAINEMENT, À L'AFFICHE"/>
+                        }
+                        <MudTextField @bind-Value="_jingle.Title" Label="@(_jingle.Kind is AtelierKind.DebutPub or AtelierKind.FinPub ? "Texte (vide = PUBLICITÉ / FIN DE LA PUBLICITÉ)" : "Titre")" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-3"
+                                      Immediate="true" DebounceInterval="400" @bind-Value:after="@Changed"/>
+                        @if (_jingle.Kind is AtelierKind.Jingle or AtelierKind.Annonce)
+                        {
+                            <MudTextField @bind-Value="_jingle.Subtitle" Label="Sous-titre (facultatif)" Placeholder="Ex. CE SOIR 20H40" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"
+                                          Immediate="true" DebounceInterval="400" @bind-Value:after="@Changed"/>
+                        }
+                        @if (_jingle.Kind == AtelierKind.Generique)
+                        {
+                            <MudTextField @bind-Value="_credits" Label="Lignes du générique" Lines="5" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"
+                                          HelperText="Une ligne par crédit, « Rôle : Nom ». Elles apparaissent une à une." Immediate="true" DebounceInterval="500" @bind-Value:after="@Changed"/>
+                        }
+                        <MudTextField @bind-Value="_jingle.ChannelName" Label="Nom de la chaîne (cartouche de fin, facultatif)" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"
+                                      Immediate="true" DebounceInterval="400" @bind-Value:after="@Changed"/>
+                    </div>
+
+                    <div class="n-card">
+                        <div class="n-card-title">2. Le son</div>
+                        <SourcePicker Value="@_jingle.AudioFile" ValueChanged="@(async v => { _jingle.AudioFile = v; await Changed(); })"/>
+                        <div class="d-flex gap-2 mt-2">
+                            <MudNumericField @bind-Value="_jingle.AudioStart" Label="Commencer à (s)" Min="0" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@string.IsNullOrEmpty(_jingle.AudioFile)" @bind-Value:after="@Changed"/>
+                            <MudNumericField @bind-Value="_jingle.Duration" Label="@(string.IsNullOrEmpty(_jingle.AudioFile) ? "Durée (s)" : "Couper à (s), 0 = tout")" Min="0" Max="120" Variant="Variant.Outlined" Margin="Margin.Dense" @bind-Value:after="@Changed"/>
+                        </div>
+                        <MudText Typo="Typo.body2" Class="n-muted mt-1">Les rectangles suivent les graves, les médiums et les aigus, et changent de place à chaque temps fort. Sans son : une pulsation régulière.</MudText>
+                    </div>
+
+                    <div class="n-card">
+                        <div class="n-card-title">3. Le style</div>
+                        <StylePicker Style="@_jingle.Style" Changed="@Changed"/>
+                        <MudSelect T="ImportRole" @bind-Value="_role" Label="Ranger dans" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-3">
+                            @foreach (ImportRole role in AtelierService.OutputRoles)
+                            {
+                                <MudSelectItem Value="@role">@FolderImportService.Label(role)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-column gap-3">
+                    <div class="n-card">
+                        <div class="n-card-title">Aperçu</div>
+                        <div class="n-atelier-preview">
+                            @if (_preview is null)
+                            {
+                                <MudProgressCircular Indeterminate="true"/>
+                            }
+                            else
+                            {
+                                <img src="@_preview" alt="Aperçu"/>
+                            }
+                        </div>
+                        <MudSlider T="double" Value="@_previewAt" ValueChanged="@(async v => { _previewAt = v; await Changed(); })" Min="0" Max="@PreviewMax" Step="0.2" Color="Color.Primary" Class="mt-2"/>
+                        <MudText Typo="Typo.caption" Class="n-muted">Image à @_previewAt.ToString("0.0", Fr) s · image fixe : le mouvement se voit dans la vidéo</MudText>
+                        <div class="d-flex gap-2 mt-3 flex-wrap">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" StartIcon="@Icons.Material.Filled.Movie" OnClick="@CreateJingle" Disabled="@Running">Créer la vidéo</MudButton>
+                        </div>
+                    </div>
+                    <JobCard Job="@_job"/>
+                </div>
+            </div>
+        </MudTabPanel>
+
+        @* ================================================================ BANDES-ANNONCES *@
+        <MudTabPanel Text="Bande-annonce" Icon="@Icons.Material.Filled.Theaters">
+            <div class="n-atelier">
+                <div class="d-flex flex-column gap-3">
+                    <div class="n-card">
+                        <div class="n-card-title">1. Le programme annoncé</div>
+                        <MudTextField @bind-Value="_trailer.Title" Label="Titre" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                        <div class="d-flex gap-2 align-start mt-2">
+                            <MudTextField @bind-Value="_trailer.DateLine" Label="Diffusion" Placeholder="Ex. 20H40 LUNDI 20" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex: 1"/>
+                            <MudTooltip Text="Chercher la prochaine diffusion de ce titre dans le guide">
+                                <MudIconButton Icon="@Icons.Material.Filled.EventAvailable" OnClick="@FindNextAiring" Style="margin-top: 4px"/>
+                            </MudTooltip>
+                        </div>
+                        <MudTextField @bind-Value="_trailer.Label" Label="Étiquette d'ouverture" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"/>
+                        <MudTextField @bind-Value="_trailer.ChannelName" Label="Nom de la chaîne (facultatif)" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"/>
+                    </div>
+
+                    <div class="n-card">
+                        <div class="n-card-title">2. La musique</div>
+                        <SourcePicker Value="@_trailer.MusicFile" ValueChanged="@(v => _trailer.MusicFile = v)" EmptyLabel="Aucune : le son des extraits"/>
+                        @if (!string.IsNullOrEmpty(_trailer.MusicFile))
+                        {
+                            <MudSwitch T="bool" @bind-Value="_trailer.KeepOriginalAudio" Color="Color.Primary" Label="Garder aussi le son des extraits, en fond"/>
+                        }
+                    </div>
+
+                    <div class="n-card">
+                        <div class="n-card-title">3. Le style</div>
+                        <StylePicker Style="@_trailer.Style"/>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-column gap-3">
+                    <div class="n-card">
+                        <div class="n-card-title">Les extraits · @_trailer.Extracts.Count · @TrailerLength()</div>
+                        <MudAutocomplete T="AtelierItem" Value="@_pick" ValueChanged="@AddProgramme" SearchFunc="@SearchItems" ToStringFunc="@(i => i?.Title)" Label="Ajouter un programme (film, épisode, vidéo)"
+                                         Variant="Variant.Outlined" Margin="Margin.Dense" DebounceInterval="300" MinCharacters="2" ResetValueOnEmptyText="true">
+                            <ItemTemplate Context="item"><div><b>@item.Title</b> <span class="n-muted">· @item.Detail</span></div></ItemTemplate>
+                        </MudAutocomplete>
+                        <MudText Typo="Typo.body2" Class="n-muted mt-1 mb-2">Chaque programme ajoute 3 extraits répartis dans le film ; réglez le début et la durée de chacun en regardant la vignette.</MudText>
+                        @for (int i = 0; i < _trailer.Extracts.Count; i++)
+                        {
+                            int index = i;
+                            TrailerExtract extract = _trailer.Extracts[index];
+                            <div class="n-extract" @key="extract">
+                                <img src="@($"nounours/atelier/vignette?item={extract.MediaItemId}&t={((int)extract.Start).ToString(CultureInfo.InvariantCulture)}")" alt="" loading="lazy"/>
+                                <div style="flex: 1; min-width: 0">
+                                    <div class="d-flex align-center gap-1">
+                                        <b style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">@(index + 1). @extract.Title</b>
+                                        <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small" Disabled="@(index == 0)" OnClick="@(() => Move(index, -1))"/>
+                                        <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small" Disabled="@(index == _trailer.Extracts.Count - 1)" OnClick="@(() => Move(index, 1))"/>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="@(() => _trailer.Extracts.RemoveAt(index))"/>
+                                    </div>
+                                    <MudText Typo="Typo.caption" Class="n-muted">Début : @Clock(extract.Start) / @Clock(extract.ItemDuration)</MudText>
+                                    <MudSlider T="double" @bind-Value="extract.Start" Min="0" Max="@Math.Max(1, extract.ItemDuration - extract.Length)" Step="1" Color="Color.Primary"/>
+                                    <div class="d-flex align-center gap-2">
+                                        <MudText Typo="Typo.caption" Class="n-muted">Durée</MudText>
+                                        <MudSlider T="double" @bind-Value="extract.Length" Min="1" Max="15" Step="0.5" Color="Color.Secondary" Style="max-width: 200px"/>
+                                        <MudText Typo="Typo.caption">@extract.Length.ToString("0.#", Fr) s</MudText>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        @if (_trailer.Extracts.Count == 0)
+                        {
+                            <div class="n-empty" style="padding: 24px">Ajoutez un ou plusieurs programmes ci-dessus.</div>
+                        }
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" Class="mt-3" StartIcon="@Icons.Material.Filled.Theaters"
+                                   OnClick="@CreateTrailer" Disabled="@(Running || _trailer.Extracts.Count == 0)">Créer la bande-annonce</MudButton>
+                        <MudText Typo="Typo.body2" Class="n-muted mt-1">Ouverture (étiquette + titre) → extraits dans le cadre clair avec le bandeau titre / diffusion → fermeture avec la date.</MudText>
+                    </div>
+                    <JobCard Job="@_job"/>
+                </div>
+            </div>
+        </MudTabPanel>
+
+        @* ================================================================ CRÉATIONS *@
+        <MudTabPanel Text="Mes créations" Icon="@Icons.Material.Filled.VideoLibrary">
+            @{
+                List<AtelierFile> files = AtelierService.Creations();
+            }
+            @if (files.Count == 0)
+            {
+                <div class="n-empty">Rien pour l'instant : vos jingles et bandes-annonces apparaîtront ici.</div>
+            }
+            else
+            {
+                <div class="n-templates">
+                    @foreach (AtelierFile file in files)
+                    {
+                        <div class="n-card" @key="file.Path" style="padding: 10px">
+                            <video src="@($"nounours/atelier/video?path={Uri.EscapeDataString(file.Path)}")" controls preload="metadata" style="width: 100%; border-radius: 8px; background: #000"></video>
+                            <div class="d-flex align-center gap-1 mt-1">
+                                <div style="flex: 1; min-width: 0">
+                                    <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap" title="@file.Name">@Pretty(file.Name)</div>
+                                    <div class="n-muted" style="font-size: .8rem">@FolderImportService.Label(file.Role) · @file.Modified.ToString("d MMM HH:mm", Fr)</div>
+                                </div>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => Delete(file))"/>
+                            </div>
+                        </div>
+                    }
+                </div>
+                <MudText Typo="Typo.body2" Class="n-muted mt-3">Ces vidéos sont dans vos collections d'habillage (Jingles, Bandes-annonces…) : utilisez-les dans un <MudLink Href="programmes">programme</MudLink> (segment « Jingle », « Bande-annonce »…).</MudText>
+            }
+        </MudTabPanel>
+    </MudTabs>
+</div>
+
+@code {
+    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
+
+    private static readonly (AtelierKind, string, string)[] Kinds =
+    [
+        (AtelierKind.Jingle, "Jingle avant programme", Icons.Material.Filled.PlayCircle),
+        (AtelierKind.Generique, "Générique", Icons.Material.Filled.Subtitles),
+        (AtelierKind.Annonce, "Annonce", Icons.Material.Filled.Campaign),
+        (AtelierKind.DebutPub, "Début de pub", Icons.Material.Filled.Login),
+        (AtelierKind.FinPub, "Fin de pub", Icons.Material.Filled.Logout)
+    ];
+
+    private static readonly string[] Labels = ["FILM", "SÉRIE", "CINÉMA", "SPORT", "DOCUMENTAIRE", "JEUNESSE", "MAGAZINE", "INFO", "MUSIQUE", "DESSIN ANIMÉ"];
+
+    private readonly JingleSpec _jingle = new() { Label = "FILM", Title = "Le film du soir", Subtitle = "", Duration = 0 };
+    private readonly TrailerSpec _trailer = new() { Title = "Le film du soir", DateLine = "CE SOIR 20H40" };
+    private string _credits = "Production : NounoursCorp\nRéalisation : \nMusique : ";
+    private ImportRole _role = ImportRole.Jingles;
+    private int _tab;
+    private string _preview;
+    private double _previewAt = 2.4;
+    private AtelierJob _job;
+    private AtelierItem _pick;
+    private Timer _timer;
+    private CancellationTokenSource _previewCts;
+
+    private bool Running => _job is { State: AtelierJobState.Running };
+    private double PreviewMax => _jingle.Duration > 0 ? _jingle.Duration : string.IsNullOrEmpty(_jingle.AudioFile) ? 6 : 30;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _job = Atelier.Jobs.FirstOrDefault(j => j.State == AtelierJobState.Running);
+        _timer = new Timer(_ => InvokeAsync(StateHasChanged), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        await Changed();
+    }
+
+    private async Task Changed()
+    {
+        _jingle.Credits = (_credits ?? string.Empty).Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Where(l => !l.EndsWith(':')).ToList();
+        if (_jingle.Kind != AtelierKind.Generique)
+        {
+            _jingle.Credits = [];
+        }
+
+        _previewCts?.Cancel();
+        _previewCts = new CancellationTokenSource();
+        CancellationToken token = _previewCts.Token;
+        try
+        {
+            double max = PreviewMax;
+            _previewAt = Math.Min(_previewAt, max);
+            var spec = new JingleSpec
+            {
+                Kind = _jingle.Kind, Title = _jingle.Title, Subtitle = _jingle.Subtitle, Label = _jingle.Label, ChannelName = _jingle.ChannelName,
+                Credits = _jingle.Credits, AudioFile = _jingle.AudioFile, AudioStart = _jingle.AudioStart,
+                Duration = _jingle.Duration > 0 ? _jingle.Duration : string.IsNullOrEmpty(_jingle.AudioFile) ? 6 : 30, Style = _jingle.Style
+            };
+            _preview = await Atelier.PreviewJingle(spec, _previewAt, token);
+        }
+        catch (OperationCanceledException)
+        {
+            // un autre aperçu est demandé
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Aperçu impossible : {ex.Message}", Severity.Warning);
+        }
+    }
+
+    private async Task SetKind(AtelierKind kind)
+    {
+        _jingle.Kind = kind;
+        _role = kind is AtelierKind.DebutPub or AtelierKind.FinPub ? ImportRole.Pubs : ImportRole.Jingles;
+        if (kind == AtelierKind.Annonce && Labels.Contains(_jingle.Label))
+        {
+            _jingle.Label = "CE SOIR";
+        }
+        else if (kind == AtelierKind.Jingle && !Labels.Contains(_jingle.Label))
+        {
+            _jingle.Label = "FILM";
+        }
+
+        await Changed();
+    }
+
+    private Task<IEnumerable<string>> SearchLabels(string text, CancellationToken token) =>
+        Task.FromResult(string.IsNullOrWhiteSpace(text) ? Labels.AsEnumerable() : Labels.Where(l => l.Contains(text, StringComparison.OrdinalIgnoreCase)).Append(text.ToUpperInvariant()).Distinct());
+
+    private void CreateJingle()
+    {
+        _jingle.Credits = _jingle.Kind == AtelierKind.Generique
+            ? (_credits ?? string.Empty).Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Where(l => !l.EndsWith(':')).ToList()
+            : [];
+        var spec = System.Text.Json.JsonSerializer.Deserialize<JingleSpec>(System.Text.Json.JsonSerializer.Serialize(_jingle));
+        _job = Atelier.StartJingle(spec, _role);
+    }
+
+    private void CreateTrailer()
+    {
+        var spec = System.Text.Json.JsonSerializer.Deserialize<TrailerSpec>(System.Text.Json.JsonSerializer.Serialize(_trailer));
+        _job = Atelier.StartTrailer(spec);
+    }
+
+    private Task<IEnumerable<AtelierItem>> SearchItems(string text, CancellationToken token) =>
+        Atelier.SearchItems(text, token).Map(l => (IEnumerable<AtelierItem>)l);
+
+    private void AddProgramme(AtelierItem item)
+    {
+        _pick = null;
+        if (item is null)
+        {
+            return;
+        }
+
+        double d = Math.Max(10, item.Duration);
+        double length = Math.Clamp(d / 12, 2, 4.5);
+        foreach (double at in new[] { 0.22, 0.48, 0.72 })
+        {
+            _trailer.Extracts.Add(new TrailerExtract
+            {
+                MediaItemId = item.MediaItemId, Title = item.Title, Path = item.Path, ItemDuration = d,
+                Start = Math.Floor(Math.Min(d - length, d * at)), Length = length
+            });
+        }
+
+        if (_trailer.Extracts.Count == 3 && (_trailer.Title == "Le film du soir" || string.IsNullOrWhiteSpace(_trailer.Title)))
+        {
+            _trailer.Title = item.Title;
+        }
+    }
+
+    private void Move(int index, int direction)
+    {
+        int target = index + direction;
+        (_trailer.Extracts[index], _trailer.Extracts[target]) = (_trailer.Extracts[target], _trailer.Extracts[index]);
+    }
+
+    private async Task FindNextAiring()
+    {
+        DateTimeOffset now = DateTimeOffset.Now;
+        List<GuideEntry> entries = await GuideService.GetEntries(now, now.AddDays(14), [], includeFiller: false, CancellationToken.None);
+        GuideEntry next = entries
+            .Where(e => string.Equals(e.DisplayTitle, _trailer.Title, StringComparison.OrdinalIgnoreCase) || string.Equals(e.Title, _trailer.Title, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(e => e.Start)
+            .FirstOrDefault(e => e.Start > now);
+        if (next is null)
+        {
+            Snackbar.Add("Pas de diffusion de ce titre dans les 14 prochains jours.", Severity.Info);
+            return;
+        }
+
+        DateTimeOffset start = next.Start.ToLocalTime();
+        string day = start.Date == now.Date ? "CE SOIR" : start.Date == now.Date.AddDays(1) ? "DEMAIN" : start.ToString("dddd d", Fr).ToUpperInvariant();
+        _trailer.DateLine = $"{start:HH}H{start:mm} {day}";
+    }
+
+    private string TrailerLength()
+    {
+        double seconds = 2.4 + _trailer.Extracts.Sum(e => e.Length) + 3.2;
+        return $"{seconds.ToString("0", Fr)} s au total";
+    }
+
+    private void Delete(AtelierFile file)
+    {
+        AtelierService.DeleteCreation(file.Path);
+        Snackbar.Add("Vidéo supprimée (elle disparaîtra de la médiathèque à la prochaine analyse).", Severity.Info);
+    }
+
+    private static string Clock(double seconds)
+    {
+        var t = TimeSpan.FromSeconds(Math.Max(0, seconds));
+        return t.TotalHours >= 1 ? t.ToString(@"h\:mm\:ss", CultureInfo.InvariantCulture) : t.ToString(@"m\:ss", CultureInfo.InvariantCulture);
+    }
+
+    private static string Pretty(string fileName) =>
+        Path.GetFileNameWithoutExtension(fileName).Replace(AtelierService.FilePrefix, string.Empty, StringComparison.Ordinal).Replace('-', ' ');
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+        _previewCts?.Cancel();
+        _previewCts?.Dispose();
+    }
+}

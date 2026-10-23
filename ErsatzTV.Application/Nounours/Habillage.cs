@@ -21,7 +21,13 @@ public enum HabillageItemKind
     Banner,
 
     /// <summary>Cadre « passe-partout » : bordure pleine autour de l'image, fenêtre transparente au centre.</summary>
-    Frame
+    Frame,
+
+    /// <summary>Bandeau défilant : phrases, flux RSS, météo.</summary>
+    Ticker,
+
+    /// <summary>Signalétique jeunesse : rond « -10 / -12 / -16 / -18 » selon la classification du programme.</summary>
+    Rating
 }
 
 public enum HabillageVisibility
@@ -85,6 +91,16 @@ public sealed class HabillageItem
     public double FrameBottom { get; set; } = 9;
     public bool FrameShadow { get; set; } = true;
 
+    // bandeau défilant (Kind = Ticker) : couleur du fond = BackgroundColor, hauteur = Height
+    public string TickerMessages { get; set; } = string.Empty;
+    public string RssUrl { get; set; } = string.Empty;
+    public string WeatherCity { get; set; } = string.Empty;
+    public double? WeatherLatitude { get; set; }
+    public double? WeatherLongitude { get; set; }
+    public double TickerSpeed { get; set; } = 140;
+    public string TickerLabel { get; set; } = "INFO";
+    public string LabelColor { get; set; } = "#F5B700";
+
     // image
     public string ImagePath { get; set; } = string.Empty;
 
@@ -110,6 +126,12 @@ public sealed class HabillageScene
     public bool MergeWithSchedule { get; set; } = true;
 
     public string PreviewBackground { get; set; } = string.Empty;
+
+    /// <summary>Plage horaire d'affichage « HH:mm » (vide = toute la journée). Ex. 06:00 → 09:00 pour une matinale.</summary>
+    public string ShowFrom { get; set; } = string.Empty;
+
+    public string ShowUntil { get; set; } = string.Empty;
+
     public List<HabillageItem> Items { get; set; } = [];
     public int? DecoId { get; set; }
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.Now;
@@ -117,7 +139,14 @@ public sealed class HabillageScene
 
 public sealed record HabillageSummary(string Slug, string Name, string Description, int Items, DateTimeOffset UpdatedAt, List<string> Channels);
 
-public sealed record HabillageChannelTarget(int ChannelId, string Number, string Name, int PlayoutId, int? CurrentDecoId, string CurrentDecoName);
+public sealed record HabillageChannelTarget(
+    int ChannelId,
+    string Number,
+    string Name,
+    int PlayoutId,
+    int? CurrentDecoId,
+    string CurrentDecoName,
+    List<string> Scenes);
 
 public interface IHabillageService
 {
@@ -130,7 +159,10 @@ public interface IHabillageService
     Task Delete(string slug, CancellationToken cancellationToken);
     Task<List<HabillageChannelTarget>> GetTargets(CancellationToken cancellationToken);
 
-    /// <summary>Définit la scène comme deco par défaut des chaînes choisies (et la retire des autres).</summary>
+    /// <summary>
+    ///     Met la scène sur les chaînes choisies (et la retire des autres). Une chaîne peut cumuler plusieurs habillages :
+    ///     ils sont alors réunis dans une deco « Habillage combiné · numéro », chacun avec sa plage horaire.
+    /// </summary>
     Task Apply(string slug, IReadOnlyCollection<int> channelIds, CancellationToken cancellationToken);
 
     Task<string> SaveAsset(string fileName, Stream content, CancellationToken cancellationToken);
@@ -146,6 +178,7 @@ public sealed partial class HabillageService(
     IMediator mediator) : IHabillageService
 {
     public const string DecoGroupName = "Habillages";
+    private bool _rebuilding;
     private const string FilePrefix = "hab_";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -166,7 +199,7 @@ public sealed partial class HabillageService(
             foreach (HabillageScene scene in maybeScene)
             {
                 var channels = targets
-                    .Where(t => scene.DecoId.HasValue && t.CurrentDecoId == scene.DecoId)
+                    .Where(t => t.Scenes.Contains(scene.Slug))
                     .Select(t => $"{t.Number} · {t.Name}")
                     .ToList();
                 result.Add(new HabillageSummary(scene.Slug, scene.Name, scene.Description, scene.Items.Count, scene.UpdatedAt, channels));
@@ -200,6 +233,10 @@ public sealed partial class HabillageService(
             if (item.Kind == HabillageItemKind.Banner)
             {
                 item.ImagePath = RenderBanner(scene.Slug, item);
+            }
+            else if (item.Kind == HabillageItemKind.Rating)
+            {
+                RenderRatingIcons();
             }
             else if (item.Kind == HabillageItemKind.Frame)
             {
@@ -246,12 +283,20 @@ public sealed partial class HabillageService(
                 .FirstOrDefaultAsync(d => d.Id == scene.DecoId.Value, cancellationToken);
         }
 
+        // deux habillages du même nom : le nom de la deco doit rester unique dans le groupe
+        string decoName = DecoName(scene);
+        int currentId = deco?.Id ?? 0;
+        if (await dbContext.Decos.AnyAsync(d => d.DecoGroupId == group.Id && d.Name == decoName && d.Id != currentId, cancellationToken))
+        {
+            decoName = $"{decoName} ({scene.Slug})";
+        }
+
         if (deco is null)
         {
             deco = new Deco
             {
                 DecoGroupId = group.Id,
-                Name = DecoName(scene),
+                Name = decoName,
                 WatermarkMode = DecoMode.Inherit,
                 DefaultFillerMode = DecoMode.Inherit,
                 DeadAirFallbackMode = DecoMode.Inherit,
@@ -263,7 +308,7 @@ public sealed partial class HabillageService(
             await dbContext.Decos.AddAsync(deco, cancellationToken);
         }
 
-        deco.Name = DecoName(scene);
+        deco.Name = decoName;
         deco.GraphicsElementsMode = wanted.Count == 0
             ? DecoMode.Inherit
             : scene.MergeWithSchedule ? DecoMode.Merge : DecoMode.Override;
@@ -291,11 +336,35 @@ public sealed partial class HabillageService(
             JsonSerializer.Serialize(scene, JsonOptions),
             cancellationToken);
 
+        if (!_rebuilding)
+        {
+            _rebuilding = true;
+            try
+            {
+                await RefreshCombined(scene.Slug, cancellationToken);
+            }
+            finally
+            {
+                _rebuilding = false;
+            }
+        }
+
         return scene;
     }
 
     public async Task Delete(string slug, CancellationToken cancellationToken)
     {
+        Dictionary<int, List<string>> map = await LoadChannelMap(cancellationToken);
+        var affected = map.Where(m => m.Value.Remove(slug)).Select(m => m.Key).ToList();
+        if (affected.Count > 0)
+        {
+            await SaveChannelMap(map, cancellationToken);
+            foreach (int channelId in affected)
+            {
+                await RebuildChannelDeco(channelId, map[channelId], cancellationToken);
+            }
+        }
+
         Option<HabillageScene> maybeScene = await GetScene(slug, cancellationToken);
         foreach (HabillageScene scene in maybeScene)
         {
@@ -347,6 +416,7 @@ public sealed partial class HabillageService(
             .Include(p => p.Deco)
             .ToListAsync(cancellationToken);
 
+        Dictionary<int, List<string>> map = await LoadChannelMap(cancellationToken);
         return rows
             .OrderBy(p => p.Channel.SortNumber)
             .Select(p => new HabillageChannelTarget(
@@ -355,7 +425,8 @@ public sealed partial class HabillageService(
                 p.Channel.Name,
                 p.Id,
                 p.DecoId,
-                p.Deco?.Name))
+                p.Deco?.Name,
+                map.GetValueOrDefault(p.ChannelId) ?? []))
             .ToList();
     }
 
@@ -364,23 +435,193 @@ public sealed partial class HabillageService(
         Option<HabillageScene> maybeScene = await GetScene(slug, cancellationToken);
         foreach (HabillageScene loaded in maybeScene)
         {
-            HabillageScene scene = loaded.DecoId.HasValue ? loaded : await Save(loaded, cancellationToken);
-
-            await using TvContext dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-            List<Playout> playouts = await dbContext.Playouts.ToListAsync(cancellationToken);
-            foreach (Playout playout in playouts)
+            if (!loaded.DecoId.HasValue)
             {
-                if (channelIds.Contains(playout.ChannelId))
+                await Save(loaded, cancellationToken);
+            }
+
+            Dictionary<int, List<string>> map = await LoadChannelMap(cancellationToken);
+            await using TvContext dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+            List<int> allChannels = await dbContext.Playouts.Select(p => p.ChannelId).ToListAsync(cancellationToken);
+            var touched = new System.Collections.Generic.HashSet<int>();
+            foreach (int channelId in allChannels)
+            {
+                List<string> scenes = map.GetValueOrDefault(channelId) ?? [];
+                bool has = scenes.Contains(slug);
+                bool want = channelIds.Contains(channelId);
+                if (has != want)
                 {
-                    playout.DecoId = scene.DecoId;
-                }
-                else if (playout.DecoId == scene.DecoId)
-                {
-                    playout.DecoId = null;
+                    if (want)
+                    {
+                        scenes.Add(slug);
+                    }
+                    else
+                    {
+                        scenes.Remove(slug);
+                    }
+
+                    map[channelId] = scenes;
+                    touched.Add(channelId);
                 }
             }
 
-            await dbContext.SaveChangesAsync(cancellationToken);
+            await SaveChannelMap(map, cancellationToken);
+            foreach (int channelId in touched)
+            {
+                await RebuildChannelDeco(channelId, map.GetValueOrDefault(channelId) ?? [], cancellationToken);
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ plusieurs habillages par chaîne
+
+    private static string ChannelMapPath => Path.Combine(FileSystemLayout.HabillageScenesFolder, "_chaines.cfg");
+
+    /// <summary>Quels habillages sur quelle chaîne. Au premier appel, déduit de la deco actuelle des chaînes.</summary>
+    private async Task<Dictionary<int, List<string>>> LoadChannelMap(CancellationToken cancellationToken)
+    {
+        if (File.Exists(ChannelMapPath))
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<Dictionary<int, List<string>>>(await File.ReadAllTextAsync(ChannelMapPath, cancellationToken)) ?? [];
+            }
+            catch (JsonException)
+            {
+                // fichier abîmé : on le reconstruit
+            }
+        }
+
+        var map = new Dictionary<int, List<string>>();
+        var scenes = new List<HabillageScene>();
+        if (Directory.Exists(FileSystemLayout.HabillageScenesFolder))
+        {
+            foreach (string file in Directory.GetFiles(FileSystemLayout.HabillageScenesFolder, "*.json"))
+            {
+                foreach (HabillageScene scene in await Load(file, cancellationToken))
+                {
+                    scenes.Add(scene);
+                }
+            }
+        }
+
+        await using TvContext dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        foreach (var playout in await dbContext.Playouts.AsNoTracking().Select(p => new { p.ChannelId, p.DecoId }).ToListAsync(cancellationToken))
+        {
+            HabillageScene match = scenes.Find(s => s.DecoId.HasValue && s.DecoId == playout.DecoId);
+            if (match is not null)
+            {
+                map[playout.ChannelId] = [match.Slug];
+            }
+        }
+
+        return map;
+    }
+
+    private static async Task SaveChannelMap(Dictionary<int, List<string>> map, CancellationToken cancellationToken)
+    {
+        Directory.CreateDirectory(FileSystemLayout.HabillageScenesFolder);
+        await File.WriteAllTextAsync(ChannelMapPath, JsonSerializer.Serialize(map, JsonOptions), cancellationToken);
+    }
+
+    /// <summary>Remet la deco d'une chaîne d'accord avec ses habillages : aucune, celle de la scène, ou une deco combinée.</summary>
+    private async Task RebuildChannelDeco(int channelId, List<string> slugs, CancellationToken cancellationToken)
+    {
+        var scenes = new List<HabillageScene>();
+        foreach (string slug in slugs)
+        {
+            foreach (HabillageScene scene in await GetScene(slug, cancellationToken))
+            {
+                scenes.Add(scene.DecoId.HasValue ? scene : await Save(scene, cancellationToken));
+            }
+        }
+
+        await using TvContext dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        Playout playout = await dbContext.Playouts
+            .Include(p => p.Channel)
+            .Include(p => p.Deco)
+            .ThenInclude(d => d.DecoGroup)
+            .FirstOrDefaultAsync(p => p.ChannelId == channelId, cancellationToken);
+        if (playout is null)
+        {
+            return;
+        }
+
+        string compositeName = $"Habillage combiné · {playout.Channel.Number}";
+        Deco composite = await dbContext.Decos
+            .Include(d => d.DecoGraphicsElements)
+            .FirstOrDefaultAsync(d => d.Name == compositeName, cancellationToken);
+
+        switch (scenes.Count)
+        {
+            case 0:
+                // on ne retire que nos propres decos (une deco faite à la main reste)
+                if (playout.Deco?.DecoGroup?.Name == DecoGroupName)
+                {
+                    playout.DecoId = null;
+                }
+
+                break;
+            case 1:
+                playout.DecoId = scenes[0].DecoId;
+                break;
+            default:
+            {
+                var decoIds = scenes.Select(s => s.DecoId!.Value).ToList();
+                List<Deco> parts = await dbContext.Decos
+                    .AsNoTracking()
+                    .Include(d => d.DecoGraphicsElements)
+                    .Where(d => decoIds.Contains(d.Id))
+                    .ToListAsync(cancellationToken);
+                var elementIds = parts.SelectMany(d => d.DecoGraphicsElements.Select(e => e.GraphicsElementId)).Distinct().ToList();
+
+                if (composite is null)
+                {
+                    DecoGroup group = await dbContext.DecoGroups.FirstAsync(g => g.Name == DecoGroupName, cancellationToken);
+                    composite = new Deco
+                    {
+                        DecoGroupId = group.Id,
+                        Name = compositeName,
+                        WatermarkMode = DecoMode.Inherit,
+                        DefaultFillerMode = DecoMode.Inherit,
+                        DeadAirFallbackMode = DecoMode.Inherit,
+                        BreakContentMode = DecoMode.Inherit,
+                        DecoGraphicsElements = [],
+                        DecoWatermarks = [],
+                        BreakContent = []
+                    };
+                    await dbContext.Decos.AddAsync(composite, cancellationToken);
+                }
+
+                composite.GraphicsElementsMode = scenes.Any(s => s.MergeWithSchedule) ? DecoMode.Merge : DecoMode.Override;
+                composite.UseGraphicsElementsDuringFiller = scenes.Any(s => s.UseDuringFiller);
+                composite.DecoGraphicsElements.RemoveAll(e => !elementIds.Contains(e.GraphicsElementId));
+                foreach (int id in elementIds.Where(id => composite.DecoGraphicsElements.All(e => e.GraphicsElementId != id)))
+                {
+                    composite.DecoGraphicsElements.Add(new DecoGraphicsElement { GraphicsElementId = id });
+                }
+
+                await dbContext.SaveChangesAsync(cancellationToken);
+                playout.DecoId = composite.Id;
+                break;
+            }
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>Après l'enregistrement d'une scène, met à jour les decos combinées qui l'utilisent.</summary>
+    private async Task RefreshCombined(string slug, CancellationToken cancellationToken)
+    {
+        if (!File.Exists(ChannelMapPath))
+        {
+            return;
+        }
+
+        Dictionary<int, List<string>> map = await LoadChannelMap(cancellationToken);
+        foreach ((int channelId, List<string> slugs) in map.Where(m => m.Value.Count > 1 && m.Value.Contains(slug)))
+        {
+            await RebuildChannelDeco(channelId, slugs, cancellationToken);
         }
     }
 
@@ -441,6 +682,27 @@ public sealed partial class HabillageService(
         return result.OrderBy(f => f.Family).ToList();
     }
 
+    private static readonly HttpClient Geo = new() { Timeout = TimeSpan.FromSeconds(6) };
+
+    /// <summary>Coordonnées d'une ville pour la météo du bandeau (service gratuit Open-Meteo).</summary>
+    public static async Task<(string Name, double Latitude, double Longitude)?> FindCity(string city, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(city))
+        {
+            return null;
+        }
+
+        string url = $"https://geocoding-api.open-meteo.com/v1/search?name={Uri.EscapeDataString(city.Trim())}&count=1&language=fr&format=json";
+        using JsonDocument json = JsonDocument.Parse(await Geo.GetStringAsync(url, cancellationToken));
+        if (!json.RootElement.TryGetProperty("results", out JsonElement results) || results.GetArrayLength() == 0)
+        {
+            return null;
+        }
+
+        JsonElement first = results[0];
+        return (first.GetProperty("name").GetString(), first.GetProperty("latitude").GetDouble(), first.GetProperty("longitude").GetDouble());
+    }
+
     public string GenerateYamlPreview(HabillageItem item) => BuildYaml(new HabillageScene { Name = "aperçu" }, item);
 
     // ------------------------------------------------------------------ YAML
@@ -457,7 +719,7 @@ public sealed partial class HabillageService(
         sb.AppendLine(CultureInfo.InvariantCulture, $"vertical_margin_percent: {Num(item.Y)}");
         sb.AppendLine(CultureInfo.InvariantCulture, $"z_index: {item.ZIndex}");
 
-        string opacityExpression = OpacityExpression(item);
+        string opacityExpression = OpacityExpression(scene, item);
         if (string.IsNullOrEmpty(opacityExpression))
         {
             sb.AppendLine(CultureInfo.InvariantCulture, $"opacity_percent: {Math.Clamp(item.Opacity, 0, 100)}");
@@ -469,12 +731,59 @@ public sealed partial class HabillageService(
 
         switch (item.Kind)
         {
+            case HabillageItemKind.Rating:
+                // l'image dépend de la classification du programme (Scriban) ; rien n'est affiché sans classification
+                sb.AppendLine("image: \"{{ r = (MediaItem_ContentRating ?? MediaItem_ShowContentRating ?? '') | string.downcase }}"
+                              + $"{{{{ if (r | string.contains '18') || r == 'nc-17' }}}}{RatingIcon("18")}"
+                              + $"{{{{ else if (r | string.contains '16') || r == 'tv-ma' || r == 'r' }}}}{RatingIcon("16")}"
+                              + $"{{{{ else if (r | string.contains '12') || (r | string.contains '13') || (r | string.contains '14') }}}}{RatingIcon("12")}"
+                              + $"{{{{ else if (r | string.contains '10') || r == 'tv-pg' || r == 'pg' }}}}{RatingIcon("10")}"
+                              + $"{{{{ else }}}}{RatingIcon("aucune")}{{{{ end }}}}\"");
+                sb.AppendLine("scale: true");
+                sb.AppendLine(CultureInfo.InvariantCulture, $"scale_width_percent: {Num(item.Width)}");
+                break;
+
             case HabillageItemKind.Image:
             case HabillageItemKind.Banner:
             case HabillageItemKind.Frame:
                 sb.AppendLine(CultureInfo.InvariantCulture, $"image: {Quote(item.ImagePath)}");
                 sb.AppendLine("scale: true");
                 sb.AppendLine(CultureInfo.InvariantCulture, $"scale_width_percent: {Num(item.Width)}");
+                break;
+
+            case HabillageItemKind.Ticker:
+                sb.AppendLine(CultureInfo.InvariantCulture, $"width_percent: {Num(Math.Max(5, item.Width))}");
+                sb.AppendLine(CultureInfo.InvariantCulture, $"height_percent: {Num(Math.Max(2, item.Height))}");
+                sb.AppendLine(CultureInfo.InvariantCulture, $"background_color: {Quote(ToSkiaColor(item.BackgroundColor))}");
+                sb.AppendLine(CultureInfo.InvariantCulture, $"speed: {Num(item.TickerSpeed)}");
+                sb.AppendLine(CultureInfo.InvariantCulture, $"messages: {Quote((item.TickerMessages ?? string.Empty).Replace("\r", string.Empty).Replace('\n', '|'))}");
+                if (!string.IsNullOrWhiteSpace(item.RssUrl))
+                {
+                    sb.AppendLine(CultureInfo.InvariantCulture, $"rss_url: {Quote(item.RssUrl.Trim())}");
+                }
+
+                if (item.WeatherLatitude.HasValue && item.WeatherLongitude.HasValue)
+                {
+                    sb.AppendLine(CultureInfo.InvariantCulture, $"weather_latitude: {Num(item.WeatherLatitude.Value)}");
+                    sb.AppendLine(CultureInfo.InvariantCulture, $"weather_longitude: {Num(item.WeatherLongitude.Value)}");
+                    sb.AppendLine(CultureInfo.InvariantCulture, $"weather_label: {Quote(item.WeatherCity ?? string.Empty)}");
+                }
+
+                if (!string.IsNullOrWhiteSpace(item.TickerLabel))
+                {
+                    sb.AppendLine(CultureInfo.InvariantCulture, $"label: {Quote(item.TickerLabel)}");
+                    sb.AppendLine(CultureInfo.InvariantCulture, $"label_color: {Quote(ToSkiaColor(item.LabelColor))}");
+                }
+
+                sb.AppendLine("include_fonts_from: " + Quote(FileSystemLayout.FontsCacheFolder));
+                sb.AppendLine("base_style: base");
+                sb.AppendLine("styles:");
+                sb.AppendLine("  - name: base");
+                sb.AppendLine(CultureInfo.InvariantCulture, $"    font_family: {Quote(string.IsNullOrWhiteSpace(item.FontFamily) ? "Roboto" : item.FontFamily)}");
+                sb.AppendLine(CultureInfo.InvariantCulture, $"    font_weight: {item.FontWeight}");
+                sb.AppendLine(CultureInfo.InvariantCulture, $"    font_italic: {(item.Italic ? "true" : "false")}");
+                sb.AppendLine(CultureInfo.InvariantCulture, $"    text_color: {Quote(ToSkiaColor(item.Color))}");
+                sb.AppendLine("text: \"\"");
                 break;
 
             case HabillageItemKind.Clock:
@@ -564,6 +873,36 @@ public sealed partial class HabillageService(
         return sb.ToString();
     }
 
+    private static string OpacityExpression(HabillageScene scene, HabillageItem item)
+    {
+        string inner = OpacityExpression(item);
+        string gate = ScheduleGate(scene);
+        if (string.IsNullOrEmpty(gate))
+        {
+            return inner;
+        }
+
+        string itemPart = string.IsNullOrEmpty(inner) ? Num(Math.Clamp(item.Opacity, 0, 100) / 100.0) : $"({inner})";
+        return $"{itemPart} * ({gate})";
+    }
+
+    /// <summary>1 pendant la plage horaire de la scène, 0 sinon (fondu d'une seconde) ; gère le passage de minuit.</summary>
+    private static string ScheduleGate(HabillageScene scene)
+    {
+        if (!TimeSpan.TryParse(scene.ShowFrom, CultureInfo.InvariantCulture, out TimeSpan from) ||
+            !TimeSpan.TryParse(scene.ShowUntil, CultureInfo.InvariantCulture, out TimeSpan until) ||
+            from == until)
+        {
+            return string.Empty;
+        }
+
+        int f = (int)from.TotalSeconds;
+        int u = (int)until.TotalSeconds;
+        return f < u
+            ? $"LinearFadePoints(time_of_day_seconds, {f}, {f + 1}, {u - 1}, {u})"
+            : $"LinearFadePoints(time_of_day_seconds, {f}, {f + 1}, 86400, 86401) + LinearFadePoints(time_of_day_seconds, -1, 0, {u - 1}, {u})";
+    }
+
     private static string OpacityExpression(HabillageItem item)
     {
         double factor = Math.Clamp(item.Opacity, 0, 100) / 100.0;
@@ -621,6 +960,45 @@ public sealed partial class HabillageService(
         data.SaveTo(stream);
 
         return path;
+    }
+
+    // ------------------------------------------------------------------ signalétique jeunesse
+
+    public static string RatingIcon(string rating) =>
+        Path.Combine(FileSystemLayout.HabillageAssetsFolder, "generated", $"{FilePrefix}signaletique_{rating}.png").Replace('\\', '/');
+
+    /// <summary>Les ronds -10, -12, -16, -18 (disque blanc, cerclé de noir) et une image vide.</summary>
+    private static void RenderRatingIcons()
+    {
+        Directory.CreateDirectory(Path.Combine(FileSystemLayout.HabillageAssetsFolder, "generated"));
+        const int size = 256;
+        string fontPath = Path.Combine(FileSystemLayout.FontsCacheFolder, "Roboto-Black.ttf");
+        using SKTypeface typeface = File.Exists(fontPath) ? SKTypeface.FromFile(fontPath) : SKTypeface.FromFamilyName("Roboto", SKFontStyle.Bold);
+        foreach (string rating in new[] { "10", "12", "16", "18", "aucune" })
+        {
+            using var bitmap = new SKBitmap(size, size, SKColorType.Rgba8888, SKAlphaType.Premul);
+            using (var canvas = new SKCanvas(bitmap))
+            {
+                canvas.Clear(SKColors.Transparent);
+                if (rating != "aucune")
+                {
+                    using var white = new SKPaint { Color = SKColors.White, IsAntialias = true };
+                    using var ring = new SKPaint { Color = SKColors.Black, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = size * 0.07f };
+                    canvas.DrawCircle(size / 2f, size / 2f, size * 0.44f, white);
+                    canvas.DrawCircle(size / 2f, size / 2f, size * 0.44f, ring);
+                    using var font = new SKFont(typeface, size * 0.4f);
+                    using var ink = new SKPaint { Color = SKColors.Black, IsAntialias = true };
+                    string text = "-" + rating;
+                    float width = font.MeasureText(text);
+                    SKFontMetrics metrics = font.Metrics;
+                    canvas.DrawText(text, (size - width) / 2f, size / 2f - (metrics.Ascent + metrics.Descent) / 2f, font, ink);
+                }
+            }
+
+            using SKImage image = SKImage.FromBitmap(bitmap);
+            using SKData data = image.Encode(SKEncodedImageFormat.Png, 100);
+            File.WriteAllBytes(RatingIcon(rating), data.ToArray());
+        }
     }
 
     // ------------------------------------------------------------------ cadre (passe-partout)
@@ -687,6 +1065,7 @@ public sealed partial class HabillageService(
         string folder = item.Kind switch
         {
             HabillageItemKind.Clock => FileSystemLayout.GraphicsElementsClockTemplatesFolder,
+            HabillageItemKind.Ticker => FileSystemLayout.GraphicsElementsTickerTemplatesFolder,
             HabillageItemKind.Text => FileSystemLayout.GraphicsElementsTextTemplatesFolder,
             _ => FileSystemLayout.GraphicsElementsImageTemplatesFolder
         };
