@@ -53,7 +53,7 @@ public sealed class GridElement(GridGraphicsElement grid) : GraphicsElement, IDi
         _width = context.FrameSize.Width;
         _height = context.FrameSize.Height;
         _cols = Math.Max(2, (int)Math.Round(4.0 * _width / _height / (16.0 / 9)));
-        _palette = (grid.Palette ?? []).Select(c => SKColor.TryParse(c, out SKColor color) ? color : SKColors.Gray).ToArray();
+        _palette = (grid.Seasonal ? Seasons.Current.Palette.ToList() : grid.Palette ?? []).Select(c => SKColor.TryParse(c, out SKColor color) ? color : SKColors.Gray).ToArray();
         if (_palette.Length == 0)
         {
             _palette = [new SKColor(0xFF, 0x32, 0x00), new SKColor(0x8C, 0x0A, 0x11), new SKColor(0x3C, 0x36, 0x32)];

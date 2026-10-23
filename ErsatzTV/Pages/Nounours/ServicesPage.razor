@@ -5,6 +5,8 @@
 @using ErsatzTV.Application.Nounours.Atelier
 @using ErsatzTV.Shared.Nounours
 @inject IAutomationService Automation
+@inject IRegieService Regie
+@inject AtelierService Atelier
 @inject IMediator Mediator
 @inject ISnackbar Snackbar
 
@@ -14,7 +16,7 @@
     <div class="n-page-header">
         <div>
             <h1>Services automatiques</h1>
-            <p>Ce qu'ErsatzTV fait tout seul : publier le guide sur votre site, fabriquer le carton « Ce soir », supprimer les chaînes éphémères. Et les serveurs de voix off / sous-titres.</p>
+            <p>Ce qu'ErsatzTV fait tout seul : publier le guide sur votre site, fabriquer le carton « Ce soir », la bande-annonce de la semaine et la météo, passer l'ouverture et la fermeture d'antenne, supprimer les chaînes éphémères. Et les serveurs de voix off / sous-titres.</p>
         </div>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" OnClick="@Save">Enregistrer</MudButton>
     </div>
@@ -96,6 +98,136 @@
             </div>
         </MudItem>
 
+        @* ------------------------------------------------ cette semaine *@
+        <MudItem xs="12" lg="6">
+            <div class="n-card" style="height: 100%">
+                <div class="n-card-title">Bande-annonce « Cette semaine », refaite chaque semaine</div>
+                <MudSwitch T="bool" @bind-Value="_s.Weekly.Enabled" Color="Color.Primary" Label="La fabriquer automatiquement"/>
+                <div class="d-flex gap-2 mt-2">
+                    <MudSelect T="DayOfWeek" @bind-Value="_s.Weekly.Day" Label="Le" Variant="Variant.Outlined" Margin="Margin.Dense">
+                        @foreach (DayOfWeek day in Week)
+                        {
+                            <MudSelectItem Value="@day">@Fr.DateTimeFormat.GetDayName(day)</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudTextField @bind-Value="_s.Weekly.At" Label="à" Placeholder="08:00" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                    <MudNumericField @bind-Value="_s.Weekly.MaxFilms" Label="Films (max)" Min="1" Max="8" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                </div>
+                @ChannelChips(_s.Weekly.ChannelIds)
+                <div class="d-flex gap-2 mt-2">
+                    <MudTextField @bind-Value="_s.Weekly.Label" Label="Étiquette" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                    <MudTextField @bind-Value="_s.Weekly.ChannelName" Label="Nom de la chaîne" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                </div>
+                <div class="mt-2"><SourcePicker Value="@_s.Weekly.Music" ValueChanged="@(v => _s.Weekly.Music = v)" EmptyLabel="Le son des films"/></div>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Theaters" OnClick="@MakeWeekly" Disabled="@_busy" Class="mt-3">Fabriquer maintenant</MudButton>
+                @if (!string.IsNullOrEmpty(_s.Weekly.LastResult))
+                {
+                    <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Dernière fois (@_s.Weekly.LastMade?.ToString("dd/MM", Fr)) : @_s.Weekly.LastResult</MudText>
+                }
+                <JobCard Job="@_weeklyJob"/>
+                <MudText Typo="Typo.body2" Class="n-muted mt-2">Les films des 7 prochains jours trouvés dans le guide : deux extraits chacun, avec le jour et l'heure de diffusion. Toujours le même fichier (« Bandes-annonces ») : mettez-le une fois dans vos programmes.</MudText>
+            </div>
+        </MudItem>
+
+        @* ------------------------------------------------ météo *@
+        <MudItem xs="12" lg="6">
+            <div class="n-card" style="height: 100%">
+                <div class="n-card-title">Carte météo en quadrillage, chaque jour</div>
+                <MudSwitch T="bool" @bind-Value="_s.Weather.Enabled" Color="Color.Primary" Label="La fabriquer automatiquement"/>
+                <div class="d-flex gap-2 mt-2">
+                    <MudTextField @bind-Value="_s.Weather.At" Label="Fabriquée à" Placeholder="06:00" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                    <MudTextField @bind-Value="_s.Weather.Title" Label="Titre" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                    <MudNumericField @bind-Value="_s.Weather.Seconds" Label="Durée (s)" Min="4" Max="60" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                </div>
+                <MudTextField @bind-Value="_s.Weather.Cities" Label="Villes (une par ligne, 6 au plus)" Lines="4" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"/>
+                <MudTextField @bind-Value="_s.Weather.ChannelName" Label="Nom de la chaîne" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"/>
+                <div class="mt-2"><SourcePicker Value="@_s.Weather.Music" ValueChanged="@(v => _s.Weather.Music = v)" EmptyLabel="Sans musique"/></div>
+                <div class="d-flex gap-2 mt-3 flex-wrap">
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Preview" OnClick="@PreviewWeather" Disabled="@_busy">Voir les températures</MudButton>
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.WbSunny" OnClick="@MakeWeather" Disabled="@_busy">Fabriquer maintenant</MudButton>
+                </div>
+                @if (_weatherRows is not null)
+                {
+                    <div class="mt-2" style="font-size: .9rem">
+                        @foreach (WeatherRow row in _weatherRows)
+                        {
+                            <div><b>@row.Temperature</b> · @row.City · @row.Detail</div>
+                        }
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(_s.Weather.LastResult))
+                {
+                    <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Dernière fois (@_s.Weather.LastMade?.ToString("dd/MM", Fr)) : @_s.Weather.LastResult</MudText>
+                }
+                <JobCard Job="@_weatherJob"/>
+                <MudText Typo="Typo.body2" Class="n-muted mt-2">Températures d'Open-Meteo (gratuit, sans clé). Toujours le même fichier (« Bandes-annonces ») : placez-le dans un programme du matin.</MudText>
+            </div>
+        </MudItem>
+
+        @* ------------------------------------------------ interlude *@
+        <MudItem xs="12" lg="6">
+            <div class="n-card" style="height: 100%">
+                <div class="n-card-title">Interlude quadrillé</div>
+                <MudText Typo="Typo.body2" Class="n-muted mb-2">Une boucle de carrés au rythme d'une musique, qui passe quand une chaîne n'a rien de prévu, à la place d'un écran noir.</MudText>
+                <div class="d-flex gap-2">
+                    <MudTextField @bind-Value="_interludeLabel" Label="Étiquette" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                    <MudTextField @bind-Value="_interludeChannel" Label="Nom de la chaîne" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                    <MudNumericField @bind-Value="_interludeSeconds" Label="Durée (s)" Min="10" Max="300" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                </div>
+                <div class="mt-2"><SourcePicker Value="@_interludeMusic" ValueChanged="@(v => _interludeMusic = v)" EmptyLabel="Pulsation régulière"/></div>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.GridView" OnClick="@MakeInterlude" Disabled="@_busy" Class="mt-3">Fabriquer l'interlude</MudButton>
+                <JobCard Job="@_interludeJob"/>
+                @ChannelChips(_interludeChannels)
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Check" OnClick="@UseInterlude" Disabled="@(_busy || _interludeChannels.Count == 0)" Class="mt-2">L'utiliser sur ces chaînes</MudButton>
+                <MudText Typo="Typo.body2" Class="n-muted mt-2">Il devient le « remplissage de secours » de ces chaînes. L'heure s'affiche si l'habillage de la chaîne a une horloge et « Afficher aussi pendant les intercalaires ».</MudText>
+            </div>
+        </MudItem>
+
+        @* ------------------------------------------------ rendez-vous *@
+        <MudItem xs="12" lg="6">
+            <div class="n-card" style="height: 100%">
+                <div class="n-card-title">Rendez-vous d'antenne (ouverture, fermeture…)</div>
+                <MudText Typo="Typo.body2" Class="n-muted mb-2">À l'heure dite, la régie passe une vidéo une fois, puis la grille reprend exactement où elle en était. Fabriquez la vidéo dans l'Atelier (Annonce « BONJOUR », Carton « BONNE NUIT »…).</MudText>
+                @foreach (Appointment a in _s.Appointments)
+                {
+                    <div class="d-flex align-center gap-2 mb-1" @key="a.Id">
+                        <MudSwitch T="bool" @bind-Value="a.Enabled" Color="Color.Primary" Size="Size.Small"/>
+                        <span style="flex: 1"><b>@a.At</b> · @a.Name · @(_regieChannels.Find(c => c.PlayoutId == a.PlayoutId)?.Name ?? "?") · @a.MediaTitle · @(a.Days.Count == 0 ? "tous les jours" : string.Join(" ", a.Days.Select(d => Fr.DateTimeFormat.GetAbbreviatedDayName(d))))</span>
+                        @if (!string.IsNullOrEmpty(a.LastResult))
+                        {
+                            <span class="n-muted" style="font-size: .8rem">@a.LastRun?.ToString("dd/MM", Fr) @a.LastResult</span>
+                        }
+                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="@(() => _s.Appointments.Remove(a))"/>
+                    </div>
+                }
+                <div class="d-flex gap-2 mt-2 flex-wrap">
+                    <MudTextField @bind-Value="_newAppointment.Name" Label="Nom" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                    <MudTextField @bind-Value="_newAppointment.At" Label="Heure" Placeholder="06:00" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 100px"/>
+                    <MudSelect T="int" @bind-Value="_newAppointment.PlayoutId" Label="Chaîne" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 160px">
+                        @foreach (RegieChannel channel in _regieChannels)
+                        {
+                            <MudSelectItem Value="@channel.PlayoutId">@channel.Number · @channel.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+                <MudAutocomplete T="RegieSource" Value="@_newSource" ValueChanged="@(v => _newSource = v)" SearchFunc="@SearchSources" ToStringFunc="@(x => x?.Title)" Label="Vidéo"
+                                 Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" DebounceInterval="300" MinCharacters="0">
+                    <ItemTemplate Context="item"><div><b>@item.Title</b> <span class="n-muted">· @item.Detail</span></div></ItemTemplate>
+                </MudAutocomplete>
+                <div class="d-flex gap-1 flex-wrap mt-2 align-center">
+                    <span class="n-muted" style="font-size: .85rem">Jours (aucun = tous) :</span>
+                    @foreach (DayOfWeek day in Week)
+                    {
+                        bool on = _newAppointment.Days.Contains(day);
+                        <MudChip T="string" Size="Size.Small" Color="@(on ? Color.Primary : Color.Default)" Variant="@(on ? Variant.Filled : Variant.Outlined)"
+                                 OnClick="@(() => { if (!_newAppointment.Days.Remove(day)) { _newAppointment.Days.Add(day); } })">@Fr.DateTimeFormat.GetAbbreviatedDayName(day)</MudChip>
+                    }
+                </div>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" OnClick="@AddAppointment" Class="mt-2"
+                           Disabled="@(_newAppointment.PlayoutId == 0 || _newSource is null || !TimeSpan.TryParse(_newAppointment.At, CultureInfo.InvariantCulture, out _))">Ajouter le rendez-vous</MudButton>
+            </div>
+        </MudItem>
+
         @* ------------------------------------------------ chaînes éphémères *@
         <MudItem xs="12" lg="6">
             <div class="n-card" style="height: 100%">
@@ -162,6 +294,7 @@
         _channels = (await Mediator.Send(new GetAllChannels()))
             .OrderBy(c => double.TryParse(c.Number, NumberStyles.Number, CultureInfo.InvariantCulture, out double n) ? n : 0)
             .ToList();
+        _regieChannels = await Regie.GetChannels(CancellationToken.None);
     }
 
     private void Save()
@@ -181,6 +314,23 @@
             s.Tonight = current.Tonight;
             s.Tonight.LastMade = lastMade;
             s.EphemeralChannels = current.EphemeralChannels;
+            (DateOnly? weeklyMade, string weeklyResult) = (s.Weekly.LastMade, s.Weekly.LastResult);
+            s.Weekly = current.Weekly;
+            (s.Weekly.LastMade, s.Weekly.LastResult) = (weeklyMade, weeklyResult);
+            (DateOnly? weatherMade, string weatherResult) = (s.Weather.LastMade, s.Weather.LastResult);
+            s.Weather = current.Weather;
+            (s.Weather.LastMade, s.Weather.LastResult) = (weatherMade, weatherResult);
+            // rendez-vous : garder la trace des derniers passages
+            foreach (Appointment a in current.Appointments)
+            {
+                Appointment saved = s.Appointments.FirstOrDefault(x => x.Id == a.Id);
+                if (saved is not null)
+                {
+                    (a.LastRun, a.LastResult) = (saved.LastRun, saved.LastResult);
+                }
+            }
+
+            s.Appointments = current.Appointments;
         });
         Snackbar.Add("Réglages enregistrés.", Severity.Success);
     }
@@ -229,6 +379,115 @@
         }
 
         await InvokeAsync(StateHasChanged);
+    }
+
+    private static readonly DayOfWeek[] Week =
+        [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday];
+
+    private RenderFragment ChannelChips(List<int> ids) => __builder =>
+    {
+        <div class="d-flex gap-1 flex-wrap mt-2 align-center">
+            <span class="n-muted" style="font-size: .85rem">Chaînes :</span>
+            @foreach (ChannelViewModel channel in _channels)
+            {
+                bool on = ids.Contains(channel.Id);
+                <MudChip T="int" Size="Size.Small" Color="@(on ? Color.Primary : Color.Default)" Variant="@(on ? Variant.Filled : Variant.Outlined)"
+                         OnClick="@(() => { if (!ids.Remove(channel.Id)) { ids.Add(channel.Id); } })">@channel.Number · @channel.Name</MudChip>
+            }
+        </div>
+    };
+
+    // ------------------------------------------------ cette semaine, météo, interlude, rendez-vous
+
+    private AtelierJob _weeklyJob;
+    private AtelierJob _weatherJob;
+    private AtelierJob _interludeJob;
+    private List<WeatherRow> _weatherRows;
+    private string _interludeLabel = "INTERLUDE";
+    private string _interludeChannel = string.Empty;
+    private string _interludeMusic = string.Empty;
+    private double _interludeSeconds = 60;
+    private readonly List<int> _interludeChannels = [];
+    private List<RegieChannel> _regieChannels = [];
+    private Appointment _newAppointment = new();
+    private RegieSource _newSource;
+
+    private async Task Busy(Func<Task> work)
+    {
+        _busy = true;
+        try
+        {
+            await work();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task Poll(Func<AtelierJob> job)
+    {
+        while (job() is { State: AtelierJobState.Running })
+        {
+            await Task.Delay(1000);
+            await InvokeAsync(StateHasChanged);
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private Task MakeWeekly() => Busy(async () =>
+    {
+        Save();
+        _weeklyJob = await Automation.MakeWeekly(CancellationToken.None);
+        _s = NounoursSettings.Load();
+        if (_weeklyJob is null)
+        {
+            Snackbar.Add(_s.Weekly.LastResult, Severity.Warning);
+        }
+        else
+        {
+            _ = Poll(() => _weeklyJob);
+        }
+    });
+
+    private Task PreviewWeather() => Busy(async () => _weatherRows = await Automation.WeatherRows(_s.Weather, CancellationToken.None));
+
+    private Task MakeWeather() => Busy(async () =>
+    {
+        Save();
+        _weatherJob = await Automation.MakeWeather(CancellationToken.None);
+        _s = NounoursSettings.Load();
+        _ = Poll(() => _weatherJob);
+    });
+
+    private void MakeInterlude()
+    {
+        _interludeJob = Atelier.StartInterlude(_interludeLabel, _interludeChannel, _interludeMusic, _interludeSeconds, new AtelierStyle());
+        _ = Poll(() => _interludeJob);
+    }
+
+    private Task UseInterlude() => Busy(async () =>
+    {
+        string result = await Automation.UseInterlude(_interludeChannels, CancellationToken.None);
+        Snackbar.Add(result, Severity.Success);
+    });
+
+    private async Task<IEnumerable<RegieSource>> SearchSources(string text, CancellationToken token) =>
+        string.IsNullOrWhiteSpace(text) ? await Regie.Suggestions(token) : await Regie.Search(text, token);
+
+    private void AddAppointment()
+    {
+        _newAppointment.MediaItemId = _newSource.MediaItemId;
+        _newAppointment.MediaTitle = _newSource.Title;
+        _s.Appointments.Add(_newAppointment);
+        _newAppointment = new Appointment { Name = "Fermeture d'antenne", At = "23:59" };
+        _newSource = null;
+        Save();
     }
 
     private void AddEphemeral()

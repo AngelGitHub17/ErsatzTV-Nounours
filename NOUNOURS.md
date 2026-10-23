@@ -148,6 +148,9 @@ Fabrique des vidéos au style « Rétro 95 » — un cadre clair, des **rectangl
   son. Six **boucles intégrées** sont fabriquées par le programme (synthétisées, sans droits) : Pulsation 95, Vitamine, Nuit calme,
   Suspense, Grand écran, Coupure pub.
 
+- **Couleurs selon la saison** (atelier et quadrillage en direct, interrupteur) : Noël (bordeaux, vert), hiver (marine),
+  printemps (vert, orange), été (orange, rouge, marine), Halloween (orange, chocolat), toujours avec les couleurs d'époque.
+- La page d'exemple **guide.php** reprend les couleurs de l'habillage (cadre vert amande, en-têtes noirs / rouges / marine).
 - **Palette Rétro 95 d'époque** (par défaut partout : atelier, rideau, « Tout de suite », cadre du modèle) : cadre vert amande
   `#E1E8CD`, noir `#000000`, blanc `#FFFFFF`, chocolat `#3C3632`, bordeaux `#8C0A11`, rouge vif `#FF3200`, vert émeraude `#008A22`,
   bleu marine `#0B2B70`, orange `#FFA800`. Le rouge vif domine ; bordeaux et chocolat en second ; vert, marine et orange en touches.
@@ -169,6 +172,13 @@ Ce qu'ErsatzTV fait tout seul, vérifié chaque minute :
   de la chaîne) ; toujours le même fichier dans « Bandes-annonces », il se met à jour seul.
 - **Chaînes éphémères** : une chaîne pour un week-end ou un événement, supprimée automatiquement à la date choisie (aussi réglable
   dans l'assistant de création).
+- **Bande-annonce « Cette semaine »** : chaque semaine (jour et heure au choix), les films des 7 prochains jours trouvés dans le
+  guide, deux extraits chacun avec le jour et l'heure de diffusion. Toujours le même fichier dans « Bandes-annonces ».
+- **Carte météo en quadrillage** : chaque jour, jusqu'à 6 villes (température, temps, mini / maxi) d'Open-Meteo, sans clé.
+- **Interlude quadrillé** : une boucle de carrés au rythme d'une musique, rangée dans « Habillage vidéo » ; un clic en fait le
+  « remplissage de secours » des chaînes choisies (ce qui passe quand rien n'est prévu, au lieu d'un écran noir).
+- **Rendez-vous d'antenne** : à l'heure dite (certains jours ou tous les jours), la régie passe une vidéo une fois — ouverture,
+  fermeture d'antenne… — puis la grille reprend où elle en était. Rattrapage de 10 minutes si ErsatzTV était arrêté.
 - Adresses des serveurs de voix off et de sous-titres (facultatifs). Réglages dans `nounours-reglages.json` (dossier de config).
 
 ### Mur de chaînes (`/mur`), grille à imprimer (`/grille`), sauvegarde (`/sauvegarde`)
@@ -267,7 +277,30 @@ Double-cliquez sur **`windows\Installer.bat`** (il faut le [SDK .NET 10](https:/
   si vos téléviseurs / lecteurs IPTV sont sur d'autres appareils.
 
 ## Compiler et lancer
-Comme avant : ouvrir `ErsatzTV.sln` dans Visual Studio (SDK .NET 10) et lancer le projet `ErsatzTV`, ou
+Visual Studio n'est pas nécessaire : il suffit de **Git** et du **SDK .NET 10** (https://dotnet.microsoft.com/download/dotnet/10.0).
+
+**Le plus simple (Windows)** — dans le dossier du projet, double-clic sur `windows\Installer.bat`, ou dans un terminal :
+
+```
+git pull
+windows\Installer.bat
+```
+
+Il compile, installe dans `%LOCALAPPDATA%\ErsatzTV-Nounours`, crée les raccourcis et le démarrage automatique
+(`Installer.bat -SansDemarrageAuto` pour s'en passer, `Installer.bat -Desinstaller` pour tout retirer).
+
+**À la main (PowerShell)**, ce que fait l'installateur :
+
+```
+git pull
+dotnet publish ErsatzTV.Scanner\ErsatzTV.Scanner.csproj -c Release -r win-x64 --self-contained true -o publish-windows -p:PublishSingleFile=true -p:DebugType=Embedded -p:EnableCompressionInSingleFile=false
+dotnet publish ErsatzTV\ErsatzTV.csproj -c Release -r win-x64 --self-contained true -o publish-windows -p:PublishSingleFile=true -p:DebugType=Embedded -p:EnableCompressionInSingleFile=false
+.\publish-windows\ErsatzTV.exe
+```
+
+puis ouvrir http://localhost:8409. Arrêtez ErsatzTV avant de republier dans le même dossier.
+
+**Pour essayer sans rien installer** (tous systèmes) :
 
 ```
 dotnet build ErsatzTV.sln -c Release
@@ -289,6 +322,8 @@ et les préférences utilisent la table de configuration existante. Les nouveaux
 | `medias-importes/` | vidéos envoyées depuis la page d'import, et créations de l'atelier |
 | `atelier/sources/` | sons envoyés dans l'atelier |
 | `templates/graphics-elements/ticker/` | bandeaux défilants |
+| `templates/graphics-elements/quadrillage/` | rideau quadrillé et « Tout de suite » |
+| `nounours-reglages.json` | réglages des services automatiques |
 
 ## Où sont les changements
 

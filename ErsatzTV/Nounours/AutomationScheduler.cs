@@ -4,7 +4,7 @@ using ErsatzTV.Core;
 
 namespace ErsatzTV.Nounours;
 
-/// <summary>Toutes les minutes : chaînes éphémères arrivées à échéance, carton « Ce soir » à l'heure dite, publication du guide.</summary>
+/// <summary>Toutes les minutes : chaînes éphémères, rendez-vous d'antenne, carton « Ce soir », bande-annonce de la semaine, météo, publication du guide.</summary>
 public sealed class AutomationScheduler(
     SystemStartup systemStartup,
     IServiceScopeFactory scopeFactory,
@@ -61,6 +61,35 @@ public sealed class AutomationScheduler(
             tonight.LastMade != DateOnly.FromDateTime(DateTime.Now))
         {
             await automation.MakeTonight(cancellationToken);
+        }
+
+        if (settings.Appointments.Count > 0)
+        {
+            await automation.RunAppointments(cancellationToken);
+        }
+
+        DateOnly today = DateOnly.FromDateTime(DateTime.Now);
+        WeeklySettings weekly = settings.Weekly;
+        if (weekly.Enabled && DateTime.Now.DayOfWeek == weekly.Day &&
+            TimeSpan.TryParse(weekly.At, CultureInfo.InvariantCulture, out TimeSpan weeklyAt) &&
+            DateTime.Now.TimeOfDay >= weeklyAt && weekly.LastMade != today)
+        {
+            await automation.MakeWeekly(cancellationToken);
+        }
+
+        WeatherSettings weather = settings.Weather;
+        if (weather.Enabled &&
+            TimeSpan.TryParse(weather.At, CultureInfo.InvariantCulture, out TimeSpan weatherAt) &&
+            DateTime.Now.TimeOfDay >= weatherAt && weather.LastMade != today)
+        {
+            try
+            {
+                await automation.MakeWeather(cancellationToken);
+            }
+            catch (InvalidOperationException ex)
+            {
+                logger.LogWarning("{Message}", ex.Message);
+            }
         }
 
         PublishSettings publish = settings.Publish;

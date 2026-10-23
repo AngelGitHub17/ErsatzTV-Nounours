@@ -27,6 +27,18 @@ public interface IAutomationService
     Task<List<(string Time, string Title, string Channel)>> TonightRows(TonightSettings settings, CancellationToken cancellationToken);
     Task<int> DeleteExpiredChannels(CancellationToken cancellationToken);
     Task<string> MakeSubtitles(int mediaItemId, CancellationToken cancellationToken);
+
+    /// <summary>Bande-annonce « Cette semaine » avec les films des 7 prochains jours.</summary>
+    Task<AtelierJob> MakeWeekly(CancellationToken cancellationToken);
+
+    Task<List<WeatherRow>> WeatherRows(WeatherSettings settings, CancellationToken cancellationToken);
+    Task<AtelierJob> MakeWeather(CancellationToken cancellationToken);
+
+    /// <summary>L'interlude devient le « remplissage de secours » des chaînes choisies (ce qui passe quand rien n'est prévu).</summary>
+    Task<string> UseInterlude(List<int> channelIds, CancellationToken cancellationToken);
+
+    /// <summary>Rendez-vous d'antenne arrivés à l'heure : la régie passe la vidéo une fois.</summary>
+    Task RunAppointments(CancellationToken cancellationToken);
 }
 
 public sealed class AutomationService(
@@ -34,6 +46,7 @@ public sealed class AutomationService(
     IDbContextFactory<TvContext> dbContextFactory,
     IGuideService guideService,
     AtelierService atelier,
+    IRegieService regie,
     ILogger<AutomationService> logger) : IAutomationService
 {
     private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
@@ -180,6 +193,249 @@ public sealed class AutomationService(
         }
 
         return expired.Count;
+    }
+
+    // ------------------------------------------------------------------ bande-annonce de la semaine
+
+    public async Task<AtelierJob> MakeWeekly(CancellationToken cancellationToken)
+    {
+        WeeklySettings settings = NounoursSettings.Load().Weekly;
+        DateTimeOffset now = DateTimeOffset.Now;
+        List<GuideEntry> entries = await guideService.GetEntries(now, now.AddDays(7), settings.ChannelIds, includeFiller: false, cancellationToken);
+
+        // les films de la semaine, première diffusion de chacun
+        var films = entries
+            .Where(e => e.Kind == GuideEntryKind.Movie && e.Start > now)
+            .OrderBy(e => e.Start)
+            .GroupBy(e => e.Title, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .Take(Math.Clamp(settings.MaxFilms, 1, 8))
+            .ToList();
+
+        await using TvContext db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var spec = new TrailerSpec
+        {
+            Label = string.IsNullOrWhiteSpace(settings.Label) ? "CETTE SEMAINE" : settings.Label,
+            Title = films.Count == 1 ? films[0].Title : "LES FILMS",
+            DateLine = $"DU {now.ToString("dddd d", Fr).ToUpperInvariant()} AU {now.AddDays(6).ToString("dddd d MMMM", Fr).ToUpperInvariant()}",
+            ChannelName = settings.ChannelName,
+            MusicFile = settings.Music,
+            OutputName = "cette-semaine.mp4"
+        };
+
+        foreach (GuideEntry film in films)
+        {
+            var found = await db.Movies.AsNoTracking()
+                .Where(m => m.MovieMetadata.Any(x => x.Title == film.Title))
+                .Select(m => new
+                {
+                    m.Id,
+                    Path = m.MediaVersions.SelectMany(v => v.MediaFiles).Select(f => f.Path).FirstOrDefault(),
+                    Duration = m.MediaVersions.Select(v => v.Duration).FirstOrDefault()
+                })
+                .FirstOrDefaultAsync(cancellationToken);
+            if (found is null || string.IsNullOrWhiteSpace(found.Path) || !File.Exists(found.Path))
+            {
+                continue;
+            }
+
+            DateTimeOffset local = film.Start.ToLocalTime();
+            string when = local.Date == now.Date ? "CE SOIR" : local.ToString("dddd", Fr).ToUpperInvariant();
+            double d = Math.Max(10, found.Duration.TotalSeconds);
+            double length = Math.Clamp(d / 14, 2, 3.5);
+            foreach (double at in new[] { 0.3, 0.62 })
+            {
+                spec.Extracts.Add(new TrailerExtract
+                {
+                    MediaItemId = found.Id, Title = film.Title, Path = found.Path, ItemDuration = d, Length = length,
+                    Start = Math.Floor(Math.Min(d - length, d * at)),
+                    OverlayTitle = film.Title, OverlayLine = $"{when} {local:HH}H{local:mm}"
+                });
+            }
+        }
+
+        string result = spec.Extracts.Count == 0
+            ? "Aucun film dans le guide des 7 prochains jours (ou fichiers introuvables)."
+            : $"{spec.Extracts.Count / 2} film(s) : {string.Join(", ", spec.Extracts.Select(e => e.Title).Distinct())}";
+        NounoursSettings.Update(s =>
+        {
+            s.Weekly.LastMade = DateOnly.FromDateTime(DateTime.Now);
+            s.Weekly.LastResult = result;
+        });
+        return spec.Extracts.Count == 0 ? null : atelier.StartTrailer(spec);
+    }
+
+    // ------------------------------------------------------------------ météo
+
+    private static readonly HttpClient Weather = CreateWeatherClient();
+
+    private static HttpClient CreateWeatherClient()
+    {
+        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("ErsatzTV-Nounours/1.0");
+        return client;
+    }
+
+    public async Task<List<WeatherRow>> WeatherRows(WeatherSettings settings, CancellationToken cancellationToken)
+    {
+        var rows = new List<WeatherRow>();
+        IEnumerable<string> cities = (settings.Cities ?? string.Empty)
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Take(6);
+        foreach (string city in cities)
+        {
+            (string Name, double Latitude, double Longitude)? found = await HabillageService.FindCity(city, cancellationToken);
+            if (found is null)
+            {
+                rows.Add(new WeatherRow("?", city.ToUpperInvariant(), "VILLE INTROUVABLE"));
+                continue;
+            }
+
+            string url = string.Create(
+                CultureInfo.InvariantCulture,
+                $"https://api.open-meteo.com/v1/forecast?latitude={found.Value.Latitude}&longitude={found.Value.Longitude}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto");
+            using JsonDocument json = JsonDocument.Parse(await Weather.GetStringAsync(url, cancellationToken));
+            JsonElement root = json.RootElement;
+            double now = root.GetProperty("current").GetProperty("temperature_2m").GetDouble();
+            int code = root.GetProperty("current").GetProperty("weather_code").GetInt32();
+            double max = root.GetProperty("daily").GetProperty("temperature_2m_max")[0].GetDouble();
+            double min = root.GetProperty("daily").GetProperty("temperature_2m_min")[0].GetDouble();
+            rows.Add(new WeatherRow(
+                $"{Math.Round(now).ToString(CultureInfo.InvariantCulture)}°",
+                found.Value.Name.ToUpperInvariant(),
+                $"{WeatherWord(code)} · {Math.Round(min).ToString(CultureInfo.InvariantCulture)}° / {Math.Round(max).ToString(CultureInfo.InvariantCulture)}°"));
+        }
+
+        return rows;
+    }
+
+    public static string WeatherWord(int code) =>
+        code switch
+        {
+            0 => "SOLEIL",
+            1 or 2 => "ÉCLAIRCIES",
+            3 => "COUVERT",
+            45 or 48 => "BROUILLARD",
+            >= 51 and <= 57 => "BRUINE",
+            >= 61 and <= 67 => "PLUIE",
+            >= 71 and <= 77 => "NEIGE",
+            >= 80 and <= 82 => "AVERSES",
+            85 or 86 => "AVERSES DE NEIGE",
+            >= 95 => "ORAGES",
+            _ => "VARIABLE"
+        };
+
+    public async Task<AtelierJob> MakeWeather(CancellationToken cancellationToken)
+    {
+        WeatherSettings settings = NounoursSettings.Load().Weather;
+        try
+        {
+            List<WeatherRow> rows = await WeatherRows(settings, cancellationToken);
+            NounoursSettings.Update(s =>
+            {
+                s.Weather.LastMade = DateOnly.FromDateTime(DateTime.Now);
+                s.Weather.LastResult = string.Join(" · ", rows.Select(r => $"{r.City} {r.Temperature}"));
+            });
+            return rows.Count == 0 ? null : atelier.StartWeather(settings, rows);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
+        {
+            NounoursSettings.Update(s =>
+            {
+                s.Weather.LastMade = DateOnly.FromDateTime(DateTime.Now);
+                s.Weather.LastResult = $"Météo indisponible : {ex.Message}";
+            });
+            throw new InvalidOperationException($"Météo indisponible : {ex.Message}", ex);
+        }
+    }
+
+    // ------------------------------------------------------------------ interlude
+
+    public const string InterludePresetName = "Interlude (Nounours)";
+
+    public async Task<string> UseInterlude(List<int> channelIds, CancellationToken cancellationToken)
+    {
+        await using TvContext db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        string path = Path.Combine(FileSystemLayout.ImportsFolder, FolderImportService.Label(ImportRole.Habillage), AtelierService.InterludeFile);
+        int? otherVideoId = await db.OtherVideos.AsNoTracking()
+            .Where(o => o.MediaVersions.Any(v => v.MediaFiles.Any(f => f.Path == path)))
+            .Select(o => (int?)o.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        int? movieId = otherVideoId is null
+            ? await db.Movies.AsNoTracking()
+                .Where(o => o.MediaVersions.Any(v => v.MediaFiles.Any(f => f.Path == path)))
+                .Select(o => (int?)o.Id)
+                .FirstOrDefaultAsync(cancellationToken)
+            : null;
+        int? mediaItemId = otherVideoId ?? movieId;
+        if (mediaItemId is null)
+        {
+            throw new InvalidOperationException("L'interlude n'est pas encore dans la médiathèque : fabriquez-le, puis réessayez une minute plus tard (le temps de l'analyse).");
+        }
+
+        Core.Domain.Filler.FillerPreset preset = await db.FillerPresets.FirstOrDefaultAsync(p => p.Name == InterludePresetName, cancellationToken);
+        if (preset is null)
+        {
+            preset = new Core.Domain.Filler.FillerPreset { Name = InterludePresetName };
+            await db.FillerPresets.AddAsync(preset, cancellationToken);
+        }
+
+        preset.FillerKind = Core.Domain.Filler.FillerKind.Fallback;
+        preset.FillerMode = Core.Domain.Filler.FillerMode.None;
+        preset.CollectionType = otherVideoId.HasValue ? CollectionType.OtherVideo : CollectionType.Movie;
+        preset.MediaItemId = mediaItemId;
+        preset.CollectionId = null;
+        preset.SmartCollectionId = null;
+        preset.MultiCollectionId = null;
+        preset.PlaylistId = null;
+        await db.SaveChangesAsync(cancellationToken);
+
+        List<Channel> channels = await db.Channels.Where(c => channelIds.Contains(c.Id)).ToListAsync(cancellationToken);
+        foreach (Channel channel in channels)
+        {
+            channel.FallbackFillerId = preset.Id;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return channels.Count == 0
+            ? "Interlude prêt (aucune chaîne choisie)."
+            : $"Interlude utilisé sur {string.Join(", ", channels.Select(c => c.Name))}.";
+    }
+
+    // ------------------------------------------------------------------ rendez-vous d'antenne
+
+    public async Task RunAppointments(CancellationToken cancellationToken)
+    {
+        List<Appointment> appointments = NounoursSettings.Load().Appointments;
+        DateTimeOffset now = DateTimeOffset.Now;
+        foreach (Appointment appointment in appointments.Where(a => a.Enabled && a.PlayoutId > 0 && a.MediaItemId > 0))
+        {
+            if (!TimeSpan.TryParse(appointment.At, CultureInfo.InvariantCulture, out TimeSpan at) ||
+                appointment.Days.Count > 0 && !appointment.Days.Contains(now.DayOfWeek))
+            {
+                continue;
+            }
+
+            // à l'heure dite (avec 10 minutes de rattrapage si ErsatzTV était arrêté), une fois par jour
+            DateTimeOffset due = new DateTimeOffset(now.Date + at, now.Offset);
+            if (now < due || now - due > TimeSpan.FromMinutes(10) || appointment.LastRun is { } last && last >= due)
+            {
+                continue;
+            }
+
+            Either<BaseError, Unit> result = await regie.TakeAir(appointment.PlayoutId, appointment.MediaItemId, RegieMode.Once, 0, appointment.Name, cancellationToken);
+            string text = result.Match(_ => $"Passé à {now:HH:mm}", error => $"Échec : {error}");
+            logger.LogInformation("Rendez-vous d'antenne « {Name} » : {Result}", appointment.Name, text);
+            NounoursSettings.Update(s =>
+            {
+                Appointment saved = s.Appointments.FirstOrDefault(a => a.Id == appointment.Id);
+                if (saved is not null)
+                {
+                    saved.LastRun = now;
+                    saved.LastResult = text;
+                }
+            });
+        }
     }
 
     // ------------------------------------------------------------------ sous-titres automatiques

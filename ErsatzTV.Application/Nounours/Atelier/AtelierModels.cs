@@ -51,6 +51,9 @@ public sealed class AtelierStyle
     /// <summary>Change la disposition des rectangles (même musique, autre chorégraphie).</summary>
     public int Seed { get; set; } = 7;
 
+    /// <summary>Couleurs selon la saison (Noël, hiver, printemps, été, Halloween), décidées au moment de la fabrication.</summary>
+    public bool Seasonal { get; set; }
+
     /// <summary>Intensité du mouvement (0,3 = calme, 1 = très nerveux).</summary>
     public double Energy { get; set; } = 0.8;
 }
@@ -145,8 +148,16 @@ public sealed class VoiceOver
     public bool Duck { get; set; } = true;
 }
 
+/// <summary>Une ligne de la carte météo : « 14° », « SAINTES », « ÉCLAIRCIES · 9° / 16° ».</summary>
+public sealed record WeatherRow(string Temperature, string City, string Detail);
+
 public sealed class TrailerExtract
 {
+    /// <summary>Bandeau propre à cet extrait (bande-annonce de la semaine) ; vide = celui de la bande-annonce.</summary>
+    public string OverlayTitle { get; set; } = string.Empty;
+
+    public string OverlayLine { get; set; } = string.Empty;
+
     public int MediaItemId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Path { get; set; } = string.Empty;
@@ -175,6 +186,9 @@ public sealed class TrailerSpec
     public bool KeepOriginalAudio { get; set; }
 
     public AtelierStyle Style { get; set; } = new();
+
+    /// <summary>Nom de fichier fixe (remplacé à chaque fabrication) ; vide = nom daté.</summary>
+    public string OutputName { get; set; } = string.Empty;
 }
 
 public enum AtelierJobState

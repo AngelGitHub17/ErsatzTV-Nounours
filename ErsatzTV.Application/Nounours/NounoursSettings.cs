@@ -16,6 +16,9 @@ public sealed class NounoursSettings
     public SubtitleSettings Subtitles { get; set; } = new();
     public PublishSettings Publish { get; set; } = new();
     public TonightSettings Tonight { get; set; } = new();
+    public WeeklySettings Weekly { get; set; } = new();
+    public WeatherSettings Weather { get; set; } = new();
+    public List<Appointment> Appointments { get; set; } = [];
 
     /// <summary>Chaînes éphémères : identifiant de chaîne → date de suppression automatique.</summary>
     public Dictionary<int, DateTimeOffset> EphemeralChannels { get; set; } = [];
@@ -101,4 +104,57 @@ public sealed class TonightSettings
     public string ChannelName { get; set; } = string.Empty;
     public double Seconds { get; set; } = 12;
     public DateOnly? LastMade { get; set; }
+}
+
+/// <summary>Bande-annonce « Cette semaine » : les films de la semaine, refaite chaque semaine au jour et à l'heure choisis.</summary>
+public sealed class WeeklySettings
+{
+    public bool Enabled { get; set; }
+
+    /// <summary>Jour de fabrication (lundi par défaut).</summary>
+    public DayOfWeek Day { get; set; } = DayOfWeek.Monday;
+
+    public string At { get; set; } = "08:00";
+    public List<int> ChannelIds { get; set; } = [];
+    public string Label { get; set; } = "CETTE SEMAINE";
+    public int MaxFilms { get; set; } = 4;
+    public string Music { get; set; } = string.Empty;
+    public string ChannelName { get; set; } = string.Empty;
+    public DateOnly? LastMade { get; set; }
+    public string LastResult { get; set; }
+}
+
+/// <summary>Carte météo en quadrillage, refaite chaque jour (Open-Meteo, sans clé).</summary>
+public sealed class WeatherSettings
+{
+    public bool Enabled { get; set; }
+    public string At { get; set; } = "06:00";
+
+    /// <summary>Villes, une par ligne (jusqu'à 6).</summary>
+    public string Cities { get; set; } = "Saintes\nLa Rochelle\nBordeaux\nParis";
+
+    public string Title { get; set; } = "MÉTÉO";
+    public string Music { get; set; } = string.Empty;
+    public string ChannelName { get; set; } = string.Empty;
+    public double Seconds { get; set; } = 12;
+    public DateOnly? LastMade { get; set; }
+    public string LastResult { get; set; }
+}
+
+/// <summary>Rendez-vous d'antenne : à l'heure dite, la régie passe une vidéo (ouverture, fermeture d'antenne…) puis rend la grille.</summary>
+public sealed class Appointment
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..8];
+    public bool Enabled { get; set; } = true;
+    public string Name { get; set; } = "Ouverture d'antenne";
+    public string At { get; set; } = "06:00";
+
+    /// <summary>Jours de la semaine (vide = tous les jours).</summary>
+    public List<DayOfWeek> Days { get; set; } = [];
+
+    public int PlayoutId { get; set; }
+    public int MediaItemId { get; set; }
+    public string MediaTitle { get; set; } = string.Empty;
+    public DateTimeOffset? LastRun { get; set; }
+    public string LastResult { get; set; }
 }

@@ -27,6 +27,8 @@
 <div class="d-flex gap-3 flex-wrap align-center mt-3">
     <MudColorPicker Value="@(new MudBlazor.Utilities.MudColor(Style.FrameColor))" ValueChanged="@(async c => { Style.FrameColor = c.Value[..7]; await Changed.InvokeAsync(); })"
                     Label="Couleur du cadre" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 190px"/>
+    <MudSwitch T="bool" Value="@Style.Seasonal" ValueChanged="@(async v => { Style.Seasonal = v; await Changed.InvokeAsync(); })" Color="Color.Primary"
+               Label="@($"Couleurs selon la saison ({ErsatzTV.Core.Graphics.Seasons.Current.Name})")"/>
     <MudSwitch T="bool" Value="@Style.Frame" ValueChanged="@(async v => { Style.Frame = v; await Changed.InvokeAsync(); })" Color="Color.Primary" Label="Cadre autour de l'image"/>
 </div>
 <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Énergie du mouvement</MudText>

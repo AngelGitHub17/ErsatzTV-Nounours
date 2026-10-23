@@ -1242,6 +1242,8 @@
                 </MudChip>
             }
         </div>
+        <MudSwitch T="bool" Value="@item.GridSeasonal" ValueChanged="@((bool v) => { item.GridSeasonal = v; MarkDirty(); })" Color="Color.Primary"
+                   Label="@($"Couleurs selon la saison (en ce moment : {ErsatzTV.Core.Graphics.Seasons.Current.Name})")"/>
         <MudSwitch T="bool" Value="@(!string.IsNullOrEmpty(item.GridLineColor))" ValueChanged="@((bool v) => { item.GridLineColor = v ? "#E1E8CD" : string.Empty; MarkDirty(); })" Color="Color.Primary" Label="Fins liserés (couleur du cadre) entre les cases"/>
     };
 

@@ -76,6 +76,9 @@ public class GridGraphicsElement : BaseGraphicsElement
 
     public int Seed { get; set; } = 7;
 
+    /// <summary>Palette choisie selon la date (Noël, hiver, printemps, été, Halloween) à la place de <see cref="Palette" />.</summary>
+    public bool Seasonal { get; set; }
+
     /// <summary>Nombre d'entrées du guide chargées pour le gabarit (2 = en cours + suivant).</summary>
     [YamlMember(Alias = "epg_entries", ApplyNamingConventions = false)]
     public int EpgEntries { get; set; }

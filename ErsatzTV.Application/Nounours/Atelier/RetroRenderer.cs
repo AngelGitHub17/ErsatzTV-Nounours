@@ -39,7 +39,7 @@ public sealed class RetroRenderer : IDisposable
         _audio = audio;
         _fps = fps;
         _frames = Math.Max(1, frames);
-        _palette = style.Palette.Select(c => Parse(c, SKColors.Gray)).DefaultIfEmpty(SKColors.Gold).ToArray();
+        _palette = (style.Seasonal ? ErsatzTV.Core.Graphics.Seasons.Current.Palette.ToList() : style.Palette).Select(c => Parse(c, SKColors.Gray)).DefaultIfEmpty(SKColors.Gold).ToArray();
         _frameColor = Parse(style.FrameColor, new SKColor(0xE1, 0xE8, 0xCD));
         _ink = Parse(style.Ink, SKColors.Black);
         _text = Parse(style.TextColor, SKColors.White);
@@ -735,6 +735,75 @@ public sealed class RetroRenderer : IDisposable
             DrawBar(canvas, text, area.Left + rowH * 1.15f, y, rowH, _window.Width - rowH * 1.3f, reveal);
         }
 
+        DrawChannelTag(canvas, channelName);
+        DrawFrameBorder(canvas);
+    }
+
+    /// <summary>
+    ///     Carte météo : bloc « MÉTÉO », puis une ligne par ville — case de couleur avec la température,
+    ///     bandeau noir avec le nom de la ville, bandeau plus fin avec le temps et les extrêmes.
+    /// </summary>
+    public void DrawWeather(SKCanvas canvas, int frame, string label, IReadOnlyList<WeatherRow> rows, string channelName)
+    {
+        canvas.Clear(SKColors.Black);
+        float p = frame / (float)Math.Max(1, _frames - 1);
+        _currentBeat = _beat[Math.Clamp(frame, 0, _frames - 1)];
+        using (var paper = new SKPaint { Color = SKColors.White })
+        {
+            canvas.DrawRect(_window, paper);
+        }
+
+        // une case vive qui saute d'une rangée à l'autre au rythme, en haut à droite
+        var random = new Random(HashCode.Combine(_style.Seed, _currentBeat));
+        using (var accent = new SKPaint { Color = Color(random.NextDouble() < 0.7 ? Cell.Accent : Cell.Extra) })
+        {
+            canvas.DrawRect(CellRect(_cols - 1, 0), accent);
+        }
+
+        using (var ink = new SKPaint { Color = _ink })
+        {
+            canvas.DrawRect(CellRect(0, 0, 2, 1), ink);
+        }
+
+        DrawBlockText(canvas, string.IsNullOrWhiteSpace(label) ? "MÉTÉO" : label, CellRect(0, 0, 2, 1));
+
+        SKRect area = CellRect(0, 1, _cols, 2);
+        int count = Math.Max(1, rows.Count);
+        float rowH = Math.Min(area.Height / count * 0.86f, _window.Height * 0.17f);
+        float gap = (area.Height - rowH * count) / (count + 1);
+        Cell[] squares = [Cell.Accent, Cell.Extra, Cell.Accent2, Cell.Gray];
+        for (var i = 0; i < rows.Count; i++)
+        {
+            float start = 0.06f + 0.5f * i / count;
+            float reveal = (p - start) * _frames / 8f;
+            if (reveal <= 0)
+            {
+                continue;
+            }
+
+            float y = area.Top + gap + i * (rowH + gap);
+            WeatherRow row = rows[i];
+            float squareW = rowH * 1.7f;
+            using (var square = new SKPaint { Color = Color(squares[i % squares.Length]) })
+            {
+                canvas.DrawRect(new SKRect(area.Left, y, area.Left + squareW, y + rowH), square);
+            }
+
+            DrawBlockText(canvas, row.Temperature, new SKRect(area.Left, y - rowH * 0.5f, area.Left + squareW, y + rowH * 1.5f));
+            float x = area.Left + squareW + rowH * 0.15f;
+            DrawBar(canvas, row.City, x, y, rowH * 0.62f, _window.Right - x, reveal);
+            DrawBar(canvas, row.Detail, x, y + rowH * 0.64f, rowH * 0.36f, _window.Right - x, reveal - 0.5f, false, Color(Cell.Gray));
+        }
+
+        DrawChannelTag(canvas, channelName);
+        DrawFrameBorder(canvas);
+    }
+
+    /// <summary>Interlude : le quadrillage tourne en boucle, l'étiquette passe d'un coin à l'autre, cartouche de la chaîne.</summary>
+    public void DrawInterlude(SKCanvas canvas, int frame, string label, string channelName)
+    {
+        canvas.Clear(SKColors.Black);
+        DrawGrid(canvas, frame, label);
         DrawChannelTag(canvas, channelName);
         DrawFrameBorder(canvas);
     }

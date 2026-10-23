@@ -313,18 +313,33 @@ public sealed class AtelierService(
         Directory.CreateDirectory(work);
         try
         {
-            // calque cadre + bandeaux posé sur les extraits
-            string overlay = Path.Combine(work, "calque.png");
-            using (var bitmap = new SKBitmap(RetroRenderer.Width, RetroRenderer.Height, SKColorType.Rgba8888, SKAlphaType.Premul))
+            // calque cadre + bandeaux posé sur les extraits (un par bandeau différent : bande-annonce de la semaine)
+            var overlays = new Dictionary<string, string>();
+            async Task<string> Overlay(TrailerExtract extract)
             {
-                using (var canvas = new SKCanvas(bitmap))
+                string title = string.IsNullOrWhiteSpace(extract.OverlayTitle) ? spec.Title : extract.OverlayTitle;
+                string line = string.IsNullOrWhiteSpace(extract.OverlayLine) ? spec.DateLine : extract.OverlayLine;
+                string key = title + "|" + line;
+                if (overlays.TryGetValue(key, out string existing))
                 {
-                    renderer.DrawTrailerOverlay(canvas, spec.Title, spec.DateLine);
+                    return existing;
                 }
 
-                using SKImage image = SKImage.FromBitmap(bitmap);
-                using SKData data = image.Encode(SKEncodedImageFormat.Png, 100);
-                await File.WriteAllBytesAsync(overlay, data.ToArray(), cancellationToken);
+                string file = Path.Combine(work, $"calque-{overlays.Count}.png");
+                using (var bitmap = new SKBitmap(RetroRenderer.Width, RetroRenderer.Height, SKColorType.Rgba8888, SKAlphaType.Premul))
+                {
+                    using (var canvas = new SKCanvas(bitmap))
+                    {
+                        renderer.DrawTrailerOverlay(canvas, title, line);
+                    }
+
+                    using SKImage image = SKImage.FromBitmap(bitmap);
+                    using SKData data = image.Encode(SKEncodedImageFormat.Png, 100);
+                    await File.WriteAllBytesAsync(file, data.ToArray(), cancellationToken);
+                }
+
+                overlays[key] = file;
+                return file;
             }
 
             var parts = new List<string>();
@@ -358,6 +373,7 @@ public sealed class AtelierService(
                 TrailerExtract extract = extracts[i];
                 job.Step = $"Extrait {i + 1} / {extracts.Count} : {extract.Title}";
                 string part = Path.Combine(work, $"{i + 1:00}-extrait.mp4");
+                string overlay = await Overlay(extract);
                 bool audioStream = await HasAudio(ffprobe, extract.Path, cancellationToken);
                 string len = extract.Length.ToString("0.###", Inv);
                 string fadeOut = Math.Max(0, extract.Length - 0.25).ToString("0.###", Inv);
@@ -432,7 +448,10 @@ public sealed class AtelierService(
                 File.Move(joined, temp, true);
             }
 
-            await Finish(job, temp, OutputPath(ImportRole.BandesAnnonces, spec.Title), ImportRole.BandesAnnonces, cancellationToken);
+            string output = string.IsNullOrWhiteSpace(spec.OutputName)
+                ? OutputPath(ImportRole.BandesAnnonces, spec.Title)
+                : Path.Combine(FileSystemLayout.ImportsFolder, FolderImportService.Label(ImportRole.BandesAnnonces), FilePrefix + Path.GetFileName(spec.OutputName));
+            await Finish(job, temp, output, ImportRole.BandesAnnonces, cancellationToken);
         }
         finally
         {
@@ -487,6 +506,71 @@ public sealed class AtelierService(
 
         string output = Path.Combine(FileSystemLayout.ImportsFolder, FolderImportService.Label(ImportRole.BandesAnnonces), TonightFile);
         await Finish(job, temp, output, ImportRole.BandesAnnonces, cancellationToken);
+    }
+
+    // ------------------------------------------------------------------ météo et interlude
+
+    public const string WeatherFile = FilePrefix + "meteo.mp4";
+    public const string InterludeFile = FilePrefix + "interlude.mp4";
+
+    /// <summary>Carte météo (toujours le même fichier, rangé dans « Bandes-annonces »).</summary>
+    public AtelierJob StartWeather(WeatherSettings settings, IReadOnlyList<WeatherRow> rows)
+    {
+        var job = new AtelierJob { Name = "Carte météo" };
+        _jobs[job.Id] = job;
+        string output = Path.Combine(FileSystemLayout.ImportsFolder, FolderImportService.Label(ImportRole.BandesAnnonces), WeatherFile);
+        List<WeatherRow> shown = rows.Take(6).ToList();
+        _ = Task.Run(() => Run(job, ct => RenderAnimated(
+            job, Math.Clamp(settings.Seconds, 4, 60), settings.Music, new AtelierStyle(), output, ImportRole.BandesAnnonces,
+            (r, canvas, frame) => r.DrawWeather(canvas, frame, settings.Title, shown, settings.ChannelName), ct)));
+        return job;
+    }
+
+    /// <summary>Interlude en boucle (rangé dans « Habillage vidéo ») : ce qui passe quand la chaîne n'a rien à diffuser.</summary>
+    public AtelierJob StartInterlude(string label, string channelName, string music, double seconds, AtelierStyle style)
+    {
+        var job = new AtelierJob { Name = "Interlude" };
+        _jobs[job.Id] = job;
+        string output = Path.Combine(FileSystemLayout.ImportsFolder, FolderImportService.Label(ImportRole.Habillage), InterludeFile);
+        _ = Task.Run(() => Run(job, ct => RenderAnimated(
+            job, Math.Clamp(seconds, 10, 300), music, style, output, ImportRole.Habillage,
+            (r, canvas, frame) => r.DrawInterlude(canvas, frame, string.IsNullOrWhiteSpace(label) ? "INTERLUDE" : label, channelName), ct)));
+        return job;
+    }
+
+    /// <summary>Une vidéo animée au rythme d'une musique (ou d'une pulsation), dessinée image par image.</summary>
+    private async Task RenderAnimated(
+        AtelierJob job,
+        double seconds,
+        string musicFile,
+        AtelierStyle style,
+        string output,
+        ImportRole role,
+        Action<RetroRenderer, SKCanvas, int> draw,
+        CancellationToken cancellationToken)
+    {
+        (string ffmpeg, _) = await Tools(cancellationToken);
+        string music = SourcePath(musicFile);
+        bool hasMusic = music is not null && File.Exists(music);
+        job.Step = hasMusic ? "Analyse de la musique…" : "Préparation…";
+        AudioAnalysis audio = (await AnalysisFor(musicFile, 0, seconds, cancellationToken)).Repeat(seconds, Fps);
+        int frames = (int)Math.Ceiling(seconds * Fps);
+        string temp = TempPath(".mp4");
+        var args = new List<string> { "-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "bgra", "-s", $"{RetroRenderer.Width}x{RetroRenderer.Height}", "-r", Fps.ToString(Inv), "-i", "-" };
+        args.AddRange(hasMusic
+            ? ["-stream_loop", "-1", "-t", seconds.ToString("0.###", Inv), "-i", music]
+            : ["-f", "lavfi", "-t", seconds.ToString("0.###", Inv), "-i", "anullsrc=r=48000:cl=stereo"]);
+        args.AddRange(["-map", "0:v", "-map", "1:a", "-af", $"aresample=48000,aformat=channel_layouts=stereo,apad,afade=t=out:st={Math.Max(0, seconds - 1).ToString("0.###", Inv)}:d=1"]);
+        args.AddRange(EncodeArgs());
+        args.AddRange(["-t", seconds.ToString("0.###", Inv), temp]);
+
+        job.Step = "Fabrication des images…";
+        using (var renderer = new RetroRenderer(style, audio, Fps, frames))
+        {
+            await Pipe(ffmpeg, args, frames, (canvas, frame) => draw(renderer, canvas, frame), p => job.Progress = p * 0.9, cancellationToken);
+        }
+
+        await Finish(job, temp, output, role, cancellationToken);
     }
 
     // ------------------------------------------------------------------ programmes (pour les extraits)

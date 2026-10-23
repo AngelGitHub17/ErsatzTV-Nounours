@@ -22,6 +22,19 @@ public sealed class AudioAnalysis
     public float HighAt(int frame) => At(High, frame);
     public bool OnsetAt(int frame) => frame >= 0 && frame < Onset.Length && Onset[frame];
 
+    /// <summary>La même analyse répétée jusqu'à <paramref name="seconds" /> (musique jouée en boucle).</summary>
+    public AudioAnalysis Repeat(double seconds, int fps)
+    {
+        int frames = (int)Math.Ceiling(seconds * fps);
+        if (Onset.Length == 0 || Onset.Length >= frames)
+        {
+            return this;
+        }
+
+        T[] Tile<T>(T[] source) => Enumerable.Range(0, frames).Select(i => source[i % source.Length]).ToArray();
+        return new AudioAnalysis { DurationSeconds = seconds, Bass = Tile(Bass), Mid = Tile(Mid), High = Tile(High), Onset = Tile(Onset) };
+    }
+
     /// <summary>Nombre de temps forts depuis le début (sert à faire « sauter » les rectangles).</summary>
     public int OnsetCount(int frame)
     {

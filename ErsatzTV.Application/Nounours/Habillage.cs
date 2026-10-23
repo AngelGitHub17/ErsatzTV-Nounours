@@ -110,6 +110,7 @@ public sealed class HabillageItem
     // quadrillage (Kind = Curtain / UpNext) : couleurs des cases (#RRGGBB séparés par des virgules)
     public string GridPalette { get; set; } = "#FF3200,#8C0A11,#3C3632,#008A22,#0B2B70,#FFA800";
     public string GridLineColor { get; set; } = "#E1E8CD";
+    public bool GridSeasonal { get; set; }
     public double CurtainSeconds { get; set; } = 1.6;
     public bool CurtainAtStart { get; set; } = true;
     public bool CurtainAtEnd { get; set; } = true;
@@ -768,6 +769,7 @@ public sealed partial class HabillageService(
                 }
 
                 sb.AppendLine(CultureInfo.InvariantCulture, $"line_color: {Quote(item.GridLineColor ?? string.Empty)}");
+                sb.AppendLine(CultureInfo.InvariantCulture, $"seasonal: {(item.GridSeasonal ? "true" : "false")}");
                 sb.AppendLine(CultureInfo.InvariantCulture, $"min_content_seconds: {Math.Max(0, item.MinProgramSeconds)}");
                 sb.AppendLine(CultureInfo.InvariantCulture, $"seed: {item.Id.Aggregate(7, (h, c) => (h * 31 + c) % 1000)}");
                 if (item.Kind == HabillageItemKind.Curtain)
