@@ -1,22 +1,32 @@
 @page "/importer"
+@page "/medias"
 @using ErsatzTV.Application.Nounours
 @inject IFolderImportService ImportService
 @inject ISnackbar Snackbar
 
-<PageTitle>Pubs & jingles · ErsatzTV</PageTitle>
+<PageTitle>Ajouter des médias · ErsatzTV</PageTitle>
 
 <div class="n-page" style="height: 100%; overflow-y: auto">
     <div class="n-page-header">
         <div>
-            <h1>Pubs, jingles & bandes-annonces</h1>
-            <p>Indiquez un dossier (ou envoyez des fichiers) : il est analysé et rangé dans une collection prête à l'emploi pour vos programmes et vos coupures.</p>
+            <h1>Ajouter des médias</h1>
+            <p>Indiquez un dossier (ou envoyez des fichiers) : il est analysé et ses vidéos deviennent utilisables dans vos chaînes, vos programmes et vos coupures.</p>
         </div>
     </div>
 
     <div class="n-card mb-4">
         <div class="n-card-title">1. Ce que contient le dossier</div>
-        <div class="d-flex gap-2 flex-wrap">
-            @foreach (ImportRole role in Enum.GetValues<ImportRole>())
+        <div class="d-flex gap-2 flex-wrap align-center">
+            <span class="n-muted" style="font-size: .85rem; min-width: 130px">Vos programmes :</span>
+            @foreach (ImportRole role in FolderImportService.ContentRoles)
+            {
+                <MudChip T="ImportRole" Color="@(role == _role ? Color.Primary : Color.Default)" Variant="@(role == _role ? Variant.Filled : Variant.Outlined)"
+                         OnClick="@(() => _role = role)" Icon="@RoleIcon(role)">@FolderImportService.Label(role)</MudChip>
+            }
+        </div>
+        <div class="d-flex gap-2 flex-wrap align-center mt-1">
+            <span class="n-muted" style="font-size: .85rem; min-width: 130px">L'habillage :</span>
+            @foreach (ImportRole role in FolderImportService.HabillageRoles)
             {
                 <MudChip T="ImportRole" Color="@(role == _role ? Color.Primary : Color.Default)" Variant="@(role == _role ? Variant.Filled : Variant.Outlined)"
                          OnClick="@(() => _role = role)" Icon="@RoleIcon(role)">@FolderImportService.Label(role)</MudChip>
@@ -78,8 +88,11 @@
         </MudTabs>
     </div>
 
-    <MudGrid Spacing="3">
-        @foreach (ImportGroup group in _groups)
+    @foreach ((string section, ImportRole[] roles) in Sections)
+    {
+    <MudText Typo="Typo.h6" Class="mb-2 mt-2">@section</MudText>
+    <MudGrid Spacing="3" Class="mb-3">
+        @foreach (ImportGroup group in _groups.Where(g => roles.Contains(g.Role)))
         {
             <MudItem xs="12" md="6" lg="3">
                 <div class="n-card" style="height: 100%">
@@ -93,7 +106,7 @@
                     </div>
                     <div class="n-stat mt-2">
                         <span class="n-stat-value">@group.Items</span>
-                        <span class="n-stat-label">vidéo(s) analysée(s)</span>
+                        <span class="n-stat-label">@(group.Role == ImportRole.Series ? "épisode(s)" : "vidéo(s)") analysé(s)</span>
                     </div>
                     @if (group.SmartCollectionId.HasValue)
                     {
@@ -117,6 +130,7 @@
             </MudItem>
         }
     </MudGrid>
+    }
     <MudText Typo="Typo.body2" Class="n-muted mt-3">
         Les collections apparaissent dans les choix de contenu des <MudLink Href="programmes">programmes</MudLink> (segments Pubs, Jingle…)
         et de l'<MudLink Href="chaines/nouvelle">assistant de chaîne</MudLink>. L'analyse peut prendre quelques minutes selon le nombre de fichiers.
@@ -127,7 +141,13 @@
     private const long MaxUpload = 4L * 1024 * 1024 * 1024;
 
     private List<ImportGroup> _groups = [];
-    private ImportRole _role = ImportRole.Pubs;
+    private static readonly (string, ImportRole[])[] Sections =
+    [
+        ("Vos programmes", FolderImportService.ContentRoles),
+        ("L'habillage", FolderImportService.HabillageRoles)
+    ];
+
+    private ImportRole _role = ImportRole.Films;
     private string _folder;
     private bool _busy;
     private bool _browsing;
@@ -169,7 +189,9 @@
             Either<BaseError, ImportResult> result = await ImportService.Import(folder, _role, CancellationToken.None);
             result.Match(
                 r => Snackbar.Add(
-                    $"{r.FilesFound} vidéo(s) trouvée(s) : analyse lancée. Elles seront dans la collection « {r.SmartCollectionName} ».",
+                    r.SmartCollectionName is null
+                        ? $"{r.FilesFound} vidéo(s) trouvée(s) : analyse lancée. Elles apparaîtront dans « {FolderImportService.Label(r.Role)} » d'ici quelques minutes."
+                        : $"{r.FilesFound} vidéo(s) trouvée(s) : analyse lancée. Elles seront dans la collection « {r.SmartCollectionName} ».",
                     Severity.Success),
                 error => Snackbar.Add(error.ToString(), Severity.Error));
             if (result.IsRight)
@@ -244,7 +266,11 @@
         {
             ImportRole.Pubs => Icons.Material.Filled.Campaign,
             ImportRole.Jingles => Icons.Material.Filled.MusicNote,
-            ImportRole.BandesAnnonces => Icons.Material.Filled.Movie,
-            _ => Icons.Material.Filled.Layers
+            ImportRole.BandesAnnonces => Icons.Material.Filled.Theaters,
+            ImportRole.Habillage => Icons.Material.Filled.Layers,
+            ImportRole.Films => Icons.Material.Filled.Movie,
+            ImportRole.Series => Icons.Material.Filled.Tv,
+            ImportRole.Clips => Icons.Material.Filled.MusicVideo,
+            _ => Icons.Material.Filled.VideoLibrary
         };
 }

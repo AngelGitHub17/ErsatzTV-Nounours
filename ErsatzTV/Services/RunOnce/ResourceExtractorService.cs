@@ -30,6 +30,12 @@ public class ResourceExtractorService : BackgroundService
 
         await ExtractFontResource(assembly, "Sen.ttf", stoppingToken);
         await ExtractFontResource(assembly, "Roboto-Regular.ttf", stoppingToken);
+
+        // édition Nounours : graisses et italiques de Roboto (titres en gras, capitales italiques…), licence Apache 2.0
+        foreach (string font in new[] { "Roboto-Medium.ttf", "Roboto-Bold.ttf", "Roboto-Black.ttf", "Roboto-RegularItalic.ttf", "Roboto-BoldItalic.ttf", "Roboto-BlackItalic.ttf" })
+        {
+            await ExtractFontResource(assembly, font, stoppingToken);
+        }
         await ExtractFontResource(assembly, "OPTIKabel-Heavy.otf", stoppingToken);
 
         await ExtractTemplateResource(

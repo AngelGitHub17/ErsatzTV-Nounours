@@ -116,156 +116,195 @@
         <MudDrawer @bind-Open="@_drawerIsOpen" Elevation="0" ClipMode="DrawerClipMode.Always" Class="nounours-drawer" Width="268px">
             <MudNavMenu Class="nounours-nav" Bordered="false">
                 <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.SpaceDashboard">Accueil</MudNavLink>
+                @if (!_expert)
+                {
+                    @* ------------------------------------------------ menu simple : l'essentiel, dans l'ordre où on s'en sert *@
+                    <div class="nounours-nav-section">Ma télé</div>
+                    <MudNavLink Href="channels" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.LiveTv">Mes chaînes</MudNavLink>
+                    <MudNavLink Href="chaines/nouvelle" Icon="@Icons.Material.Filled.AddCircleOutline">Créer une chaîne</MudNavLink>
+                    <MudNavLink Href="programmes" Icon="@Icons.Material.Filled.ViewAgenda">Programmes</MudNavLink>
+                    <MudNavLink Href="planning" Icon="@Icons.Material.Filled.CalendarMonth">Planning</MudNavLink>
+                    <MudNavLink Href="regie" Icon="@Icons.Material.Filled.Podcasts">Régie (direct)</MudNavLink>
 
-                <MudNavGroup Title="Chaînes" Icon="@Icons.Material.Filled.LiveTv" Expanded="true">
-                    <MudNavLink Href="channels" Match="NavLinkMatch.All">Mes chaînes</MudNavLink>
-                    <MudNavLink Href="chaines/nouvelle">Nouvelle chaîne (assistant)</MudNavLink>
-                    <MudNavLink Href="programmes">Programmes (conducteurs)</MudNavLink>
-                    <MudNavLink Href="planning">Planning des programmes</MudNavLink>
-                    <MudNavLink Href="semaine-type">Semaine type</MudNavLink>
-                    <MudNavLink Href="regie">Régie (direct)</MudNavLink>
-                    @if (_expert)
+                    <div class="nounours-nav-section">À l'écran</div>
+                    <MudNavLink Href="habillage" Icon="@Icons.Material.Filled.Layers">Habillage</MudNavLink>
+
+                    <div class="nounours-nav-section">Mes médias</div>
+                    <MudNavLink Href="medias" Icon="@Icons.Material.Filled.CreateNewFolder">Ajouter des médias</MudNavLink>
+                    <MudNavLink Href="media/movies" Icon="@Icons.Material.Filled.Movie">Films</MudNavLink>
+                    <MudNavLink Href="media/tv/shows" Icon="@Icons.Material.Filled.Tv">Séries</MudNavLink>
+                    <MudNavLink Href="media/other/videos" Icon="@Icons.Material.Filled.VideoLibrary">Autres vidéos</MudNavLink>
+
+                    var simplePluginLinks = PluginRegistry.Enabled.SelectMany(p => p.Plugin.NavItems.Select(n => (p.Plugin, n))).ToList();
+                    @if (simplePluginLinks.Count > 0)
                     {
-                        <MudNavLink Href="channels/numbers">Numérotation</MudNavLink>
+                        <div class="nounours-nav-section">Modules</div>
+                        @foreach ((ErsatzTV.Plugins.IErsatzPlugin plugin, ErsatzTV.Plugins.PluginNavItem item) in simplePluginLinks)
+                        {
+                            <MudNavLink Href="@item.Href" Icon="@(item.Icon ?? plugin.Icon)">@item.Title</MudNavLink>
+                        }
                     }
-                </MudNavGroup>
 
-                <MudNavGroup Title="Habillage" Icon="@Icons.Material.Filled.Layers" Expanded="true">
-                    <MudNavLink Href="habillage">Studio d'habillage</MudNavLink>
-                    <MudNavLink Href="importer">Pubs & jingles (import)</MudNavLink>
-                    <MudNavLink Href="watermarks">Logos & filigranes</MudNavLink>
-                </MudNavGroup>
-
-                <MudNavGroup Icon="@Icons.Material.Filled.CalendarMonth">
-                    <TitleContent>
-                        <div style="align-items: center; display: flex">
-                            Programmation
-                            @if (_playoutWarnings > 0)
-                            {
-                                <MudIcon Color="@Color.Warning" Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Class="mx-2"/>
-                            }
-                        </div>
-                    </TitleContent>
-                    <ChildContent>
-                        <MudNavLink Href="schedules">Plannings</MudNavLink>
-                        <MudNavLink Href="playouts">
-                            @if (_playoutWarnings > 0)
-                            {
-                                <MudBadge Content="_playoutWarnings" Color="Color.Warning" Origin="Origin.CenterRight" BadgeClass="mx-3">Playouts</MudBadge>
-                            }
-                            else
-                            {
-                                @("Playouts")
-                            }
+                    <div class="nounours-nav-section">Réglages</div>
+                    <MudNavLink Href="settings/ui" Icon="@Icons.Material.Filled.Settings">Réglages</MudNavLink>
+                    @if (_errors > 0 || _warnings > 0)
+                    {
+                        <MudNavLink Href="system/health" Icon="@Icons.Material.Filled.MonitorHeart">
+                            <MudBadge Content="@(_errors > 0 ? _errors : _warnings)" Color="@(_errors > 0 ? Color.Error : Color.Warning)" Origin="Origin.CenterRight" BadgeClass="mx-3">À vérifier</MudBadge>
                         </MudNavLink>
+                    }
+                }
+                else
+                {
+
+                    <MudNavGroup Title="Chaînes" Icon="@Icons.Material.Filled.LiveTv" Expanded="true">
+                        <MudNavLink Href="channels" Match="NavLinkMatch.All">Mes chaînes</MudNavLink>
+                        <MudNavLink Href="chaines/nouvelle">Nouvelle chaîne (assistant)</MudNavLink>
+                        <MudNavLink Href="programmes">Programmes (conducteurs)</MudNavLink>
+                        <MudNavLink Href="planning">Planning des programmes</MudNavLink>
+                        <MudNavLink Href="semaine-type">Semaine type</MudNavLink>
+                        <MudNavLink Href="regie">Régie (direct)</MudNavLink>
                         @if (_expert)
                         {
-                            <MudNavLink Href="blocks">Blocs</MudNavLink>
-                            <MudNavLink Href="templates">Modèles de journée</MudNavLink>
-                            <MudNavLink Href="decos">Décos</MudNavLink>
-                            <MudNavLink Href="deco-templates">Modèles de décos</MudNavLink>
+                            <MudNavLink Href="channels/numbers">Numérotation</MudNavLink>
                         }
-                    </ChildContent>
-                </MudNavGroup>
-
-                <MudNavGroup Title="Médiathèque" Icon="@Icons.Material.Filled.VideoLibrary">
-                    <MudNavLink Href="media/tv/shows">Séries</MudNavLink>
-                    <MudNavLink Href="media/movies">Films</MudNavLink>
-                    <MudNavLink Href="media/music/artists">Musique</MudNavLink>
-                    <MudNavLink Href="media/other/videos">Autres vidéos</MudNavLink>
-                    @if (_expert)
-                    {
-                        <MudNavLink Href="media/music/songs">Morceaux</MudNavLink>
-                        <MudNavLink Href="media/browser/images">Images</MudNavLink>
-                        <MudNavLink Href="media/remote/streams">Flux distants</MudNavLink>
-                    }
-                    <MudNavLink Href="media/libraries">Bibliothèques</MudNavLink>
-                    <MudNavLink Href="media/trash">Corbeille</MudNavLink>
-                </MudNavGroup>
-
-                <MudNavGroup Title="Collections" Icon="@Icons.Material.Filled.CollectionsBookmark">
-                    <MudNavLink Href="media/collections">Collections</MudNavLink>
-                    <MudNavLink Href="media/smart-collections">Collections intelligentes</MudNavLink>
-                    <MudNavLink Href="media/playlists">Playlists</MudNavLink>
-                    @if (_expert)
-                    {
-                        <MudNavLink Href="media/multi-collections">Multi-collections</MudNavLink>
-                        <MudNavLink Href="media/rerun-collections">Rediffusions</MudNavLink>
-                        <MudNavLink Href="media/trakt/lists">Listes Trakt</MudNavLink>
-                        <MudNavLink Href="media/filler/presets">Préréglages de remplissage</MudNavLink>
-                    }
-                </MudNavGroup>
-
-                <MudNavGroup Title="Sources" Icon="@Icons.Material.Filled.Storage">
-                    <MudNavLink Href="media/sources/local">Dossiers locaux</MudNavLink>
-                    <MudNavLink Href="media/sources/plex">Plex</MudNavLink>
-                    <MudNavLink Href="media/sources/jellyfin">Jellyfin</MudNavLink>
-                    <MudNavLink Href="media/sources/emby">Emby</MudNavLink>
-                </MudNavGroup>
-
-                @{
+                    </MudNavGroup>
+    
+                    <MudNavGroup Title="Habillage" Icon="@Icons.Material.Filled.Layers" Expanded="true">
+                        <MudNavLink Href="habillage">Studio d'habillage</MudNavLink>
+                        <MudNavLink Href="importer">Pubs & jingles (import)</MudNavLink>
+                        <MudNavLink Href="watermarks">Logos & filigranes</MudNavLink>
+                    </MudNavGroup>
+    
+                    <MudNavGroup Icon="@Icons.Material.Filled.CalendarMonth">
+                        <TitleContent>
+                            <div style="align-items: center; display: flex">
+                                Programmation
+                                @if (_playoutWarnings > 0)
+                                {
+                                    <MudIcon Color="@Color.Warning" Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Class="mx-2"/>
+                                }
+                            </div>
+                        </TitleContent>
+                        <ChildContent>
+                            <MudNavLink Href="schedules">Plannings</MudNavLink>
+                            <MudNavLink Href="playouts">
+                                @if (_playoutWarnings > 0)
+                                {
+                                    <MudBadge Content="_playoutWarnings" Color="Color.Warning" Origin="Origin.CenterRight" BadgeClass="mx-3">Playouts</MudBadge>
+                                }
+                                else
+                                {
+                                    @("Playouts")
+                                }
+                            </MudNavLink>
+                            @if (_expert)
+                            {
+                                <MudNavLink Href="blocks">Blocs</MudNavLink>
+                                <MudNavLink Href="templates">Modèles de journée</MudNavLink>
+                                <MudNavLink Href="decos">Décos</MudNavLink>
+                                <MudNavLink Href="deco-templates">Modèles de décos</MudNavLink>
+                            }
+                        </ChildContent>
+                    </MudNavGroup>
+    
+                    <MudNavGroup Title="Médiathèque" Icon="@Icons.Material.Filled.VideoLibrary">
+                        <MudNavLink Href="media/tv/shows">Séries</MudNavLink>
+                        <MudNavLink Href="media/movies">Films</MudNavLink>
+                        <MudNavLink Href="media/music/artists">Musique</MudNavLink>
+                        <MudNavLink Href="media/other/videos">Autres vidéos</MudNavLink>
+                        @if (_expert)
+                        {
+                            <MudNavLink Href="media/music/songs">Morceaux</MudNavLink>
+                            <MudNavLink Href="media/browser/images">Images</MudNavLink>
+                            <MudNavLink Href="media/remote/streams">Flux distants</MudNavLink>
+                        }
+                        <MudNavLink Href="media/libraries">Bibliothèques</MudNavLink>
+                        <MudNavLink Href="media/trash">Corbeille</MudNavLink>
+                    </MudNavGroup>
+    
+                    <MudNavGroup Title="Collections" Icon="@Icons.Material.Filled.CollectionsBookmark">
+                        <MudNavLink Href="media/collections">Collections</MudNavLink>
+                        <MudNavLink Href="media/smart-collections">Collections intelligentes</MudNavLink>
+                        <MudNavLink Href="media/playlists">Playlists</MudNavLink>
+                        @if (_expert)
+                        {
+                            <MudNavLink Href="media/multi-collections">Multi-collections</MudNavLink>
+                            <MudNavLink Href="media/rerun-collections">Rediffusions</MudNavLink>
+                            <MudNavLink Href="media/trakt/lists">Listes Trakt</MudNavLink>
+                            <MudNavLink Href="media/filler/presets">Préréglages de remplissage</MudNavLink>
+                        }
+                    </MudNavGroup>
+    
+                    <MudNavGroup Title="Sources" Icon="@Icons.Material.Filled.Storage">
+                        <MudNavLink Href="media/sources/local">Dossiers locaux</MudNavLink>
+                        <MudNavLink Href="media/sources/plex">Plex</MudNavLink>
+                        <MudNavLink Href="media/sources/jellyfin">Jellyfin</MudNavLink>
+                        <MudNavLink Href="media/sources/emby">Emby</MudNavLink>
+                    </MudNavGroup>
+    
                     var pluginLinks = PluginRegistry.Enabled.SelectMany(p => p.Plugin.NavItems.Select(n => (p.Plugin, n))).ToList();
+                    <MudNavGroup Title="Modules" Icon="@Icons.Material.Filled.Extension">
+                        @foreach ((ErsatzTV.Plugins.IErsatzPlugin plugin, ErsatzTV.Plugins.PluginNavItem item) in pluginLinks)
+                        {
+                            <MudNavLink Href="@item.Href" Icon="@(item.Icon ?? plugin.Icon)">@item.Title</MudNavLink>
+                        }
+                        <MudNavLink Href="modules" Match="NavLinkMatch.All">Gérer les modules</MudNavLink>
+                    </MudNavGroup>
+    
+                    <MudNavGroup Title="Réglages" Icon="@Icons.Material.Filled.Settings">
+                        <MudNavLink Href="ffmpeg">Profils de diffusion (FFmpeg)</MudNavLink>
+                        <MudNavLink Href="settings/ui">Interface</MudNavLink>
+                        <MudNavLink Href="settings/playout">Programmation</MudNavLink>
+                        <MudNavLink Href="settings/scanner">Analyse des bibliothèques</MudNavLink>
+                        <MudNavLink Href="settings/xmltv">Guide XMLTV</MudNavLink>
+                        @if (_expert)
+                        {
+                            <MudNavLink Href="settings/ffmpeg">FFmpeg</MudNavLink>
+                            <MudNavLink Href="settings/hdhr">HDHomeRun</MudNavLink>
+                            <MudNavLink Href="settings/logging">Journalisation</MudNavLink>
+                        }
+                    </MudNavGroup>
+    
+                    <MudNavGroup Icon="@Icons.Material.Filled.MonitorHeart">
+                        <TitleContent>
+                            <div style="align-items: center; display: flex">
+                                Diagnostic
+                                @if (_errors > 0)
+                                {
+                                    <MudIcon Color="@Color.Error" Icon="@Icons.Material.Filled.Error" Size="Size.Small" Class="mx-2"/>
+                                }
+                                else if (_warnings > 0)
+                                {
+                                    <MudIcon Color="@Color.Warning" Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Class="mx-2"/>
+                                }
+                            </div>
+                        </TitleContent>
+                        <ChildContent>
+                            <MudNavLink Href="system/health">
+                                @if (_errors > 0)
+                                {
+                                    <MudBadge Content="_errors" Color="Color.Error" Origin="Origin.CenterRight" BadgeClass="mx-3">État du système</MudBadge>
+                                }
+                                else if (_warnings > 0)
+                                {
+                                    <MudBadge Content="_warnings" Color="Color.Warning" Origin="Origin.CenterRight" BadgeClass="mx-3">État du système</MudBadge>
+                                }
+                                else
+                                {
+                                    @("État du système")
+                                }
+                            </MudNavLink>
+                            <MudNavLink Href="system/logs">Journaux</MudNavLink>
+                            <MudNavLink Href="system/troubleshooting">Dépannage</MudNavLink>
+                        </ChildContent>
+                    </MudNavGroup>
                 }
-                <MudNavGroup Title="Modules" Icon="@Icons.Material.Filled.Extension">
-                    @foreach ((ErsatzTV.Plugins.IErsatzPlugin plugin, ErsatzTV.Plugins.PluginNavItem item) in pluginLinks)
-                    {
-                        <MudNavLink Href="@item.Href" Icon="@(item.Icon ?? plugin.Icon)">@item.Title</MudNavLink>
-                    }
-                    <MudNavLink Href="modules" Match="NavLinkMatch.All">Gérer les modules</MudNavLink>
-                </MudNavGroup>
-
-                <MudNavGroup Title="Réglages" Icon="@Icons.Material.Filled.Settings">
-                    <MudNavLink Href="ffmpeg">Profils de diffusion (FFmpeg)</MudNavLink>
-                    <MudNavLink Href="settings/ui">Interface</MudNavLink>
-                    <MudNavLink Href="settings/playout">Programmation</MudNavLink>
-                    <MudNavLink Href="settings/scanner">Analyse des bibliothèques</MudNavLink>
-                    <MudNavLink Href="settings/xmltv">Guide XMLTV</MudNavLink>
-                    @if (_expert)
-                    {
-                        <MudNavLink Href="settings/ffmpeg">FFmpeg</MudNavLink>
-                        <MudNavLink Href="settings/hdhr">HDHomeRun</MudNavLink>
-                        <MudNavLink Href="settings/logging">Journalisation</MudNavLink>
-                    }
-                </MudNavGroup>
-
-                <MudNavGroup Icon="@Icons.Material.Filled.MonitorHeart">
-                    <TitleContent>
-                        <div style="align-items: center; display: flex">
-                            Diagnostic
-                            @if (_errors > 0)
-                            {
-                                <MudIcon Color="@Color.Error" Icon="@Icons.Material.Filled.Error" Size="Size.Small" Class="mx-2"/>
-                            }
-                            else if (_warnings > 0)
-                            {
-                                <MudIcon Color="@Color.Warning" Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Class="mx-2"/>
-                            }
-                        </div>
-                    </TitleContent>
-                    <ChildContent>
-                        <MudNavLink Href="system/health">
-                            @if (_errors > 0)
-                            {
-                                <MudBadge Content="_errors" Color="Color.Error" Origin="Origin.CenterRight" BadgeClass="mx-3">État du système</MudBadge>
-                            }
-                            else if (_warnings > 0)
-                            {
-                                <MudBadge Content="_warnings" Color="Color.Warning" Origin="Origin.CenterRight" BadgeClass="mx-3">État du système</MudBadge>
-                            }
-                            else
-                            {
-                                @("État du système")
-                            }
-                        </MudNavLink>
-                        <MudNavLink Href="system/logs">Journaux</MudNavLink>
-                        <MudNavLink Href="system/troubleshooting">Dépannage</MudNavLink>
-                    </ChildContent>
-                </MudNavGroup>
             </MudNavMenu>
 
             <div class="nounours-drawer-footer">
-                <MudTooltip Text="Le mode expert affiche toutes les options avancées d'ErsatzTV (blocs, décos, multi-collections…)" Placement="Placement.Top">
-                    <MudSwitch T="bool" Value="@_expert" ValueChanged="@ToggleExpert" Color="Color.Primary" Label="Mode expert"/>
+                <MudTooltip Text="Affiche tous les menus et toutes les options avancées d'ErsatzTV (sources Plex/Jellyfin, blocs, décos, FFmpeg…)" Placement="Placement.Top">
+                    <MudSwitch T="bool" Value="@_expert" ValueChanged="@ToggleExpert" Color="Color.Primary" Label="Toutes les options (expert)"/>
                 </MudTooltip>
                 <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mt-2">ErsatzTV @InfoVersion</MudText>
                 @if (BuildConfiguration != "release")

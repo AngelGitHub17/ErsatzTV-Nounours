@@ -43,6 +43,8 @@
             </div>
         </div>
 
+        <ErsatzTV.Shared.Nounours.StartGuide/>
+
         @if (_problems.Count > 0)
         {
             <MudAlert Severity="@(_problems.Any(p => p.Status == HealthCheckStatus.Fail) ? Severity.Error : Severity.Warning)"

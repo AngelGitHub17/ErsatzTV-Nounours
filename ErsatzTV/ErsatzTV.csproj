@@ -78,6 +78,12 @@
         <EmbeddedResource Include="Resources\_background.png" />
         <EmbeddedResource Include="Resources\Fonts\OPTIKabel-Heavy.otf" />
         <EmbeddedResource Include="Resources\Fonts\Roboto-Regular.ttf" />
+        <EmbeddedResource Include="Resources\Fonts\Roboto-Medium.ttf" />
+        <EmbeddedResource Include="Resources\Fonts\Roboto-Bold.ttf" />
+        <EmbeddedResource Include="Resources\Fonts\Roboto-Black.ttf" />
+        <EmbeddedResource Include="Resources\Fonts\Roboto-RegularItalic.ttf" />
+        <EmbeddedResource Include="Resources\Fonts\Roboto-BoldItalic.ttf" />
+        <EmbeddedResource Include="Resources\Fonts\Roboto-BlackItalic.ttf" />
         <EmbeddedResource Include="Resources\Scripts\_threePartEpisodes.js" />
         <EmbeddedResource Include="Resources\Scripts\_episode.js" />
         <EmbeddedResource Include="Resources\Scripts\_movie.js" />

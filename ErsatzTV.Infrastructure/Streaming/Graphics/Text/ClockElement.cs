@@ -27,6 +27,9 @@ public class ClockElement(
     private Option<NCalc.Expression> _maybeOpacityExpression;
     private float _opacity;
     private List<DateTimeOffset> _countdownTargets = [];
+    private SKBitmap _analogBitmap;
+    private SKPointI _analogLocation;
+    private string _analogKey;
 
     public override int ZIndex { get; } = clockElement.ZIndex ?? 0;
 
@@ -37,6 +40,8 @@ public class ClockElement(
         GC.SuppressFinalize(this);
         _current?.Dispose();
         _current = null;
+        _analogBitmap?.Dispose();
+        _analogBitmap = null;
     }
 
     public override Task InitializeAsync(GraphicsEngineContext context, CancellationToken cancellationToken)
@@ -125,6 +130,11 @@ public class ClockElement(
 
         DateTimeOffset frameTime = _context.ContentStartTime + contentTime;
         DateTimeOffset local = TimeZoneInfo.ConvertTime(frameTime, _timeZone);
+
+        if (clockElement.Analog)
+        {
+            return RenderAnalog(local, opacity);
+        }
         string text = clockElement.Text.Replace("{clock}", local.ToString(clockElement.Format, _culture), StringComparison.Ordinal);
 
         if (text.Contains("{countdown}", StringComparison.Ordinal))
@@ -170,6 +180,147 @@ public class ClockElement(
 
         return new PreparedElementImage(image, _current.RenderedLocation, opacity, ZIndex, false);
     }
+
+    // ------------------------------------------------------------------ horloge à aiguilles
+
+    private Option<PreparedElementImage> RenderAnalog(DateTimeOffset local, float opacity)
+    {
+        string key = clockElement.AnalogSeconds ? local.ToString("HH:mm:ss", CultureInfo.InvariantCulture) : local.ToString("HH:mm", CultureInfo.InvariantCulture);
+        if (key != _analogKey || _analogBitmap is null)
+        {
+            int frameWidth = _context.FrameSize.Width;
+            int frameHeight = _context.FrameSize.Height;
+            int size = Math.Max(16, (int)Math.Round(Math.Clamp(clockElement.AnalogSizePercent, 2, 100) / 100.0 * frameHeight));
+
+            SKBitmap previous = _analogBitmap;
+            _analogBitmap = DrawAnalog(size, local);
+            previous?.Dispose();
+
+            _analogLocation = CalculatePosition(
+                clockElement.Location,
+                frameWidth,
+                frameHeight,
+                size,
+                size,
+                (int)Math.Round((clockElement.HorizontalMarginPercent ?? 0) / 100.0 * frameWidth),
+                (int)Math.Round((clockElement.VerticalMarginPercent ?? 0) / 100.0 * frameHeight));
+            _analogKey = key;
+        }
+
+        return new PreparedElementImage(_analogBitmap, _analogLocation, opacity, ZIndex, false);
+    }
+
+    private SKBitmap DrawAnalog(int size, DateTimeOffset local)
+    {
+        var bitmap = new SKBitmap(size, size, SKColorType.Bgra8888, SKAlphaType.Premul);
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(SKColors.Transparent);
+
+        SKColor color = ParseColor(clockElement.AnalogColor, SKColors.White);
+        SKColor face = ParseColor(clockElement.AnalogFaceColor, SKColors.Transparent);
+        SKColor secondsColor = ParseColor(clockElement.AnalogSecondsColor, new SKColor(0xFF, 0x39, 0x35));
+        bool hasShadow = !string.IsNullOrWhiteSpace(clockElement.AnalogShadowColor);
+        SKColor shadow = ParseColor(clockElement.AnalogShadowColor, new SKColor(0, 0, 0, 160));
+
+        float c = size / 2f;
+        float outline = (float)(Math.Clamp(clockElement.AnalogOutlinePercent, 0, 20) / 100.0 * size);
+        float shadowExtra = hasShadow ? Math.Max(2f, size * 0.025f) : 0f;
+        float radius = c - outline / 2f - shadowExtra - 1f;
+
+        using var fill = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Fill, Color = face };
+        canvas.DrawCircle(c, c, radius, fill);
+
+        void Stroke(Action<SKPaint> draw, float width, SKColor strokeColor)
+        {
+            if (hasShadow)
+            {
+                using var under = new SKPaint
+                {
+                    IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeCap = SKStrokeCap.Round,
+                    StrokeWidth = width + shadowExtra * 2, Color = shadow
+                };
+                draw(under);
+            }
+
+            using var paint = new SKPaint
+            {
+                IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeCap = SKStrokeCap.Round,
+                StrokeWidth = width, Color = strokeColor
+            };
+            draw(paint);
+        }
+
+        void Dot(float x, float y, float r)
+        {
+            if (hasShadow)
+            {
+                using var under = new SKPaint { IsAntialias = true, Color = shadow };
+                canvas.DrawCircle(x, y, r + shadowExtra, under);
+            }
+
+            using var paint = new SKPaint { IsAntialias = true, Color = color };
+            canvas.DrawCircle(x, y, r, paint);
+        }
+
+        if (outline > 0)
+        {
+            Stroke(p => canvas.DrawCircle(c, c, radius, p), outline, color);
+        }
+
+        // repères des heures
+        float inner = radius - outline / 2f;
+        string ticks = (clockElement.AnalogTicks ?? "dots").ToLowerInvariant();
+        for (var i = 0; i < 12; i++)
+        {
+            double a = i * Math.PI / 6;
+            bool major = i % 3 == 0;
+            if (ticks == "dots")
+            {
+                float r = size * (major ? 0.032f : 0.022f);
+                float d = inner - size * 0.09f;
+                Dot(c + (float)(Math.Sin(a) * d), c - (float)(Math.Cos(a) * d), r);
+            }
+            else if (ticks == "lines")
+            {
+                float from = inner - size * (major ? 0.16f : 0.11f);
+                float to = inner - size * 0.05f;
+                float w = size * (major ? 0.04f : 0.022f);
+                Stroke(
+                    p => canvas.DrawLine(
+                        c + (float)(Math.Sin(a) * from), c - (float)(Math.Cos(a) * from),
+                        c + (float)(Math.Sin(a) * to), c - (float)(Math.Cos(a) * to), p),
+                    w,
+                    color);
+            }
+        }
+
+        // aiguilles
+        double minutes = local.Minute + local.Second / 60.0;
+        double hours = local.Hour % 12 + minutes / 60.0;
+
+        void Hand(double angleDegrees, float length, float width, SKColor handColor)
+        {
+            double a = angleDegrees * Math.PI / 180;
+            Stroke(
+                p => canvas.DrawLine(c, c, c + (float)(Math.Sin(a) * length), c - (float)(Math.Cos(a) * length), p),
+                width,
+                handColor);
+        }
+
+        Hand(hours * 30, inner * 0.50f, size * 0.075f, color);
+        Hand(minutes * 6, inner * 0.78f, size * 0.055f, color);
+        if (clockElement.AnalogSeconds)
+        {
+            Hand(local.Second * 6, inner * 0.82f, size * 0.022f, secondsColor);
+        }
+
+        Dot(c, c, size * 0.045f);
+        canvas.Flush();
+        return bitmap;
+    }
+
+    private static SKColor ParseColor(string value, SKColor fallback) =>
+        !string.IsNullOrWhiteSpace(value) && SKColor.TryParse(value, out SKColor color) ? color : fallback;
 
     private static string FormatSpan(TimeSpan span)
     {

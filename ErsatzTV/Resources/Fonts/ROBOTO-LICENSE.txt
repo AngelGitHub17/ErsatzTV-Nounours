@@ -1,0 +1,3 @@
+Roboto — Copyright 2011 Google Inc. All Rights Reserved.
+Licensed under the Apache License, Version 2.0 : http://www.apache.org/licenses/LICENSE-2.0
+(fichiers convertis depuis le paquet npm roboto-fontface 0.10.0 ; nom de famille unifié « Roboto »)

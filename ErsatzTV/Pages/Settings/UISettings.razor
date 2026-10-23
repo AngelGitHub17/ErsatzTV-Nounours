@@ -35,6 +35,12 @@
                     }
                 </MudSelect>
             </MudStack>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex">
+                    <MudText>Guide « Bien démarrer »</MudText>
+                </div>
+                <MudSwitch T="bool" @bind-Value="_showGuide" Color="Color.Primary" Label="Afficher le guide sur l'accueil"/>
+            </MudStack>
         </MudContainer>
     </div>
 </MudForm>
@@ -43,6 +49,7 @@
     private CancellationTokenSource _cts;
 
     private UiSettingsViewModel _uiSettings = new();
+    private bool _showGuide = true;
 
     public void Dispose()
     {
@@ -60,6 +67,9 @@
         try
         {
             _uiSettings = await Mediator.Send(new GetUiSettings(), token);
+            _showGuide = !await Mediator.Send(new GetConfigElementByKey(ConfigElementKey.PagesStartGuideHidden), token)
+                .MapT(r => bool.TryParse(r.Value, out bool v) && v)
+                .IfNoneAsync(false);
         }
         catch (OperationCanceledException)
         {
@@ -70,6 +80,7 @@
     private async Task SaveUiSettings()
     {
         Either<BaseError, Unit> result = await Mediator.Send(new UpdateUiSettings(_uiSettings), _cts.Token);
+        await Mediator.Send(new SaveConfigElementByKey(ConfigElementKey.PagesStartGuideHidden, (!_showGuide).ToString()), _cts.Token);
 
         foreach (var error in result.LeftToSeq())
         {

@@ -13,7 +13,19 @@
             <h1>Studio d'habillage</h1>
             <p>Composez ce qui s'affiche par-dessus vos programmes — horloge, logo, bandeau, « à suivre »… — comme dans OBS, puis appliquez-le à vos chaînes.</p>
         </div>
-        <MudButton Href="habillage/nouveau" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">Nouvel habillage</MudButton>
+        <MudButton Href="habillage/nouveau" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">Nouvel habillage vierge</MudButton>
+    </div>
+
+    <MudText Typo="Typo.h6" Class="mb-2">Partir d'un modèle</MudText>
+    <div class="n-templates mb-6">
+        @foreach ((string key, string name, string description, string preview) in Templates)
+        {
+            <a class="n-card n-template" href="@($"habillage/nouveau?modele={key}")">
+                <div class="n-template-preview n-template-@key">@((MarkupString)preview)</div>
+                <div style="font-weight: 700" class="mt-2">@name</div>
+                <div class="n-muted" style="font-size: .85rem">@description</div>
+            </a>
+        }
     </div>
 
     @if (_scenes is null)
@@ -29,7 +41,7 @@
                 Un habillage regroupe des calques : une horloge en direct, votre logo, le titre du programme, un bandeau « À suivre »…
                 Ils sont incrustés en temps réel dans le flux de la chaîne.
             </MudText>
-            <MudButton Href="habillage/nouveau?modele=classique" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2" StartIcon="@Icons.Material.Filled.AutoAwesome">Partir d'un modèle prêt à l'emploi</MudButton>
+            <MudText Class="n-muted">Choisissez un modèle ci-dessus pour commencer en un clic.</MudText>
         </div>
     }
     else
@@ -74,6 +86,17 @@
 </div>
 
 @code {
+    // aperçus schématiques (pas de logo : à vous d'ajouter le vôtre)
+    private static readonly (string, string, string, string)[] Templates =
+    [
+        ("classique", "Classique", "Horloge, titre du programme au début, « à suivre » à la fin.",
+            "<span style='right:6%;top:8%;font-weight:700'>20:45</span><span style='left:6%;top:8%'>Titre du programme</span><span style='left:6%;bottom:8%'>À suivre : Le journal · 21:00</span>"),
+        ("retro95", "Rétro 95 · cadre & bandeaux", "Cadre clair autour de l'image, bandeaux noirs en capitales italiques, blocs de couleur.",
+            "<i class='f'></i><b style='left:7%;top:9%;padding:1px 6px'>MA CHAÎNE</b><em style='right:8%;top:11%'></em><b style='left:7%;bottom:15%'>TITRE DU PROGRAMME</b><b style='left:7%;bottom:9%;font-size:.55rem'>À SUIVRE · 20H40</b>"),
+        ("matinale", "Matinale", "Horloge à aiguilles et titre empilé en haut à gauche, date et heure en bas.",
+            "<span class='c'></span><span style='left:20%;top:8%;font-weight:800;line-height:1'>LA<br>MATINALE</span><span style='left:6%;bottom:8%'>vendredi 23 octobre · 7:42</span>")
+    ];
+
     private List<HabillageSummary> _scenes;
 
     protected override async Task OnInitializedAsync() => _scenes = await HabillageService.GetAll(CancellationToken.None);

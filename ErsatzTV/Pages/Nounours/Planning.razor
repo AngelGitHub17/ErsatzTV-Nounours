@@ -44,6 +44,7 @@
                 <MudButton OnClick="@Today">Aujourd'hui</MudButton>
                 <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" OnClick="@(() => Shift(1))" aria-label="Suivant"/>
             </MudButtonGroup>
+            <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.CalendarViewWeek" Href="@(_week ? $"semaine-type?chaine={_channelId}" : "semaine-type")">Semaine type</MudButton>
             <MudDatePicker Date="@_date" DateChanged="@SetDate" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 150px" DateFormat="dd/MM/yyyy" Culture="@Fr"/>
             @if (!_week)
             {

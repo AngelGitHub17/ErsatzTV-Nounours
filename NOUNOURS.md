@@ -14,6 +14,16 @@ entièrement en français, et facile à étendre.
 - **Tout en français** : les ~80 pages d'origine, les messages, les dialogues de suppression, les vérifications de santé,
   la pagination, et une langue « Français » ajoutée (par défaut) dans Réglages › Interface.
 
+### Menu simple et guide « Bien démarrer »
+- Par défaut, le menu ne montre que l'essentiel, rangé par usage : **Ma télé** (chaînes, créer une chaîne, programmes,
+  planning, régie) · **À l'écran** (habillage) · **Mes médias** (ajouter des médias, films, séries, vidéos) · Modules · Réglages.
+  « À vérifier » n'apparaît qu'en cas de problème. L'interrupteur **« Toutes les options (expert) »** affiche le menu complet d'ErsatzTV.
+- Sur l'accueil, le guide **« Bien démarrer »** coche tout seul les 5 étapes : FFmpeg → ajouter des médias → créer une chaîne →
+  habiller la chaîne → regarder (avec les adresses M3U et XMLTV à copier). Il disparaît quand tout est fait
+  (ou via « Masquer ce guide » ; réactivable dans Réglages › Interface).
+- **Ajouter des médias** (`/medias`) : films, séries, clips et vidéos s'ajoutent comme les pubs — on choisit le type, on indique le dossier
+  (ou on envoie les fichiers), c'est analysé. Le dossier rejoint votre bibliothèque existante du même type s'il y en a une.
+
 ### Tableau de bord (page d'accueil)
 - Chaque chaîne avec son logo, **ce qui passe maintenant** (barre de progression, temps restant) et **le programme suivant**.
 - Statistiques de la médiathèque, alerte si une vérification de santé échoue, diffusions en cours.
@@ -49,6 +59,17 @@ Composez ce qui s'affiche par-dessus les programmes, en glisser-déposer sur une
 - **Compte à rebours** (« Début dans 1:30 » avant le programme suivant, affichable seulement les X dernières minutes),
   **temps restant** du programme en cours (`{restant}`), et **« Prochainement »** : les 3 prochains programmes du guide avec leur heure.
   Dans un texte d'horloge : `{clock}` = l'heure, `{countdown}` = temps avant le programme suivant, `{restant}` = temps restant.
+
+- **Horloge à aiguilles** (nouveau dans le moteur) : cadran rond avec repères (points, traits ou aucun), contour, fond, aiguille des secondes
+  en option, ombre pour rester lisible sur fond clair. Taille à la poignée, comme une image.
+- **Cadre (passe-partout)** : une bordure pleine autour de l'image avec une fenêtre au centre (épaisseurs, couleur, arrondi, fine ombre),
+  pour l'effet « carton » des années 90. Il passe sous les autres calques ; l'image n'est pas réduite, ses bords sont recouverts.
+- **Modèles** en un clic sur la page Habillage :
+  - **Classique** — horloge, titre au début du programme, « à suivre » à la fin ;
+  - **Rétro 95** — cadre clair, cartouche « MA CHAÎNE », bandeaux noirs en capitales italiques (titre au début, « À SUIVRE · 20H40 · TITRE » à la fin),
+    bloc de couleur ; remplacez le cartouche par votre logo ;
+  - **Matinale** — horloge à aiguilles et titre empilé en haut à gauche, date et heure en bas.
+- Mettre un texte en capitales : `{{ MediaItem_Title | string.upcase }}`. Les graisses Medium, Bold, Black et les italiques de Roboto sont fournies.
 
 « Enregistrer » génère les fichiers YAML du moteur graphique d'ErsatzTV et une **déco** « Habillage : nom » (groupe « Habillages ») ;
 « Appliquer aux chaînes » en fait la déco par défaut des chaînes choisies. Visible dès le programme suivant

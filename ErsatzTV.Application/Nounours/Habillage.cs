@@ -18,7 +18,10 @@ public enum HabillageItemKind
     Clock,
     Text,
     Image,
-    Banner
+    Banner,
+
+    /// <summary>Cadre « passe-partout » : bordure pleine autour de l'image, fenêtre transparente au centre.</summary>
+    Frame
 }
 
 public enum HabillageVisibility
@@ -67,6 +70,20 @@ public sealed class HabillageItem
 
     /// <summary>Compte à rebours : n'afficher que pendant les X dernières minutes avant le programme suivant (0 = toujours).</summary>
     public double CountdownMaxMinutes { get; set; }
+
+    // horloge à aiguilles (Kind = Clock, Analog = true ; diamètre = Width % de la largeur)
+    public bool Analog { get; set; }
+    public string AnalogTicks { get; set; } = "dots";
+    public bool AnalogSeconds { get; set; }
+    public double AnalogOutline { get; set; } = 6;
+    public string FaceColor { get; set; } = "#00000000";
+    public string SecondsColor { get; set; } = "#E53935";
+
+    // cadre (Kind = Frame) : épaisseurs en % ; couleur = BackgroundColor ; arrondi de la fenêtre = CornerRadius
+    public double FrameSide { get; set; } = 5.5;
+    public double FrameTop { get; set; } = 7;
+    public double FrameBottom { get; set; } = 9;
+    public bool FrameShadow { get; set; } = true;
 
     // image
     public string ImagePath { get; set; } = string.Empty;
@@ -183,6 +200,14 @@ public sealed partial class HabillageService(
             if (item.Kind == HabillageItemKind.Banner)
             {
                 item.ImagePath = RenderBanner(scene.Slug, item);
+            }
+            else if (item.Kind == HabillageItemKind.Frame)
+            {
+                item.X = 0;
+                item.Y = 0;
+                item.Width = 100;
+                item.Height = 100;
+                item.ImagePath = RenderFrame(scene.Slug, item);
             }
 
             string path = ElementPath(scene.Slug, item);
@@ -446,6 +471,7 @@ public sealed partial class HabillageService(
         {
             case HabillageItemKind.Image:
             case HabillageItemKind.Banner:
+            case HabillageItemKind.Frame:
                 sb.AppendLine(CultureInfo.InvariantCulture, $"image: {Quote(item.ImagePath)}");
                 sb.AppendLine("scale: true");
                 sb.AppendLine(CultureInfo.InvariantCulture, $"scale_width_percent: {Num(item.Width)}");
@@ -458,6 +484,23 @@ public sealed partial class HabillageService(
                     sb.AppendLine(CultureInfo.InvariantCulture, $"format: {Quote(string.IsNullOrWhiteSpace(item.Format) ? "HH:mm" : item.Format)}");
                     sb.AppendLine(CultureInfo.InvariantCulture, $"time_zone: {Quote(item.TimeZone ?? string.Empty)}");
                     sb.AppendLine("culture: \"fr-FR\"");
+                    if (item.Analog)
+                    {
+                        // le diamètre suit la largeur du calque (en % de la largeur) ; le moteur l'attend en % de la hauteur
+                        sb.AppendLine("analog: true");
+                        sb.AppendLine(CultureInfo.InvariantCulture, $"analog_size_percent: {Num(Math.Max(1, item.Width) * 16 / 9)}");
+                        sb.AppendLine(CultureInfo.InvariantCulture, $"analog_color: {Quote(ToSkiaColor(item.Color))}");
+                        sb.AppendLine(CultureInfo.InvariantCulture, $"analog_face_color: {Quote(ToSkiaColor(item.FaceColor))}");
+                        sb.AppendLine(CultureInfo.InvariantCulture, $"analog_seconds_color: {Quote(ToSkiaColor(item.SecondsColor))}");
+                        if (item.HaloWidth > 0)
+                        {
+                            sb.AppendLine(CultureInfo.InvariantCulture, $"analog_shadow_color: {Quote(ToSkiaColor(item.HaloColor))}");
+                        }
+
+                        sb.AppendLine(CultureInfo.InvariantCulture, $"analog_outline_percent: {Num(item.AnalogOutline)}");
+                        sb.AppendLine(CultureInfo.InvariantCulture, $"analog_ticks: {Quote(item.AnalogTicks ?? "dots")}");
+                        sb.AppendLine(CultureInfo.InvariantCulture, $"analog_seconds: {(item.AnalogSeconds ? "true" : "false")}");
+                    }
                 }
 
                 int epgEntries = item.EpgEntries;
@@ -577,6 +620,63 @@ public sealed partial class HabillageService(
         using FileStream stream = File.Create(path);
         data.SaveTo(stream);
 
+        return path;
+    }
+
+    // ------------------------------------------------------------------ cadre (passe-partout)
+
+    private static string RenderFrame(string slug, HabillageItem item)
+    {
+        const int width = 1920;
+        const int height = 1080;
+        string folder = Path.Combine(FileSystemLayout.HabillageAssetsFolder, "generated");
+        Directory.CreateDirectory(folder);
+        string path = Path.Combine(folder, $"{FilePrefix}{slug}_{item.Id}.png");
+
+        if (!SKColor.TryParse(ToSkiaColor(item.BackgroundColor), out SKColor color))
+        {
+            color = new SKColor(0xF2, 0xEF, 0xE4);
+        }
+
+        float side = (float)(Math.Clamp(item.FrameSide, 0, 45) / 100.0 * width);
+        float top = (float)(Math.Clamp(item.FrameTop, 0, 45) / 100.0 * height);
+        float bottom = (float)(Math.Clamp(item.FrameBottom, 0, 45) / 100.0 * height);
+        var window = new SKRect(side, top, width - side, height - bottom);
+        var radius = (float)Math.Max(0, item.CornerRadius);
+
+        using var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using (var canvas = new SKCanvas(bitmap))
+        {
+            canvas.Clear(SKColors.Transparent);
+            using var path2 = new SKPath { FillType = SKPathFillType.EvenOdd };
+            path2.AddRect(new SKRect(0, 0, width, height));
+            path2.AddRoundRect(window, radius, radius);
+
+            using var paint = new SKPaint { Color = color, IsAntialias = true };
+            canvas.DrawPath(path2, paint);
+
+            if (item.FrameShadow)
+            {
+                // fine ombre intérieure : donne l'effet « image posée dans le cadre »
+                using var shadow = new SKPaint
+                {
+                    Color = new SKColor(0, 0, 0, 90),
+                    IsAntialias = true,
+                    Style = SKPaintStyle.Stroke,
+                    StrokeWidth = 4,
+                    MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 3)
+                };
+                canvas.Save();
+                canvas.ClipPath(path2);
+                canvas.DrawRoundRect(window, radius, radius, shadow);
+                canvas.Restore();
+            }
+        }
+
+        using SKImage image = SKImage.FromBitmap(bitmap);
+        using SKData data = image.Encode(SKEncodedImageFormat.Png, 100);
+        using FileStream stream = File.Create(path);
+        data.SaveTo(stream);
         return path;
     }
 

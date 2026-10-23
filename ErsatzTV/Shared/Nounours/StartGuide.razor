@@ -1,0 +1,132 @@
+@using ErsatzTV.Application.Configuration
+@using ErsatzTV.Application.Nounours
+@using ErsatzTV.Nounours.Audience
+@inject IDbContextFactory<TvContext> DbContextFactory
+@inject IMediator Mediator
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+@* Guide « Bien démarrer » du tableau de bord : les 5 étapes pour avoir une chaîne qui tourne, cochées automatiquement. *@
+@if (_steps is not null && !_hidden && _steps.Any(s => !s.Done))
+{
+    int done = _steps.Count(s => s.Done);
+    <div class="n-card n-startguide mb-5">
+        <div class="d-flex align-center gap-3 flex-wrap">
+            <div style="flex: 1; min-width: 220px">
+                <div class="n-card-title" style="margin: 0">Bien démarrer · @done / @_steps.Count</div>
+                <div class="n-meter mt-2" style="max-width: 360px"><div style="width: @(done * 100 / _steps.Count)%"></div></div>
+            </div>
+            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@Hide">Masquer ce guide</MudButton>
+        </div>
+        <div class="n-startguide-steps mt-3">
+            @for (int i = 0; i < _steps.Count; i++)
+            {
+                Step step = _steps[i];
+                bool current = !step.Done && _steps.Take(i).All(s => s.Done);
+                <div class="n-startguide-step @(step.Done ? "is-done" : "") @(current ? "is-current" : "")">
+                    <div class="n-startguide-num">
+                        @if (step.Done)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small"/>
+                        }
+                        else
+                        {
+                            @(i + 1)
+                        }
+                    </div>
+                    <div style="flex: 1; min-width: 0">
+                        <div style="font-weight: 600">@step.Title</div>
+                        <div class="n-muted" style="font-size: .85rem">@step.Help</div>
+                        @if (step.Extra is not null && !step.Done)
+                        {
+                            @step.Extra
+                        }
+                    </div>
+                    @if (!step.Done && step.Href is not null)
+                    {
+                        <MudButton Size="Size.Small" Variant="@(current ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" Href="@step.Href">@step.Action</MudButton>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private sealed record Step(string Title, string Help, string Action, string Href, bool Done, RenderFragment Extra = null);
+
+    private List<Step> _steps;
+    private bool _hidden;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _hidden = await Mediator.Send(new GetConfigElementByKey(ConfigElementKey.PagesStartGuideHidden))
+            .MapT(r => bool.TryParse(r.Value, out bool v) && v)
+            .IfNoneAsync(false);
+        if (_hidden)
+        {
+            return;
+        }
+
+        await using TvContext db = await DbContextFactory.CreateDbContextAsync();
+
+        string ffmpeg = await db.ConfigElements.Where(c => c.Key == ConfigElementKey.FFmpegPath.Key).Select(c => c.Value).FirstOrDefaultAsync();
+        bool hasFFmpeg = !string.IsNullOrWhiteSpace(ffmpeg) && File.Exists(ffmpeg);
+        bool hasMedia = await db.MediaItems.AnyAsync(m => m is Movie || m is Episode || m is OtherVideo || m is MusicVideo);
+        bool hasChannel = await db.Playouts.AnyAsync();
+        bool hasHabillage = await db.Playouts.AnyAsync(p => p.DecoId != null);
+        bool hasViewer = AudienceStore.AvailableDays().Count > 0;
+
+        string m3u = $"{Navigation.BaseUri}iptv/channels.m3u";
+        string xmltv = $"{Navigation.BaseUri}iptv/xmltv.xml";
+
+        _steps =
+        [
+            new Step("Indiquer où se trouve FFmpeg", "ErsatzTV en a besoin pour diffuser. Sous Windows : le chemin de ffmpeg.exe et ffprobe.exe.",
+                "Régler FFmpeg", "settings/ffmpeg", hasFFmpeg),
+            new Step("Ajouter vos films, séries ou vidéos", "Choisissez simplement le dossier où ils se trouvent.",
+                "Ajouter des médias", "medias", hasMedia),
+            new Step("Créer votre première chaîne", "L'assistant vous guide en 4 étapes : nom, contenu, horaires, habillage.",
+                "Créer une chaîne", "chaines/nouvelle", hasChannel),
+            new Step("Habiller la chaîne", "Logo, horloge, « à suivre »… à composer en glisser-déposer.",
+                "Ouvrir le studio", "habillage", hasHabillage),
+            new Step("Regarder sur votre TV ou votre lecteur", "Ajoutez ces deux adresses dans VLC, Kodi, TiviMate, Jellyfin… (liste des chaînes + guide).",
+                null, null, hasViewer, Addresses(m3u, xmltv))
+        ];
+    }
+
+    private RenderFragment Addresses(string m3u, string xmltv) =>
+        @<div class="d-flex flex-column gap-1 mt-2">
+            @foreach ((string label, string url) in new[] { ("Chaînes (M3U)", m3u), ("Guide (XMLTV)", xmltv) })
+            {
+                <div class="d-flex align-center gap-2 flex-wrap">
+                    <span class="n-muted" style="font-size: .8rem; min-width: 105px">@label</span>
+                    <code style="font-size: .8rem; overflow-wrap: anywhere">@url</code>
+                    <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" aria-label="Copier" OnClick="@(() => Copy(url))"/>
+                </div>
+            }
+        </div>;
+
+    [Inject]
+    private IJSRuntime Js { get; set; }
+
+    private async Task Copy(string text)
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("navigator.clipboard.writeText", text);
+            Snackbar.Add("Adresse copiée", Severity.Success);
+        }
+        catch (JSException)
+        {
+            Snackbar.Add(text, Severity.Info);
+        }
+    }
+
+    private async Task Hide()
+    {
+        _hidden = true;
+        await Mediator.Send(new SaveConfigElementByKey(ConfigElementKey.PagesStartGuideHidden, "true"));
+        Snackbar.Add("Guide masqué. Il reste accessible dans Réglages › Interface.", Severity.Info);
+    }
+}

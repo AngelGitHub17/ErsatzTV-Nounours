@@ -22,6 +22,11 @@ window.nounours = (function () {
                 return;
             }
             e.preventDefault();
+            if (layer.classList.contains("n-layer-fixed")) {
+                // calque plein écran (cadre) : sélection seulement
+                dotnetRef.invokeMethodAsync("OnLayerSelected", layer.dataset.id);
+                return;
+            }
             const rect = stage.getBoundingClientRect();
             const lr = layer.getBoundingClientRect();
             drag = {

@@ -203,3 +203,37 @@ div.ersatztv-light.nounours {
 .n-regie-channel.is-onair { border-left: 4px solid var(--n-onair); }
 .n-regie-badge { align-items: center; background: var(--n-onair); border-radius: 6px; color: #fff; display: inline-flex; font-size: .7rem; font-weight: 800; letter-spacing: .06em; padding: 2px 8px; }
 .n-regie-live { border: 1px solid var(--n-onair); box-shadow: 0 0 24px -8px var(--n-onair); }
+
+/* ---------- menu simple ---------- */
+.nounours-nav-section { color: var(--n-muted); font-size: .7rem; font-weight: 700; letter-spacing: .08em; margin: 14px 12px 4px; text-transform: uppercase; }
+
+/* ---------- bien démarrer ---------- */
+.n-startguide { border: 1px solid color-mix(in srgb, var(--n-accent) 40%, transparent); }
+.n-startguide-steps { display: flex; flex-direction: column; gap: 6px; }
+.n-startguide-step { align-items: flex-start; border-radius: 10px; display: flex; gap: 12px; padding: 10px; }
+.n-startguide-step.is-current { background: color-mix(in srgb, var(--n-accent) 10%, transparent); }
+.n-startguide-step.is-done { opacity: .55; }
+.n-startguide-num { align-items: center; border: 2px solid var(--n-border); border-radius: 50%; display: flex; flex: none; font-weight: 700; height: 28px; justify-content: center; width: 28px; }
+.n-startguide-step.is-current .n-startguide-num { border-color: var(--n-accent); color: var(--n-accent); }
+.n-startguide-step.is-done .n-startguide-num { background: var(--n-accent); border-color: var(--n-accent); color: #fff; }
+
+/* ---------- studio : cadre et horloge à aiguilles ---------- */
+.n-layer-fixed { cursor: pointer; height: 100%; pointer-events: none; }
+.n-layer-fixed svg { display: block; height: 100%; width: 100%; }
+.n-layer-fixed svg path { pointer-events: visiblePainted; }
+.n-layer svg.n-analog { display: block; height: auto; pointer-events: none; width: 100%; }
+
+/* ---------- modèles d'habillage ---------- */
+.n-templates { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.n-template { color: inherit; display: block; padding: 12px; text-decoration: none; transition: transform .15s; }
+.n-template:hover { transform: translateY(-2px); box-shadow: 0 0 0 2px var(--n-accent); }
+.n-template-preview { aspect-ratio: 16 / 9; background: linear-gradient(135deg, #2b3a55, #6b4f8a); border-radius: 8px; color: #fff; font-size: .62rem; overflow: hidden; position: relative; }
+.n-template-preview > * { position: absolute; }
+.n-template-retro95 { background: linear-gradient(135deg, #34495e, #7f8c8d); font-style: italic; }
+.n-template-retro95 .f { border: solid #f2efe4; border-width: 7% 5.5% 9%; border-width: 12px 13px 15px; inset: 0; }
+.n-template-retro95 b { background: #000; color: #fff; font-weight: 800; padding: 1px 5px; }
+.n-template-retro95 em { background: #f5b700; height: 16%; width: 9%; }
+.n-template-matinale .c { border: 3px solid #fff; border-radius: 50%; height: 24%; left: 5%; top: 7%; aspect-ratio: 1; width: auto; }
+.n-template-matinale .c::before, .n-template-matinale .c::after { background: #fff; border-radius: 2px; content: ""; left: 50%; position: absolute; top: 50%; transform-origin: 50% 100%; width: 3px; }
+.n-template-matinale .c::before { height: 28%; transform: translate(-50%, -100%) rotate(210deg); }
+.n-template-matinale .c::after { height: 40%; transform: translate(-50%, -100%) rotate(250deg); }

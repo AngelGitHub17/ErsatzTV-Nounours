@@ -41,6 +41,7 @@
                     <div class="n-card-title">Ajouter</div>
                     <div class="n-toolbox">
                         <div class="n-tool" @onclick="@(() => Add("clock"))"><MudIcon Icon="@Icons.Material.Filled.Schedule"/>Horloge</div>
+                        <div class="n-tool" @onclick="@(() => Add("analog"))"><MudIcon Icon="@Icons.Material.Filled.AccessTime"/>Horloge à aiguilles</div>
                         <div class="n-tool" @onclick="@(() => Add("date"))"><MudIcon Icon="@Icons.Material.Filled.Today"/>Date</div>
                         <div class="n-tool" @onclick="@(() => Add("text"))"><MudIcon Icon="@Icons.Material.Filled.TextFields"/>Texte</div>
                         <div class="n-tool" @onclick="@(() => Add("title"))"><MudIcon Icon="@Icons.Material.Filled.Title"/>Titre du programme</div>
@@ -51,6 +52,7 @@
                         <div class="n-tool" @onclick="@(() => Add("image"))"><MudIcon Icon="@Icons.Material.Filled.Image"/>Logo / image</div>
                         <div class="n-tool" @onclick="@(() => Add("banner"))"><MudIcon Icon="@Icons.Material.Filled.CropLandscape"/>Bandeau</div>
                         <div class="n-tool" @onclick="@(() => Add("lowerthird"))"><MudIcon Icon="@Icons.Material.Filled.ViewDay"/>Bas d'écran</div>
+                        <div class="n-tool" @onclick="@(() => Add("frame"))"><MudIcon Icon="@Icons.Material.Filled.CropFree"/>Cadre</div>
                     </div>
                 </div>
                 <div class="n-card" style="padding: 12px">
@@ -95,14 +97,20 @@
                 <div class="n-stage" @ref="_stage" style="@StageBackground()">
                     @foreach (HabillageItem item in _scene.Items.OrderBy(i => i.ZIndex))
                     {
-                        <div class="n-layer @(item.Id == _selectedId ? "is-selected" : "") @(item.Visible ? "" : "is-hidden")"
+                        <div class="n-layer @(item.Id == _selectedId ? "is-selected" : "") @(item.Visible ? "" : "is-hidden") @(item.Kind == HabillageItemKind.Frame ? "n-layer-fixed" : "")"
                              data-id="@item.Id" @key="item.Id"
                              style="@LayerStyle(item)">
                             @switch (item.Kind)
                             {
+                                case HabillageItemKind.Clock when item.Analog:
+                                    @AnalogPreview(item)
+                                    break;
                                 case HabillageItemKind.Clock:
                                 case HabillageItemKind.Text:
                                     <div class="n-layer-text" style="@TextStyle(item)">@PreviewText(item)</div>
+                                    break;
+                                case HabillageItemKind.Frame:
+                                    @FramePreview(item)
                                     break;
                                 case HabillageItemKind.Image:
                                     @if (string.IsNullOrWhiteSpace(item.ImagePath))
@@ -118,7 +126,7 @@
                                     <div style="@BannerStyle(item)"></div>
                                     break;
                             }
-                            @if (item.Id == _selectedId && item.Kind is HabillageItemKind.Image or HabillageItemKind.Banner)
+                            @if (item.Id == _selectedId && (item.Kind is HabillageItemKind.Image or HabillageItemKind.Banner || item.Analog && item.Kind == HabillageItemKind.Clock))
                             {
                                 <div class="n-layer-handle"></div>
                             }
@@ -171,7 +179,57 @@
 
                     <MudTabs Elevation="0" Rounded="true" TabPanelsClass="pt-3" Class="mt-2" ApplyEffectsToContainer="true" Outlined="false">
                         <MudTabPanel Text="Contenu">
-                            @if (item.Kind == HabillageItemKind.Clock)
+                            @if (item.Kind == HabillageItemKind.Clock && item.Analog)
+                            {
+                                <MudColorPicker Value="@(new MudBlazor.Utilities.MudColor(item.Color))" ValueChanged="@(c => { item.Color = c.Value; MarkDirty(); })"
+                                                Label="Couleur du cadran et des aiguilles" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                                <MudColorPicker Value="@(new MudBlazor.Utilities.MudColor(item.FaceColor))" ValueChanged="@(c => { item.FaceColor = c.Value; MarkDirty(); })"
+                                                Label="Fond du cadran" Variant="Variant.Outlined" Margin="Margin.Dense" ShowAlpha="true" Class="mt-2"/>
+                                <MudSelect T="string" @bind-Value="item.AnalogTicks" Label="Repères des heures" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" @bind-Value:after="@MarkDirty">
+                                    <MudSelectItem Value="@("dots")">Points</MudSelectItem>
+                                    <MudSelectItem Value="@("lines")">Traits</MudSelectItem>
+                                    <MudSelectItem Value="@("none")">Aucun</MudSelectItem>
+                                </MudSelect>
+                                <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Épaisseur du contour</MudText>
+                                <MudSlider T="double" @bind-Value="item.AnalogOutline" Min="0" Max="15" Step="0.5" Color="Color.Primary" @bind-Value:after="@MarkDirty"/>
+                                <MudText Typo="Typo.caption" Class="n-muted d-block">Taille : @Num(item.Width) % de la largeur (poignée bleue sur la scène)</MudText>
+                                <MudSlider T="double" @bind-Value="item.Width" Min="2" Max="40" Step="0.5" Color="Color.Primary" @bind-Value:after="@MarkDirty"/>
+                                <MudSwitch T="bool" @bind-Value="item.AnalogSeconds" Color="Color.Primary" Label="Aiguille des secondes" @bind-Value:after="@MarkDirty"/>
+                                @if (item.AnalogSeconds)
+                                {
+                                    <MudColorPicker Value="@(new MudBlazor.Utilities.MudColor(item.SecondsColor))" ValueChanged="@(c => { item.SecondsColor = c.Value; MarkDirty(); })"
+                                                    Label="Couleur de l'aiguille des secondes" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                                }
+                                <MudSwitch T="bool" Value="@(item.HaloWidth > 0)" ValueChanged="@((bool v) => { item.HaloWidth = v ? 2 : 0; MarkDirty(); })" Color="Color.Primary" Label="Ombre (lisible sur fond clair)"/>
+                                <MudSelect T="string" @bind-Value="item.TimeZone" Label="Fuseau horaire" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" @bind-Value:after="@MarkDirty">
+                                    <MudSelectItem Value="@("Europe/Paris")">Paris</MudSelectItem>
+                                    <MudSelectItem Value="@("Europe/London")">Londres</MudSelectItem>
+                                    <MudSelectItem Value="@("America/Montreal")">Montréal</MudSelectItem>
+                                    <MudSelectItem Value="@("Indian/Reunion")">La Réunion</MudSelectItem>
+                                    <MudSelectItem Value="@("America/Martinique")">Martinique</MudSelectItem>
+                                    <MudSelectItem Value="@("UTC")">UTC</MudSelectItem>
+                                    <MudSelectItem Value="@string.Empty">Celui du serveur</MudSelectItem>
+                                </MudSelect>
+                            }
+                            else if (item.Kind == HabillageItemKind.Frame)
+                            {
+                                <MudColorPicker Value="@(new MudBlazor.Utilities.MudColor(item.BackgroundColor))" ValueChanged="@(c => { item.BackgroundColor = c.Value; MarkDirty(); })"
+                                                Label="Couleur du cadre" Variant="Variant.Outlined" Margin="Margin.Dense" ShowAlpha="true"/>
+                                <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Côtés : @Num(item.FrameSide) %</MudText>
+                                <MudSlider T="double" @bind-Value="item.FrameSide" Min="0" Max="25" Step="0.5" Color="Color.Primary" @bind-Value:after="@MarkDirty"/>
+                                <MudText Typo="Typo.caption" Class="n-muted d-block">Haut : @Num(item.FrameTop) %</MudText>
+                                <MudSlider T="double" @bind-Value="item.FrameTop" Min="0" Max="25" Step="0.5" Color="Color.Primary" @bind-Value:after="@MarkDirty"/>
+                                <MudText Typo="Typo.caption" Class="n-muted d-block">Bas : @Num(item.FrameBottom) %</MudText>
+                                <MudSlider T="double" @bind-Value="item.FrameBottom" Min="0" Max="25" Step="0.5" Color="Color.Primary" @bind-Value:after="@MarkDirty"/>
+                                <MudText Typo="Typo.caption" Class="n-muted d-block">Arrondi de la fenêtre</MudText>
+                                <MudSlider T="double" @bind-Value="item.CornerRadius" Min="0" Max="60" Step="1" Color="Color.Primary" @bind-Value:after="@MarkDirty"/>
+                                <MudSwitch T="bool" @bind-Value="item.FrameShadow" Color="Color.Primary" Label="Fine ombre autour de l'image" @bind-Value:after="@MarkDirty"/>
+                                <MudText Typo="Typo.body2" Class="n-muted mt-1">
+                                    Le cadre recouvre les bords de l'image (l'image n'est pas réduite). Associez-le à l'apparition « au début du programme »
+                                    pour l'effet « carton » des années 90, ou laissez-le tout le temps.
+                                </MudText>
+                            }
+                            else if (item.Kind == HabillageItemKind.Clock)
                             {
                                 <MudSelect T="string" Value="@item.Format" ValueChanged="@(v => { item.Format = v; MarkDirty(); })" Label="Format" Variant="Variant.Outlined" Margin="Margin.Dense">
                                     @foreach ((string format, string label) in ClockFormats)
@@ -244,7 +302,7 @@
                             }
                         </MudTabPanel>
 
-                        @if (item.Kind is HabillageItemKind.Clock or HabillageItemKind.Text)
+                        @if (item.Kind is HabillageItemKind.Clock or HabillageItemKind.Text && !item.Analog)
                         {
                             <MudTabPanel Text="Style">
                                 <MudAutocomplete T="string" Value="@item.FontFamily" ValueChanged="@(v => { item.FontFamily = v; MarkDirty(); })" SearchFunc="@SearchFonts"
@@ -420,15 +478,16 @@
         if (string.IsNullOrWhiteSpace(Slug))
         {
             _scene = new HabillageScene();
-            if (Template == "classique")
+            _scene = Template switch
             {
-                _scene.Name = "Habillage classique";
-                _scene.Items =
-                [
-                    NewItem("clock"),
-                    NewItem("title"),
-                    NewItem("next")
-                ];
+                "classique" => new HabillageScene { Name = "Habillage classique", Items = [NewItem("clock"), NewItem("title"), NewItem("next")] },
+                "retro95" => Retro95(),
+                "matinale" => Matinale(),
+                _ => _scene
+            };
+            for (var i = 0; i < _scene.Items.Count; i++)
+            {
+                _scene.Items[i].ZIndex = _scene.Items[i].Kind == HabillageItemKind.Frame ? 1 : 10 + i;
             }
         }
         else
@@ -567,6 +626,11 @@
     {
         HabillageItem item = NewItem(kind);
         item.ZIndex = _scene.Items.Count == 0 ? 10 : _scene.Items.Max(i => i.ZIndex) + 1;
+        if (kind == "frame")
+        {
+            // le cadre passe sous tous les autres calques (bandeaux et textes viennent dessus)
+            item.ZIndex = _scene.Items.Count == 0 ? 1 : Math.Max(0, _scene.Items.Min(i => i.ZIndex) - 1);
+        }
         if (kind == "lowerthird")
         {
             HabillageItem banner = NewItem("banner");
@@ -585,6 +649,81 @@
         _scene.Items.Add(item);
         _selectedId = item.Id;
         MarkDirty();
+    }
+
+    // ------------------------------------------------ modèles
+
+    /// <summary>Style années 90 : cadre clair, bandeaux noirs en capitales italiques, blocs de couleur. Aucun logo : ajoutez le vôtre.</summary>
+    private static HabillageScene Retro95()
+    {
+        const string ink = "#000000F2";
+        const string font = "Roboto";
+        HabillageItem Bar(string label, double x, double y, double w, double h, HabillageVisibility visibility, int seconds, string color = ink) =>
+            new()
+            {
+                Kind = HabillageItemKind.Banner, Label = label, X = x, Y = y, Width = w, Height = h, CornerRadius = 0,
+                BackgroundColor = color, Visibility = visibility, VisibleSeconds = seconds
+            };
+        HabillageItem Caps(string label, string text, double x, double y, double size, int weight, HabillageVisibility visibility, int seconds, int epg = 0) =>
+            new()
+            {
+                Kind = HabillageItemKind.Text, Label = label, Text = text, X = x, Y = y, Width = 0, FontFamily = font, FontSize = size,
+                FontWeight = weight, Italic = true, Color = "#FFFFFF", HaloWidth = 0, Visibility = visibility, VisibleSeconds = seconds, EpgEntries = epg
+            };
+
+        return new HabillageScene
+        {
+            Name = "Rétro 95",
+            Description = "Cadre clair, bandeaux noirs en capitales italiques, blocs de couleur au début de chaque programme.",
+            Items =
+            [
+                new HabillageItem
+                {
+                    Kind = HabillageItemKind.Frame, Label = "Cadre", BackgroundColor = "#F2EFE4FF", FrameSide = 5.5, FrameTop = 7,
+                    FrameBottom = 9, CornerRadius = 0, FrameShadow = true, Visibility = HabillageVisibility.ProgramStart, VisibleSeconds = 20
+                },
+                Bar("Cartouche · fond", 5.5, 7, 17, 6.5, HabillageVisibility.Always, 10),
+                Caps("Cartouche · nom de la chaîne", "MA CHAÎNE", 6.3, 7.9, 46, 900, HabillageVisibility.Always, 10),
+                Bar("Bloc de couleur", 88.5, 7, 6, 10.7, HabillageVisibility.ProgramStart, 12, "#F5B700FF"),
+                Bar("Bandeau titre · fond", 5.5, 80.6, 52, 4.6, HabillageVisibility.ProgramStart, 20),
+                Caps("Bandeau titre · texte", "{{ MediaItem_Title | string.upcase }}", 6.3, 81.2, 34, 800, HabillageVisibility.ProgramStart, 20),
+                Bar("À suivre · fond", 5.5, 85.5, 52, 4.6, HabillageVisibility.ProgramEnd, 30),
+                Caps("À suivre · texte",
+                    "{{ if Epg.size > 1 }}À SUIVRE · {{ format_datetime Epg[1].Start \"Europe/Paris\" \"HH'H'mm\" }} · {{ Epg[1].Title | string.upcase }}{{ end }}",
+                    6.3, 86.1, 30, 800, HabillageVisibility.ProgramEnd, 30, 2)
+            ]
+        };
+    }
+
+    /// <summary>Matinale : horloge à aiguilles + titre empilé, date et heure en bas.</summary>
+    private static HabillageScene Matinale()
+    {
+        HabillageItem clock = NewItem("analog");
+        clock.X = 4;
+        clock.Y = 5;
+        clock.Width = 7.5;
+        clock.AnalogOutline = 6;
+        clock.AnalogTicks = "dots";
+
+        return new HabillageScene
+        {
+            Name = "Matinale",
+            Description = "Horloge à aiguilles et titre empilé en haut à gauche, date et heure en bas.",
+            Items =
+            [
+                clock,
+                new HabillageItem
+                {
+                    Kind = HabillageItemKind.Text, Label = "Titre de l'émission", Text = "LA\nMATINALE", X = 12.6, Y = 5.6, Width = 0,
+                    FontSize = 56, FontWeight = 900, Color = "#FFFFFF", HaloColor = "#000000", HaloWidth = 2
+                },
+                new HabillageItem
+                {
+                    Kind = HabillageItemKind.Clock, Label = "Date et heure", Format = "dddd d MMMM · HH:mm", X = 4.5, Y = 90, Width = 0,
+                    FontSize = 30, FontWeight = 500, Color = "#FFFFFF", HaloColor = "#000000", HaloWidth = 2
+                }
+            ]
+        };
     }
 
     private static HabillageItem NewItem(string kind) =>
@@ -621,6 +760,16 @@
             {
                 Kind = HabillageItemKind.Clock, Label = "Temps restant", X = 86, Y = 11, Width = 0, FontSize = 28, FontWeight = 400,
                 Text = "-{restant}"
+            },
+            "analog" => new HabillageItem
+            {
+                Kind = HabillageItemKind.Clock, Analog = true, Label = "Horloge à aiguilles", X = 4, Y = 5, Width = 7, FontSize = 40,
+                Color = "#FFFFFF", HaloColor = "#000000", HaloWidth = 2, AnalogTicks = "dots", AnalogOutline = 6
+            },
+            "frame" => new HabillageItem
+            {
+                Kind = HabillageItemKind.Frame, Label = "Cadre", X = 0, Y = 0, Width = 100, Height = 100, ZIndex = 1,
+                BackgroundColor = "#F2EFE4FF", CornerRadius = 0
             },
             "image" => new HabillageItem { Kind = HabillageItemKind.Image, Label = "Logo", X = 87, Y = 82, Width = 9, Opacity = 85 },
             "banner" => new HabillageItem { Kind = HabillageItemKind.Banner, Label = "Bandeau", X = 0, Y = 86, Width = 100, Height = 10, BackgroundColor = "#101828CC", CornerRadius = 0, ZIndex = 5 },
@@ -829,7 +978,12 @@
     private static string LayerStyle(HabillageItem item)
     {
         var css = $"left: {Num(item.X)}%; top: {Num(item.Y)}%; z-index: {item.ZIndex}; opacity: {Num(Math.Clamp(item.Opacity, 0, 100) / 100.0)};";
-        if (item.Kind is HabillageItemKind.Image or HabillageItemKind.Banner)
+        if (item.Kind == HabillageItemKind.Frame)
+        {
+            return $"left: 0; top: 0; width: 100%; height: 100%; z-index: {item.ZIndex}; opacity: {Num(Math.Clamp(item.Opacity, 0, 100) / 100.0)};";
+        }
+
+        if (item.Kind is HabillageItemKind.Image or HabillageItemKind.Banner || item.Kind == HabillageItemKind.Clock && item.Analog)
         {
             css += $" width: {Num(item.Width)}%;";
         }
@@ -857,6 +1011,118 @@
         }
 
         return css;
+    }
+
+    // aperçu de l'horloge à aiguilles (même dessin que le moteur, en SVG)
+    private static RenderFragment AnalogPreview(HabillageItem item)
+    {
+        DateTime now = DateTime.Now;
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(item.TimeZone))
+            {
+                now = TimeZoneInfo.ConvertTime(DateTimeOffset.Now, TimeZoneConverter.TZConvert.GetTimeZoneInfo(item.TimeZone)).DateTime;
+            }
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            // fuseau inconnu : heure locale
+        }
+
+        const double size = 100;
+        double outline = Math.Clamp(item.AnalogOutline, 0, 20);
+        double shadow = item.HaloWidth > 0 ? 2.5 : 0;
+        double radius = size / 2 - outline / 2 - shadow - 1;
+        double inner = radius - outline / 2;
+        double minutes = now.Minute + now.Second / 60.0;
+        double hours = now.Hour % 12 + minutes / 60.0;
+        string stroke = item.Color;
+        string shadowColor = item.HaloColor;
+
+        (double, double) At(double degrees, double length) =>
+            (50 + Math.Sin(degrees * Math.PI / 180) * length, 50 - Math.Cos(degrees * Math.PI / 180) * length);
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append(CultureInfo.InvariantCulture, $"<svg class=\"n-analog\" viewBox=\"0 0 100 100\"><circle cx=\"50\" cy=\"50\" r=\"{Num(radius)}\" fill=\"{item.FaceColor}\"/>");
+
+        void Line(double x1, double y1, double x2, double y2, double width, string color)
+        {
+            if (shadow > 0)
+            {
+                sb.Append(CultureInfo.InvariantCulture, $"<line x1=\"{Num(x1)}\" y1=\"{Num(y1)}\" x2=\"{Num(x2)}\" y2=\"{Num(y2)}\" stroke=\"{shadowColor}\" stroke-opacity=\".6\" stroke-width=\"{Num(width + shadow * 2)}\" stroke-linecap=\"round\"/>");
+            }
+
+            sb.Append(CultureInfo.InvariantCulture, $"<line x1=\"{Num(x1)}\" y1=\"{Num(y1)}\" x2=\"{Num(x2)}\" y2=\"{Num(y2)}\" stroke=\"{color}\" stroke-width=\"{Num(width)}\" stroke-linecap=\"round\"/>");
+        }
+
+        void Dot(double x, double y, double r)
+        {
+            if (shadow > 0)
+            {
+                sb.Append(CultureInfo.InvariantCulture, $"<circle cx=\"{Num(x)}\" cy=\"{Num(y)}\" r=\"{Num(r + shadow)}\" fill=\"{shadowColor}\" fill-opacity=\".6\"/>");
+            }
+
+            sb.Append(CultureInfo.InvariantCulture, $"<circle cx=\"{Num(x)}\" cy=\"{Num(y)}\" r=\"{Num(r)}\" fill=\"{stroke}\"/>");
+        }
+
+        if (outline > 0)
+        {
+            if (shadow > 0)
+            {
+                sb.Append(CultureInfo.InvariantCulture, $"<circle cx=\"50\" cy=\"50\" r=\"{Num(radius)}\" fill=\"none\" stroke=\"{shadowColor}\" stroke-opacity=\".6\" stroke-width=\"{Num(outline + shadow * 2)}\"/>");
+            }
+
+            sb.Append(CultureInfo.InvariantCulture, $"<circle cx=\"50\" cy=\"50\" r=\"{Num(radius)}\" fill=\"none\" stroke=\"{stroke}\" stroke-width=\"{Num(outline)}\"/>");
+        }
+
+        for (var i = 0; i < 12; i++)
+        {
+            bool major = i % 3 == 0;
+            if (item.AnalogTicks == "dots")
+            {
+                (double x, double y) = At(i * 30, inner - 9);
+                Dot(x, y, major ? 3.2 : 2.2);
+            }
+            else if (item.AnalogTicks == "lines")
+            {
+                (double x1, double y1) = At(i * 30, inner - (major ? 16 : 11));
+                (double x2, double y2) = At(i * 30, inner - 5);
+                Line(x1, y1, x2, y2, major ? 4 : 2.2, stroke);
+            }
+        }
+
+        (double hx, double hy) = At(hours * 30, inner * 0.5);
+        Line(50, 50, hx, hy, 7.5, stroke);
+        (double mx, double my) = At(minutes * 6, inner * 0.78);
+        Line(50, 50, mx, my, 5.5, stroke);
+        if (item.AnalogSeconds)
+        {
+            (double sx, double sy) = At(now.Second * 6, inner * 0.82);
+            Line(50, 50, sx, sy, 2.2, item.SecondsColor);
+        }
+
+        Dot(50, 50, 4.5);
+        sb.Append("</svg>");
+        string svg = sb.ToString();
+        return builder => builder.AddMarkupContent(0, svg);
+    }
+
+    private static RenderFragment FramePreview(HabillageItem item)
+    {
+        double l = Math.Clamp(item.FrameSide, 0, 45) * 16;
+        double t = Math.Clamp(item.FrameTop, 0, 45) * 9;
+        double b = Math.Clamp(item.FrameBottom, 0, 45) * 9;
+        double r = Math.Max(0, item.CornerRadius) * 1600 / 1920;
+        double w = 1600 - 2 * l;
+        double h = 900 - t - b;
+        string window = r > 0
+            ? $"M{Num(l + r)},{Num(t)} h{Num(w - 2 * r)} a{Num(r)},{Num(r)} 0 0 1 {Num(r)},{Num(r)} v{Num(h - 2 * r)} a{Num(r)},{Num(r)} 0 0 1 -{Num(r)},{Num(r)} h-{Num(w - 2 * r)} a{Num(r)},{Num(r)} 0 0 1 -{Num(r)},-{Num(r)} v-{Num(h - 2 * r)} a{Num(r)},{Num(r)} 0 0 1 {Num(r)},-{Num(r)} Z"
+            : $"M{Num(l)},{Num(t)} h{Num(w)} v{Num(h)} h-{Num(w)} Z";
+        string shadow = item.FrameShadow
+            ? $"<rect x=\"{Num(l)}\" y=\"{Num(t)}\" width=\"{Num(w)}\" height=\"{Num(h)}\" rx=\"{Num(r)}\" fill=\"none\" stroke=\"rgba(0,0,0,.35)\" stroke-width=\"3\" pointer-events=\"none\"/>"
+            : string.Empty;
+        string svg = $"<svg viewBox=\"0 0 1600 900\" preserveAspectRatio=\"none\"><path fill-rule=\"evenodd\" fill=\"{item.BackgroundColor}\" d=\"M0,0 H1600 V900 H0 Z {window}\"/>{shadow}</svg>";
+        return builder => builder.AddMarkupContent(0, svg);
     }
 
     private static string BannerStyle(HabillageItem item) =>
@@ -921,6 +1187,7 @@
             HabillageItemKind.Clock => Icons.Material.Filled.Schedule,
             HabillageItemKind.Image => Icons.Material.Filled.Image,
             HabillageItemKind.Banner => Icons.Material.Filled.CropLandscape,
+            HabillageItemKind.Frame => Icons.Material.Filled.CropFree,
             _ => Icons.Material.Filled.TextFields
         };
 
@@ -930,6 +1197,7 @@
             HabillageItemKind.Clock => "Horloge",
             HabillageItemKind.Image => "Image",
             HabillageItemKind.Banner => "Bandeau",
+            HabillageItemKind.Frame => "Cadre",
             _ => "Texte"
         };
 

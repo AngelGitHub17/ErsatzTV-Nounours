@@ -12,7 +12,13 @@ public enum ImportRole
     Pubs,
     Jingles,
     BandesAnnonces,
-    Habillage
+    Habillage,
+
+    // programmes
+    Films,
+    Series,
+    Clips,
+    Videos
 }
 
 public sealed record ImportGroup(
@@ -54,13 +60,22 @@ public sealed class FolderImportService(IDbContextFactory<TvContext> dbContextFa
     public static readonly string[] VideoExtensions =
         [".mp4", ".mkv", ".mov", ".avi", ".ts", ".m2ts", ".webm", ".m4v", ".mpg", ".mpeg", ".wmv", ".flv", ".ogv"];
 
+    public static readonly ImportRole[] ContentRoles = [ImportRole.Films, ImportRole.Series, ImportRole.Clips, ImportRole.Videos];
+    public static readonly ImportRole[] HabillageRoles = [ImportRole.Pubs, ImportRole.Jingles, ImportRole.BandesAnnonces, ImportRole.Habillage];
+
+    public static bool IsContent(ImportRole role) => ContentRoles.Contains(role);
+
     public static string Label(ImportRole role) =>
         role switch
         {
             ImportRole.Pubs => "Pubs",
             ImportRole.Jingles => "Jingles",
             ImportRole.BandesAnnonces => "Bandes-annonces",
-            _ => "Habillage vidéo"
+            ImportRole.Habillage => "Habillage vidéo",
+            ImportRole.Films => "Films",
+            ImportRole.Series => "Séries",
+            ImportRole.Clips => "Clips",
+            _ => "Vidéos"
         };
 
     public static string Describe(ImportRole role) =>
@@ -69,10 +84,49 @@ public sealed class FolderImportService(IDbContextFactory<TvContext> dbContextFa
             ImportRole.Pubs => "Spots publicitaires, autopromos : pour les coupures et les écrans pub.",
             ImportRole.Jingles => "Jingles d'ouverture / de fin, virgules, génériques courts.",
             ImportRole.BandesAnnonces => "Bandes-annonces de films et de programmes à venir.",
-            _ => "Mires, boucles d'attente, écrans de secours, tout le reste."
+            ImportRole.Habillage => "Mires, boucles d'attente, écrans de secours, tout le reste.",
+            ImportRole.Films => "Un dossier par film, nommé « Titre (Année) », ex. « Le Grand Bleu (1988)/Le Grand Bleu (1988).mkv ».",
+            ImportRole.Series => "Un dossier par série puis par saison, ex. « Les Nounours (2024)/Season 01/Les Nounours - S01E01.mkv ».",
+            ImportRole.Clips => "Clips musicaux, rangés par artiste : « Artiste/Titre.mp4 ».",
+            _ => "Vidéos personnelles, émissions, reportages : rangées comme vous voulez."
         };
 
-    private static string LibraryName(ImportRole role) => $"Habillage · {Label(role)}";
+    private static LibraryMediaKind MediaKind(ImportRole role) =>
+        role switch
+        {
+            ImportRole.Films => LibraryMediaKind.Movies,
+            ImportRole.Series => LibraryMediaKind.Shows,
+            ImportRole.Clips => LibraryMediaKind.MusicVideos,
+            _ => LibraryMediaKind.OtherVideos
+        };
+
+    private static string LibraryName(ImportRole role) => IsContent(role) ? Label(role) : $"Habillage · {Label(role)}";
+
+    /// <summary>
+    ///     Bibliothèque utilisée pour un type : pour les films / séries / clips, la première bibliothèque locale
+    ///     de ce type (celle que vous avez déjà, s'il y en a une) ; sinon la bibliothèque dédiée par son nom.
+    /// </summary>
+    private static async Task<LocalLibrary> FindLibrary(TvContext dbContext, ImportRole role, CancellationToken cancellationToken)
+    {
+        string name = LibraryName(role);
+        LocalLibrary byName = await dbContext.LocalLibraries
+            .AsNoTracking()
+            .Include(l => l.Paths)
+            .FirstOrDefaultAsync(l => l.Name == name, cancellationToken);
+
+        if (byName is not null || role is not (ImportRole.Films or ImportRole.Series or ImportRole.Clips))
+        {
+            return byName;
+        }
+
+        LibraryMediaKind kind = MediaKind(role);
+        return await dbContext.LocalLibraries
+            .AsNoTracking()
+            .Include(l => l.Paths)
+            .Where(l => l.MediaKind == kind)
+            .OrderBy(l => l.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
 
     public async Task<List<ImportGroup>> GetGroups(CancellationToken cancellationToken)
     {
@@ -80,20 +134,18 @@ public sealed class FolderImportService(IDbContextFactory<TvContext> dbContextFa
         var result = new List<ImportGroup>();
         foreach (ImportRole role in Enum.GetValues<ImportRole>())
         {
-            string name = LibraryName(role);
-            LocalLibrary library = await dbContext.LocalLibraries
-                .AsNoTracking()
-                .Include(l => l.Paths)
-                .FirstOrDefaultAsync(l => l.Name == name, cancellationToken);
+            LocalLibrary library = await FindLibrary(dbContext, role, cancellationToken);
 
             int items = 0;
             if (library is not null)
             {
                 var pathIds = library.Paths.Select(p => p.Id).ToList();
-                items = await dbContext.MediaItems.CountAsync(m => pathIds.Contains(m.LibraryPathId), cancellationToken);
+                items = role == ImportRole.Series
+                    ? await dbContext.Episodes.CountAsync(m => pathIds.Contains(m.LibraryPathId), cancellationToken)
+                    : await dbContext.MediaItems.CountAsync(m => pathIds.Contains(m.LibraryPathId), cancellationToken);
             }
 
-            string query = library is null ? null : $"library_id:{library.Id}";
+            string query = library is null || IsContent(role) ? null : $"library_id:{library.Id}";
             SmartCollection collection = query is null
                 ? null
                 : await dbContext.SmartCollections
@@ -141,16 +193,13 @@ public sealed class FolderImportService(IDbContextFactory<TvContext> dbContextFa
         string libraryName = LibraryName(role);
 
         await using TvContext dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        LocalLibrary existing = await dbContext.LocalLibraries
-            .AsNoTracking()
-            .Include(l => l.Paths)
-            .FirstOrDefaultAsync(l => l.Name == libraryName, cancellationToken);
+        LocalLibrary existing = await FindLibrary(dbContext, role, cancellationToken);
 
         int libraryId;
         if (existing is null)
         {
             Either<BaseError, LocalLibraryViewModel> created = await mediator.Send(
-                new CreateLocalLibrary(libraryName, LibraryMediaKind.OtherVideos, [path]),
+                new CreateLocalLibrary(libraryName, MediaKind(role), [path]),
                 cancellationToken);
 
             if (created.IsLeft)
@@ -180,6 +229,12 @@ public sealed class FolderImportService(IDbContextFactory<TvContext> dbContextFa
             await mediator.Send(new QueueLibraryScanByLibraryId(libraryId), cancellationToken);
         }
 
+        if (IsContent(role))
+        {
+            // films, séries… : pas de collection, ils sont directement utilisables dans l'assistant et les programmes
+            return new ImportResult(role, libraryId, 0, null, files);
+        }
+
         Either<BaseError, (int Id, string Name)> collection = await EnsureCollection(dbContext, role, libraryId, cancellationToken);
         return collection.Map(c => new ImportResult(role, libraryId, c.Id, c.Name, files));
     }
@@ -187,11 +242,7 @@ public sealed class FolderImportService(IDbContextFactory<TvContext> dbContextFa
     public async Task<Either<BaseError, Unit>> RemoveFolder(ImportRole role, string folder, CancellationToken cancellationToken)
     {
         await using TvContext dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        string libraryName = LibraryName(role);
-        LocalLibrary existing = await dbContext.LocalLibraries
-            .AsNoTracking()
-            .Include(l => l.Paths)
-            .FirstOrDefaultAsync(l => l.Name == libraryName, cancellationToken);
+        LocalLibrary existing = await FindLibrary(dbContext, role, cancellationToken);
 
         if (existing is null)
         {
@@ -213,11 +264,7 @@ public sealed class FolderImportService(IDbContextFactory<TvContext> dbContextFa
     public async Task Rescan(ImportRole role, CancellationToken cancellationToken)
     {
         await using TvContext dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        string libraryName = LibraryName(role);
-        int? id = await dbContext.LocalLibraries
-            .Where(l => l.Name == libraryName)
-            .Select(l => (int?)l.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+        int? id = (await FindLibrary(dbContext, role, cancellationToken))?.Id;
 
         if (id.HasValue)
         {
