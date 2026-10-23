@@ -56,7 +56,7 @@ public sealed class GridElement(GridGraphicsElement grid) : GraphicsElement, IDi
         _palette = (grid.Palette ?? []).Select(c => SKColor.TryParse(c, out SKColor color) ? color : SKColors.Gray).ToArray();
         if (_palette.Length == 0)
         {
-            _palette = [new SKColor(0xFF, 0x40, 0x00), new SKColor(0xC0, 0, 0), new SKColor(0x43, 0x43, 0x3B), SKColors.White, new SKColor(0x11, 0x11, 0x11)];
+            _palette = [new SKColor(0xFF, 0x32, 0x00), new SKColor(0x8C, 0x0A, 0x11), new SKColor(0x3C, 0x36, 0x32)];
         }
 
         _line = !string.IsNullOrWhiteSpace(grid.LineColor) && SKColor.TryParse(grid.LineColor, out SKColor line) ? line : null;
@@ -200,11 +200,13 @@ public sealed class GridElement(GridGraphicsElement grid) : GraphicsElement, IDi
         double roll = random.NextDouble();
         return roll switch
         {
-            < 0.34 => _palette[0],
-            < 0.58 => _palette.Length > 4 ? _palette[4] : SKColors.Black,
-            < 0.78 => _palette.Length > 3 ? _palette[3] : SKColors.White,
-            < 0.9 => _palette.Length > 1 ? _palette[1] : _palette[0],
-            _ => _palette.Length > 2 ? _palette[2] : SKColors.Gray
+            < 0.32 => _palette[0],
+            < 0.54 => SKColors.Black,
+            < 0.72 => SKColors.White,
+            < 0.82 => _palette.Length > 1 ? _palette[1] : _palette[0],
+            < 0.9 => _palette.Length > 2 ? _palette[2] : SKColors.Gray,
+            // couleurs d'appoint (vert, marine, orange…), plus rares
+            _ => _palette.Length > 3 ? _palette[3 + random.Next(_palette.Length - 3)] : _palette[0]
         };
     }
 
@@ -249,14 +251,15 @@ public sealed class GridElement(GridGraphicsElement grid) : GraphicsElement, IDi
             // 2. petite case qui change de couleur au rythme
             if (pieces >= 2)
             {
-                paint.Color = CellColor(99, step) == _palette[0] ? _palette.Length > 3 ? _palette[3] : SKColors.White : CellColor(99, step);
+                SKColor square = CellColor(99, step);
+                paint.Color = square == _palette[0] ? SKColors.White : square;
                 canvas.DrawRect(new SKRect(labelWidth, 0, labelWidth + unit, top), paint);
             }
 
             // 3. bloc noir : titre (et heure à droite, en couleur vive)
             if (pieces >= 3)
             {
-                paint.Color = _palette.Length > 4 ? _palette[4] : SKColors.Black;
+                paint.Color = SKColors.Black;
                 canvas.DrawRect(new SKRect(0, top, w, h), paint);
                 string time = (grid.NextTime ?? string.Empty).Trim().ToUpperInvariant();
                 float right = w - h * 0.12f;

@@ -31,6 +31,7 @@ public sealed class RetroRenderer : IDisposable
     private readonly bool _grid;
     private readonly int _cols;
     private const int Rows = 3;
+    private int _currentBeat;
 
     public RetroRenderer(AtelierStyle style, AudioAnalysis audio, int fps, int frames)
     {
@@ -39,7 +40,7 @@ public sealed class RetroRenderer : IDisposable
         _fps = fps;
         _frames = Math.Max(1, frames);
         _palette = style.Palette.Select(c => Parse(c, SKColors.Gray)).DefaultIfEmpty(SKColors.Gold).ToArray();
-        _frameColor = Parse(style.FrameColor, new SKColor(0xF2, 0xEF, 0xE4));
+        _frameColor = Parse(style.FrameColor, new SKColor(0xE1, 0xE8, 0xCD));
         _ink = Parse(style.Ink, SKColors.Black);
         _text = Parse(style.TextColor, SKColors.White);
         _black = LoadTypeface("Roboto-BlackItalic.ttf", SKFontStyleWeight.Black);
@@ -179,7 +180,10 @@ public sealed class RetroRenderer : IDisposable
         Accent,
         Accent2,
         Gray,
-        Frame
+        Frame,
+
+        /// <summary>Couleur d'appoint (4e couleur et suivantes de la palette), qui change à chaque temps.</summary>
+        Extra
     }
 
     private SKColor Color(Cell cell) =>
@@ -188,7 +192,8 @@ public sealed class RetroRenderer : IDisposable
             Cell.Ink => _ink,
             Cell.Accent => _palette[0],
             Cell.Accent2 => _palette.Length > 1 ? _palette[1] : _palette[0],
-            Cell.Gray => _palette.Length > 2 ? _palette[2] : new SKColor(0x43, 0x43, 0x3B),
+            Cell.Gray => _palette.Length > 2 ? _palette[2] : new SKColor(0x3C, 0x36, 0x32),
+            Cell.Extra => _palette.Length > 3 ? _palette[3 + _currentBeat % (_palette.Length - 3)] : _palette[0],
             Cell.Frame => _frameColor,
             _ => SKColors.White
         };
@@ -223,7 +228,7 @@ public sealed class RetroRenderer : IDisposable
                 for (var r = 0; r < Rows; r++)
                 {
                     double roll = random.NextDouble();
-                    cells[c, r] = roll < 0.55 ? Cell.Paper : roll < 0.85 ? Cell.Accent : roll < 0.93 ? Cell.Ink : Cell.Accent2;
+                    cells[c, r] = roll < 0.55 ? Cell.Paper : roll < 0.82 ? Cell.Accent : roll < 0.9 ? Cell.Ink : roll < 0.95 ? Cell.Accent2 : Cell.Extra;
                 }
             }
 
@@ -240,7 +245,8 @@ public sealed class RetroRenderer : IDisposable
             return cells;
         }
 
-        Cell a = random.NextDouble() < 0.8 ? Cell.Accent : Cell.Accent2;
+        double pick = random.NextDouble();
+        Cell a = pick < 0.62 ? Cell.Accent : pick < 0.8 ? Cell.Accent2 : Cell.Extra;
         Cell b = random.NextDouble() < 0.6 ? Cell.Paper : Cell.Ink;
         switch (random.Next(0, 7))
         {
@@ -307,7 +313,7 @@ public sealed class RetroRenderer : IDisposable
                     for (var r = 0; r < Rows; r++)
                     {
                         double roll = random.NextDouble();
-                        cells[c, r] = roll < 0.45 ? Cell.Ink : roll < 0.75 ? Cell.Paper : roll < 0.95 ? a : Cell.Gray;
+                        cells[c, r] = roll < 0.42 ? Cell.Ink : roll < 0.7 ? Cell.Paper : roll < 0.88 ? a : roll < 0.95 ? Cell.Gray : Cell.Extra;
                     }
                 }
 
@@ -332,6 +338,7 @@ public sealed class RetroRenderer : IDisposable
     public void DrawGrid(SKCanvas canvas, int frame, string label)
     {
         int beat = _beat[Math.Clamp(frame, 0, _frames - 1)];
+        _currentBeat = beat;
         Cell[,] cells = Composition(beat, !string.IsNullOrWhiteSpace(label), out (int Col, int Row) labelAt);
         using var paint = new SKPaint();
         for (var c = 0; c < _cols; c++)

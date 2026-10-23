@@ -148,6 +148,12 @@ Fabrique des vidéos au style « Rétro 95 » — un cadre clair, des **rectangl
   son. Six **boucles intégrées** sont fabriquées par le programme (synthétisées, sans droits) : Pulsation 95, Vitamine, Nuit calme,
   Suspense, Grand écran, Coupure pub.
 
+- **Palette Rétro 95 d'époque** (par défaut partout : atelier, rideau, « Tout de suite », cadre du modèle) : cadre vert amande
+  `#E1E8CD`, noir `#000000`, blanc `#FFFFFF`, chocolat `#3C3632`, bordeaux `#8C0A11`, rouge vif `#FF3200`, vert émeraude `#008A22`,
+  bleu marine `#0B2B70`, orange `#FFA800`. Le rouge vif domine ; bordeaux et chocolat en second ; vert, marine et orange en touches.
+  Variantes prêtes : Rouges 95, Orange 95, Vert 95, Marine 95. Les habillages déjà enregistrés gardent leurs couleurs : cliquez
+  « Rétro 95 » dans le calque pour les mettre à jour.
+
 ### Quadrillage en direct (studio d'habillage)
 Deux nouveaux calques, aussi présents dans le modèle « Rétro 95 » :
 - **Rideau quadrillé** : à la fin de chaque programme, des cases de couleur couvrent l'image une à une ; au début du suivant, elles

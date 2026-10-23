@@ -108,8 +108,8 @@ public sealed class HabillageItem
     public string LabelColor { get; set; } = "#F5B700";
 
     // quadrillage (Kind = Curtain / UpNext) : couleurs des cases (#RRGGBB séparés par des virgules)
-    public string GridPalette { get; set; } = "#FF4000,#C00000,#43433B,#FFFFFF,#111111";
-    public string GridLineColor { get; set; } = "#FFFFED";
+    public string GridPalette { get; set; } = "#FF3200,#8C0A11,#3C3632,#008A22,#0B2B70,#FFA800";
+    public string GridLineColor { get; set; } = "#E1E8CD";
     public double CurtainSeconds { get; set; } = 1.6;
     public bool CurtainAtStart { get; set; } = true;
     public bool CurtainAtEnd { get; set; } = true;
@@ -724,7 +724,7 @@ public sealed partial class HabillageService(
     public static List<string> GridColors(string palette) =>
         (palette ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         .Where(c => SKColor.TryParse(c, out _))
-        .DefaultIfEmpty("#FF4000")
+        .DefaultIfEmpty("#FF3200")
         .ToList();
 
     public string GenerateYamlPreview(HabillageItem item) => BuildYaml(new HabillageScene { Name = "aperçu" }, item);

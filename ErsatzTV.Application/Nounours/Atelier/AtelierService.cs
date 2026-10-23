@@ -352,7 +352,7 @@ public sealed class AtelierService(
             int wh = (int)window.Height / 2 * 2;
             int wx = (int)window.Left;
             int wy = (int)window.Top;
-            string frameColor = "0x" + (spec.Style.FrameColor ?? "#F2EFE4").TrimStart('#')[..6];
+            string frameColor = "0x" + (spec.Style.FrameColor ?? "#E1E8CD").TrimStart('#')[..6];
             for (var i = 0; i < extracts.Count; i++)
             {
                 TrailerExtract extract = extracts[i];

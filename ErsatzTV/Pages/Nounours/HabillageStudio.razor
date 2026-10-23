@@ -766,12 +766,12 @@
             [
                 new HabillageItem
                 {
-                    Kind = HabillageItemKind.Frame, Label = "Cadre", BackgroundColor = "#F2EFE4FF", FrameSide = 5.5, FrameTop = 7,
+                    Kind = HabillageItemKind.Frame, Label = "Cadre", BackgroundColor = "#E1E8CDFF", FrameSide = 5.5, FrameTop = 7,
                     FrameBottom = 9, CornerRadius = 0, FrameShadow = true, Visibility = HabillageVisibility.ProgramStart, VisibleSeconds = 20
                 },
                 Bar("Cartouche · fond", 5.5, 7, 17, 6.5, HabillageVisibility.Always, 10),
                 Caps("Cartouche · nom de la chaîne", "MA CHAÎNE", 6.3, 7.9, 46, 900, HabillageVisibility.Always, 10),
-                Bar("Bloc de couleur", 88.5, 7, 6, 10.7, HabillageVisibility.ProgramStart, 12, "#F5B700FF"),
+                Bar("Bloc de couleur", 88.5, 7, 6, 10.7, HabillageVisibility.ProgramStart, 12, "#FF3200FF"),
                 Bar("Bandeau titre · fond", 5.5, 80.6, 52, 4.6, HabillageVisibility.ProgramStart, 20),
                 Caps("Bandeau titre · texte", "{{ MediaItem_Title | string.upcase }}", 6.3, 81.2, 34, 800, HabillageVisibility.ProgramStart, 20),
                 new HabillageItem
@@ -878,7 +878,7 @@
             "frame" => new HabillageItem
             {
                 Kind = HabillageItemKind.Frame, Label = "Cadre", X = 0, Y = 0, Width = 100, Height = 100, ZIndex = 1,
-                BackgroundColor = "#F2EFE4FF", CornerRadius = 0
+                BackgroundColor = "#E1E8CDFF", CornerRadius = 0
             },
             "image" => new HabillageItem { Kind = HabillageItemKind.Image, Label = "Logo", X = 87, Y = 82, Width = 9, Opacity = 85 },
             "banner" => new HabillageItem { Kind = HabillageItemKind.Banner, Label = "Bandeau", X = 0, Y = 86, Width = 100, Height = 10, BackgroundColor = "#101828CC", CornerRadius = 0, ZIndex = 5 },
@@ -1218,11 +1218,12 @@
 
     private static readonly (string Name, string Colors)[] GridPalettes =
     [
-        ("Rétro 95", "#FF4000,#C00000,#43433B,#FFFFFF,#111111"),
-        ("Jaune", "#F5B700,#FF4000,#43433B,#FFFFFF,#111111"),
-        ("Bleu", "#1E5EFF,#00B3E6,#43433B,#FFFFFF,#111111"),
-        ("Vert", "#1DB954,#F5B700,#43433B,#FFFFFF,#111111"),
-        ("Noir & blanc", "#FFFFFF,#888888,#43433B,#FFFFFF,#111111")
+        ("Rétro 95", "#FF3200,#8C0A11,#3C3632,#008A22,#0B2B70,#FFA800"),
+        ("Rouges 95", "#FF3200,#8C0A11,#3C3632"),
+        ("Orange 95", "#FFA800,#FF3200,#3C3632,#8C0A11"),
+        ("Vert 95", "#008A22,#FFA800,#3C3632,#0B2B70"),
+        ("Marine 95", "#0B2B70,#FF3200,#3C3632,#FFA800"),
+        ("Noir & blanc", "#FFFFFF,#888888,#3C3632")
     ];
 
     private RenderFragment GridColorsEditor(HabillageItem item) => __builder =>
@@ -1232,7 +1233,7 @@
             @foreach ((string name, string colors) in GridPalettes)
             {
                 <MudChip T="string" Size="Size.Small" Variant="@(item.GridPalette == colors ? Variant.Filled : Variant.Outlined)" Color="@(item.GridPalette == colors ? Color.Primary : Color.Default)"
-                         OnClick="@(() => { item.GridPalette = colors; MarkDirty(); })">
+                         OnClick="@(() => { item.GridPalette = colors; if (!string.IsNullOrEmpty(item.GridLineColor)) item.GridLineColor = "#E1E8CD"; MarkDirty(); })">
                     @foreach (string c in colors.Split(',').Take(3))
                     {
                         <span style="display: inline-block; width: 10px; height: 10px; margin-right: 2px; background: @c"></span>
@@ -1241,7 +1242,7 @@
                 </MudChip>
             }
         </div>
-        <MudSwitch T="bool" Value="@(!string.IsNullOrEmpty(item.GridLineColor))" ValueChanged="@((bool v) => { item.GridLineColor = v ? "#FFFFED" : string.Empty; MarkDirty(); })" Color="Color.Primary" Label="Fins liserés crème entre les cases"/>
+        <MudSwitch T="bool" Value="@(!string.IsNullOrEmpty(item.GridLineColor))" ValueChanged="@((bool v) => { item.GridLineColor = v ? "#E1E8CD" : string.Empty; MarkDirty(); })" Color="Color.Primary" Label="Fins liserés (couleur du cadre) entre les cases"/>
     };
 
     private static RenderFragment CurtainPreview(HabillageItem item) => __builder =>
@@ -1262,12 +1263,12 @@
     private static RenderFragment UpNextPreview(HabillageItem item) => __builder =>
     {
         List<string> colors = ErsatzTV.Application.Nounours.HabillageService.GridColors(item.GridPalette);
-        string ink = colors.Count > 4 ? colors[4] : "#111";
+        const string ink = "#000000";
         string label = string.IsNullOrWhiteSpace(item.UpNextLabel) ? "TOUT DE SUITE" : item.UpNextLabel.ToUpperInvariant();
         <div style="width: 100%; aspect-ratio: 100 / 27; font-family: Roboto, sans-serif; font-weight: 900; container-type: inline-size; display: flex; flex-direction: column">
             <div style="display: flex; height: 38%">
                 <div style="background: @colors[0]; color: #fff; display: flex; align-items: center; padding: 0 4cqw; font-size: 7cqw; white-space: nowrap">@label</div>
-                <div style="background: @(colors.Count > 3 ? colors[3] : "#fff"); aspect-ratio: 1"></div>
+                <div style="background: @(colors.Count > 5 ? colors[5] : "#fff"); aspect-ratio: 1"></div>
             </div>
             <div style="background: @ink; color: #fff; flex: 1; display: flex; align-items: center; justify-content: space-between; padding: 0 3cqw; font-size: 8.5cqw; white-space: nowrap; overflow: hidden">
                 <span>LE PROGRAMME SUIVANT</span><span style="color: @colors[0]">21H00</span>
@@ -1401,6 +1402,8 @@
             HabillageItemKind.Frame => Icons.Material.Filled.CropFree,
             HabillageItemKind.Ticker => Icons.Material.Filled.ViewStream,
             HabillageItemKind.Rating => Icons.Material.Filled.ChildCare,
+            HabillageItemKind.Curtain => Icons.Material.Filled.GridView,
+            HabillageItemKind.UpNext => Icons.Material.Filled.FastForward,
             _ => Icons.Material.Filled.TextFields
         };
 

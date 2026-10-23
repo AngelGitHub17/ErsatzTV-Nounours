@@ -22,12 +22,12 @@ public class GridGraphicsElement : BaseGraphicsElement
     [YamlMember(Alias = "opacity_expression", ApplyNamingConventions = false)]
     public string OpacityExpression { get; set; }
 
-    /// <summary>Couleurs des cases (#RRGGBB), la première est la couleur vive principale.</summary>
-    public List<string> Palette { get; set; } = ["#FF4000", "#C00000", "#43433B", "#FFFFFF", "#111111"];
+    /// <summary>Couleurs des cases (#RRGGBB) : vive principale, seconde, gris foncé, puis couleurs d'appoint. Noir et blanc toujours présents.</summary>
+    public List<string> Palette { get; set; } = ["#FF3200", "#8C0A11", "#3C3632", "#008A22", "#0B2B70", "#FFA800"];
 
     /// <summary>Couleur des fins liserés entre les cases (vide = aucun).</summary>
     [YamlMember(Alias = "line_color", ApplyNamingConventions = false)]
-    public string LineColor { get; set; } = "#FFFFED";
+    public string LineColor { get; set; } = "#E1E8CD";
 
     /// <summary>Rideau : durée de l'ouverture et de la fermeture, en secondes.</summary>
     [YamlMember(Alias = "curtain_seconds", ApplyNamingConventions = false)]

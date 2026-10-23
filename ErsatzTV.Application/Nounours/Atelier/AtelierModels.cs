@@ -25,7 +25,7 @@ public enum AtelierKind
 public sealed class AtelierStyle
 {
     /// <summary>Couleur du cadre autour de l'image.</summary>
-    public string FrameColor { get; set; } = "#FFFFED";
+    public string FrameColor { get; set; } = "#E1E8CD";
 
     /// <summary>« grille » : quadrillage de cases pleines qui changent à chaque temps fort (le look des années 90) ; « libre » : rectangles flottants.</summary>
     public string Layout { get; set; } = "grille";
@@ -38,9 +38,12 @@ public sealed class AtelierStyle
 
     public string TextColor { get; set; } = "#FFFFFF";
 
-    /// <summary>Couleurs des rectangles qui dansent.</summary>
-    /// <summary>En grille : 1re couleur = couleur vive principale, 2e = seconde couleur, 3e = gris ; noir et blanc sont toujours là.</summary>
-    public List<string> Palette { get; set; } = ["#FF4000", "#C00000", "#43433B", "#FFFFFF", "#111111"];
+    /// <summary>
+    ///     Couleurs des cases. En grille : 1re = couleur vive principale, 2e = seconde couleur, 3e = gris foncé,
+    ///     les suivantes = couleurs d'appoint (plus rares) ; le noir et le blanc sont toujours là.
+    ///     Par défaut : la palette de l'habillage « Carrés » de 1995 (rouge vif, bordeaux, chocolat, vert, marine, orange).
+    /// </summary>
+    public List<string> Palette { get; set; } = ["#FF3200", "#8C0A11", "#3C3632", "#008A22", "#0B2B70", "#FFA800"];
 
     /// <summary>Afficher le cadre clair autour de l'image.</summary>
     public bool Frame { get; set; } = true;

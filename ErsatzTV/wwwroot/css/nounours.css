@@ -230,9 +230,9 @@ div.ersatztv-light.nounours {
 .n-template-preview { aspect-ratio: 16 / 9; background: linear-gradient(135deg, #2b3a55, #6b4f8a); border-radius: 8px; color: #fff; font-size: .62rem; overflow: hidden; position: relative; }
 .n-template-preview > * { position: absolute; }
 .n-template-retro95 { background: linear-gradient(135deg, #34495e, #7f8c8d); font-style: italic; }
-.n-template-retro95 .f { border: solid #f2efe4; border-width: 7% 5.5% 9%; border-width: 12px 13px 15px; inset: 0; }
+.n-template-retro95 .f { border: solid #e1e8cd; border-width: 7% 5.5% 9%; border-width: 12px 13px 15px; inset: 0; }
 .n-template-retro95 b { background: #000; color: #fff; font-weight: 800; padding: 1px 5px; }
-.n-template-retro95 em { background: #f5b700; height: 16%; width: 9%; }
+.n-template-retro95 em { background: #ff3200; height: 16%; width: 9%; }
 .n-template-matinale .c { border: 3px solid #fff; border-radius: 50%; height: 24%; left: 5%; top: 7%; aspect-ratio: 1; width: auto; }
 .n-template-matinale .c::before, .n-template-matinale .c::after { background: #fff; border-radius: 2px; content: ""; left: 50%; position: absolute; top: 50%; transform-origin: 50% 100%; width: 3px; }
 .n-template-matinale .c::before { height: 28%; transform: translate(-50%, -100%) rotate(210deg); }
