@@ -70,6 +70,13 @@ public sealed class AutomationScheduler(
             await scope.ServiceProvider.GetRequiredService<IInfoService>().RefreshFeeds(cancellationToken);
         }
 
+        // programme d'EBS dans le guide, toutes les heures (et après chaque reconstruction de grille)
+        if (settings.Info.EbsGuide && settings.Info.Sources.Any(InfoService.IsEbs) &&
+            (settings.Info.EbsGuideAt is null || now - settings.Info.EbsGuideAt >= TimeSpan.FromMinutes(60)))
+        {
+            await scope.ServiceProvider.GetRequiredService<IInfoService>().RefreshEbsGuide(cancellationToken);
+        }
+
         if (settings.EphemeralChannels.Count > 0)
         {
             await automation.DeleteExpiredChannels(cancellationToken);
@@ -107,6 +114,21 @@ public sealed class AutomationScheduler(
             catch (InvalidOperationException ex)
             {
                 logger.LogWarning("{Message}", ex.Message);
+            }
+        }
+
+        // l'essentiel du jour : aux heures choisies, avec les titres du moment
+        EssentialSettings essential = settings.Essential;
+        if (essential.Enabled)
+        {
+            DateTimeOffset due = AutomationService.ParseTimes(essential.At)
+                .Select(t => new DateTimeOffset(DateTime.Today + t, DateTimeOffset.Now.Offset))
+                .Where(t => t <= DateTimeOffset.Now)
+                .DefaultIfEmpty(DateTimeOffset.MinValue)
+                .Max();
+            if (due > DateTimeOffset.MinValue && (essential.LastMadeAt is null || essential.LastMadeAt < due))
+            {
+                await automation.MakeEssential(cancellationToken);
             }
         }
 

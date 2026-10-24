@@ -979,6 +979,58 @@ public sealed class RetroRenderer : IDisposable
         DrawFrameBorder(canvas);
     }
 
+    /// <summary>
+    ///     « L'essentiel du jour » : écran d'ouverture (étiquette + date), puis un titre par écran dans le quadrillage,
+    ///     le nom du site en étiquette (« NSN : … ») et le numéro dans la case de couleur. Les cases se recomposent au rythme.
+    /// </summary>
+    public void DrawEssential(SKCanvas canvas, int frame, string label, string dateLine, IReadOnlyList<string> headlines, IReadOnlyList<double> starts, string channelName)
+    {
+        canvas.Clear(SKColors.Black);
+        double now = frame / (double)_fps;
+        int index = -1;
+        for (var i = 0; i < starts.Count; i++)
+        {
+            if (now >= starts[i])
+            {
+                index = i;
+            }
+        }
+
+        JingleSpec spec;
+        double from;
+        double until;
+        if (index < 0)
+        {
+            spec = new JingleSpec { Label = label, Title = "DU JOUR", Subtitle = dateLine, ChannelName = channelName };
+            (from, until) = (0, starts.Count > 0 ? starts[0] : _frames / (double)_fps);
+        }
+        else
+        {
+            string headline = headlines[index];
+            string site = string.Empty;
+            int colon = headline.IndexOf(" : ", StringComparison.Ordinal);
+            if (colon is > 0 and <= 24)
+            {
+                site = headline[..colon];
+                headline = headline[(colon + 3)..];
+            }
+
+            spec = new JingleSpec
+            {
+                Label = string.IsNullOrWhiteSpace(site) ? label : site,
+                Title = headline,
+                Subtitle = $"{index + 1} / {headlines.Count}",
+                ChannelName = channelName
+            };
+            (from, until) = (starts[index], index + 1 < starts.Count ? starts[index + 1] : _frames / (double)_fps);
+        }
+
+        // le titre apparaît case par case pendant la première seconde de son écran
+        float t = (float)Math.Clamp((now - from) / Math.Max(1.0, Math.Min(until - from, 12)), 0, 1);
+        DrawTitleGrid(canvas, frame, spec, t);
+        DrawFrameBorder(canvas);
+    }
+
     /// <summary>Interlude : le quadrillage tourne en boucle, l'étiquette passe d'un coin à l'autre, cartouche de la chaîne.</summary>
     public void DrawInterlude(SKCanvas canvas, int frame, string label, string channelName)
     {

@@ -18,6 +18,7 @@ public sealed class NounoursSettings
     public TonightSettings Tonight { get; set; } = new();
     public WeeklySettings Weekly { get; set; } = new();
     public WeatherSettings Weather { get; set; } = new();
+    public EssentialSettings Essential { get; set; } = new();
     public List<Appointment> Appointments { get; set; } = [];
 
     /// <summary>Diffusion automatique de l'interlude à heures fixes (en plus du remplissage de secours).</summary>
@@ -174,6 +175,31 @@ public sealed class WeatherSettings
     public string LastResult { get; set; }
 }
 
+/// <summary>« L'essentiel du jour » : les titres de l'info en quadrillage, lus par la voix off, refait aux heures choisies.</summary>
+public sealed class EssentialSettings
+{
+    public BroadcastSettings Broadcast { get; set; } = new() { Times = "12:55, 19:25" };
+
+    public bool Enabled { get; set; }
+
+    /// <summary>Heures de fabrication, ex. « 12:30, 19:00 » (les titres du moment à chaque fois).</summary>
+    public string At { get; set; } = "12:30, 19:00";
+
+    public string Title { get; set; } = "L'ESSENTIEL";
+    public int Items { get; set; } = 5;
+
+    /// <summary>Durée d'un titre à l'écran quand il n'y a pas de voix off.</summary>
+    public double Seconds { get; set; } = 6;
+
+    /// <summary>Voix off qui lit les titres (réglages des serveurs plus bas sur la page).</summary>
+    public Atelier.VoiceEngine Voice { get; set; } = Atelier.VoiceEngine.None;
+
+    public string Music { get; set; } = string.Empty;
+    public string ChannelName { get; set; } = string.Empty;
+    public DateTimeOffset? LastMadeAt { get; set; }
+    public string LastResult { get; set; }
+}
+
 /// <summary>Rendez-vous d'antenne : à l'heure dite, la régie passe une vidéo (ouverture, fermeture d'antenne…) puis rend la grille.</summary>
 public sealed class Appointment
 {
@@ -244,6 +270,15 @@ public sealed class InfoSettings
     public string Feeds { get; set; } = string.Empty;
 
     public int FeedItems { get; set; } = 6;
+
+    /// <summary>Code de la télécommande sur téléphone (/telecommande) ; vide = télécommande fermée.</summary>
+    public string RemotePin { get; set; } = string.Empty;
+
+    /// <summary>Programme d'EBS dans le guide : dernière lecture.</summary>
+    public bool EbsGuide { get; set; } = true;
+
+    public DateTimeOffset? EbsGuideAt { get; set; }
+    public string EbsGuideResult { get; set; }
     public int FeedMinutes { get; set; } = 10;
     public DateTimeOffset? FeedsAt { get; set; }
     public string FeedsResult { get; set; }

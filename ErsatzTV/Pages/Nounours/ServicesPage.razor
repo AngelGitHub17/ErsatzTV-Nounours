@@ -167,6 +167,41 @@
             </div>
         </MudItem>
 
+        @* ------------------------------------------------ l'essentiel du jour *@
+        <MudItem xs="12" lg="6">
+            <div class="n-card" style="height: 100%">
+                <div class="n-card-title">« L'essentiel du jour »</div>
+                <MudText Typo="Typo.body2" Class="n-muted mb-2">Les titres de l'info (les vôtres et ceux de vos sites, page Info) : un par écran dans le quadrillage, le nom du site en étiquette, lus par la voix off. Refait aux heures choisies avec les titres du moment.</MudText>
+                <MudSwitch T="bool" @bind-Value="_s.Essential.Enabled" Color="Color.Primary" Label="Le fabriquer automatiquement"/>
+                <div class="d-flex gap-2 mt-2">
+                    <MudTextField @bind-Value="_s.Essential.At" Label="Fabriqué à" Placeholder="12:30, 19:00" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                    <MudTextField @bind-Value="_s.Essential.Title" Label="Étiquette" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                    <MudNumericField @bind-Value="_s.Essential.Items" Label="Titres" Min="1" Max="8" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 100px"/>
+                </div>
+                <div class="d-flex gap-2 mt-2">
+                    <MudSelect T="VoiceEngine" @bind-Value="_s.Essential.Voice" Label="Voix off" Variant="Variant.Outlined" Margin="Margin.Dense">
+                        <MudSelectItem Value="VoiceEngine.None">Sans voix (titres à l'écran)</MudSelectItem>
+                        <MudSelectItem Value="VoiceEngine.Windows">Voix de Windows (française si installée)</MudSelectItem>
+                        <MudSelectItem Value="VoiceEngine.Server">Serveur de synthèse (réglé plus bas)</MudSelectItem>
+                    </MudSelect>
+                    @if (_s.Essential.Voice == VoiceEngine.None)
+                    {
+                        <MudNumericField @bind-Value="_s.Essential.Seconds" Label="Secondes par titre" Min="3" Max="20" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 170px"/>
+                    }
+                </div>
+                <MudTextField @bind-Value="_s.Essential.ChannelName" Label="Nom de la chaîne" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"/>
+                <div class="mt-2"><SourcePicker Value="@_s.Essential.Music" ValueChanged="@(v => _s.Essential.Music = v)" EmptyLabel="Pulsation régulière"/></div>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Newspaper" OnClick="@MakeEssential" Disabled="@_busy" Class="mt-3">Fabriquer maintenant</MudButton>
+                @if (!string.IsNullOrEmpty(_s.Essential.LastResult))
+                {
+                    <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Dernière fois (@_s.Essential.LastMadeAt?.ToLocalTime().ToString("dd/MM HH:mm", Fr)) : @_s.Essential.LastResult</MudText>
+                }
+                @BroadcastEditor(_s.Essential.Broadcast)
+                <JobCard Job="@_essentialJob"/>
+                <MudText Typo="Typo.body2" Class="n-muted mt-2">Toujours le même fichier (« Bandes-annonces ») : il se met à jour tout seul là où vous l'avez placé, et passe aux heures de diffusion ci-dessus.</MudText>
+            </div>
+        </MudItem>
+
         @* ------------------------------------------------ interlude *@
         <MudItem xs="12" lg="6">
             <div class="n-card" style="height: 100%">
@@ -334,6 +369,9 @@
             (DateOnly? weatherMade, string weatherResult) = (s.Weather.LastMade, s.Weather.LastResult);
             s.Weather = current.Weather;
             (s.Weather.LastMade, s.Weather.LastResult) = (weatherMade, weatherResult);
+            (DateTimeOffset? essentialMade, string essentialResult) = (s.Essential.LastMadeAt, s.Essential.LastResult);
+            s.Essential = current.Essential;
+            (s.Essential.LastMadeAt, s.Essential.LastResult) = (essentialMade, essentialResult);
             // rendez-vous : garder la trace des derniers passages
             foreach (Appointment a in current.Appointments)
             {
@@ -502,6 +540,22 @@
         _weatherJob = await Automation.MakeWeather(CancellationToken.None);
         _s = NounoursSettings.Load();
         _ = Poll(() => _weatherJob);
+    });
+
+    private AtelierJob _essentialJob;
+
+    private Task MakeEssential() => Busy(async () =>
+    {
+        Save();
+        _essentialJob = await Automation.MakeEssential(CancellationToken.None);
+        _s = NounoursSettings.Load();
+        if (_essentialJob is null)
+        {
+            Snackbar.Add(_s.Essential.LastResult, Severity.Warning);
+            return;
+        }
+
+        _ = Poll(() => _essentialJob);
     });
 
     private void MakeInterlude()

@@ -1,0 +1,151 @@
+@page "/telecommande"
+@layout ErsatzTV.Shared.Nounours.BareLayout
+@using System.Collections.Concurrent
+@using ErsatzTV.Application.Nounours
+@using System.Security.Cryptography
+@using System.Text
+@inject IInfoService Info
+@inject ISnackbar Snackbar
+
+<PageTitle>Télécommande info</PageTitle>
+
+<div class="n-remote">
+    <div class="n-remote-head">
+        <span class="n-remote-dot"></span>
+        <b>@(string.IsNullOrWhiteSpace(_s?.Info.ChannelName) ? "INFO" : _s.Info.ChannelName.ToUpperInvariant())</b>
+        <span class="n-muted" style="margin-left: auto">télécommande</span>
+    </div>
+
+    @if (string.IsNullOrWhiteSpace(_s?.Info.RemotePin))
+    {
+        <p>La télécommande est fermée. Pour l'ouvrir, choisissez un code dans ErsatzTV, page <b>Info</b> › « Télécommande sur téléphone ».</p>
+    }
+    else if (!_unlocked)
+    {
+        <p class="n-muted">Code de la télécommande</p>
+        <MudTextField @bind-Value="_pin" InputType="InputType.Password" Variant="Variant.Outlined" Immediate="true" OnKeyUp="@(e => e.Key == "Enter" ? Unlock() : Task.CompletedTask)"
+                      UserAttributes="@(new Dictionary<string, object> { ["inputmode"] = "numeric", ["autocomplete"] = "off" })" Style="font-size: 2rem; letter-spacing: .4em"/>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Size="Size.Large" Class="mt-3" OnClick="@Unlock">Entrer</MudButton>
+        @if (!string.IsNullOrEmpty(_message))
+        {
+            <p class="mt-3" style="color: #FF3200">@_message</p>
+        }
+    }
+    else
+    {
+        <div class="n-remote-block">
+            <label>FLASH (bandeau rouge)</label>
+            <MudTextField @bind-Value="_flash" Immediate="true" Lines="2" Variant="Variant.Outlined" Placeholder="Coupure de courant dans le centre-ville"/>
+            <MudButton Variant="Variant.Filled" Style="background: #8C0A11; color: #fff" FullWidth="true" Size="Size.Large" Class="mt-2" Disabled="@(_busy || string.IsNullOrWhiteSpace(_flash))" OnClick="@(() => Send(s => s.Flash = _flash.Trim()))">
+                FLASH À L'ANTENNE
+            </MudButton>
+            @if (!string.IsNullOrWhiteSpace(_s.Info.Flash))
+            {
+                <div class="n-remote-now">À l'antenne : @_s.Info.Flash</div>
+                <MudButton Variant="Variant.Outlined" FullWidth="true" Class="mt-2" Disabled="@_busy" OnClick="@(() => Send(s => s.Flash = string.Empty))">Retirer le flash</MudButton>
+            }
+        </div>
+
+        <div class="n-remote-block">
+            <label>EN DIRECT (sujet en cours)</label>
+            <MudTextField @bind-Value="_topic" Variant="Variant.Outlined" Placeholder="Conseil municipal de Saintes"/>
+            <div class="d-flex gap-2 mt-2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Style="flex: 1" Disabled="@_busy" OnClick="@(() => Send(s => s.Topic = (_topic ?? string.Empty).Trim()))">Afficher</MudButton>
+                <MudButton Variant="Variant.Outlined" Disabled="@_busy" OnClick="@(() => { _topic = string.Empty; return Send(s => s.Topic = string.Empty); })">Masquer</MudButton>
+            </div>
+        </div>
+
+        <div class="n-remote-block">
+            <label>NOUVEAU TITRE (en tête du bandeau qui défile)</label>
+            <MudTextField @bind-Value="_headline" Immediate="true" Variant="Variant.Outlined"/>
+            <MudButton Variant="Variant.Outlined" FullWidth="true" Class="mt-2" Disabled="@(_busy || string.IsNullOrWhiteSpace(_headline))"
+                       OnClick="@(() => Send(s => s.Headlines = _headline.Trim() + "\n" + (s.Headlines ?? string.Empty)))">Ajouter le titre</MudButton>
+        </div>
+
+        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => { _unlocked = false; _pin = string.Empty; })">Verrouiller</MudButton>
+    }
+</div>
+
+@code {
+    // essais ratés, tous téléphones confondus : 5 de suite → 5 minutes de pause
+    private static readonly ConcurrentQueue<DateTimeOffset> Failures = new();
+    private static DateTimeOffset _lockedUntil = DateTimeOffset.MinValue;
+
+    private NounoursSettings _s;
+    private string _pin = string.Empty;
+    private bool _unlocked;
+    private bool _busy;
+    private string _message;
+    private string _flash = string.Empty;
+    private string _topic = string.Empty;
+    private string _headline = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        _s = NounoursSettings.Load();
+        _topic = _s.Info.Topic;
+    }
+
+    private async Task Unlock()
+    {
+        _s = NounoursSettings.Load();
+        if (DateTimeOffset.Now < _lockedUntil)
+        {
+            _message = $"Trop d'essais : réessayez après {_lockedUntil.ToLocalTime():HH:mm}.";
+            return;
+        }
+
+        byte[] given = Encoding.UTF8.GetBytes((_pin ?? string.Empty).Trim());
+        byte[] expected = Encoding.UTF8.GetBytes(_s.Info.RemotePin.Trim());
+        if (given.Length > 0 && CryptographicOperations.FixedTimeEquals(given, expected))
+        {
+            _unlocked = true;
+            _message = null;
+            Failures.Clear();
+            return;
+        }
+
+        await Task.Delay(800); // ralentit les essais
+        Failures.Enqueue(DateTimeOffset.Now);
+        while (Failures.TryPeek(out DateTimeOffset first) && DateTimeOffset.Now - first > TimeSpan.FromMinutes(5))
+        {
+            Failures.TryDequeue(out _);
+        }
+
+        if (Failures.Count >= 5)
+        {
+            _lockedUntil = DateTimeOffset.Now.AddMinutes(5);
+            Failures.Clear();
+        }
+
+        _message = "Code incorrect.";
+        _pin = string.Empty;
+    }
+
+    private async Task Send(Action<InfoSettings> change)
+    {
+        if (!_unlocked)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            NounoursSettings.Update(s => change(s.Info));
+            _s = NounoursSettings.Load();
+            string result = await Info.PublishBanners(_s.Info, CancellationToken.None);
+            Snackbar.Add(result, Severity.Success);
+            _flash = string.Empty;
+            _headline = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -34,6 +34,9 @@ public interface IAutomationService
     Task<List<WeatherRow>> WeatherRows(WeatherSettings settings, CancellationToken cancellationToken);
     Task<AtelierJob> MakeWeather(CancellationToken cancellationToken);
 
+    /// <summary>« L'essentiel du jour » avec les titres du moment (les vôtres et ceux de vos sites).</summary>
+    Task<AtelierJob> MakeEssential(CancellationToken cancellationToken);
+
     /// <summary>L'interlude devient le « remplissage de secours » des chaînes choisies (ce qui passe quand rien n'est prévu).</summary>
     Task<string> UseInterlude(List<int> channelIds, CancellationToken cancellationToken);
 
@@ -357,6 +360,23 @@ public sealed class AutomationService(
         }
     }
 
+    // ------------------------------------------------------------------ l'essentiel du jour
+
+    public Task<AtelierJob> MakeEssential(CancellationToken cancellationToken)
+    {
+        NounoursSettings all = NounoursSettings.Load();
+        EssentialSettings settings = all.Essential;
+        List<string> headlines = InfoService.CurrentHeadlines(all.Info).Take(Math.Clamp(settings.Items, 1, 8)).ToList();
+        NounoursSettings.Update(s =>
+        {
+            s.Essential.LastMadeAt = DateTimeOffset.Now;
+            s.Essential.LastResult = headlines.Count == 0
+                ? "Aucun titre : écrivez-en sur la page Info, ou ajoutez les adresses de vos sites."
+                : $"{headlines.Count} titre(s), dont « {headlines[0]} »";
+        });
+        return Task.FromResult(headlines.Count == 0 ? null : atelier.StartEssential(settings, headlines));
+    }
+
     // ------------------------------------------------------------------ interlude
 
     public const string InterludePresetName = "Interlude (Nounours)";
@@ -463,6 +483,7 @@ public sealed class AutomationService(
             ("meteo", "Météo", settings.Weather.Broadcast, Path.Combine(folder(ImportRole.BandesAnnonces), AtelierService.WeatherFile)),
             ("semaine", "Cette semaine", settings.Weekly.Broadcast, Path.Combine(folder(ImportRole.BandesAnnonces), "atelier-cette-semaine.mp4")),
             ("cesoir", "Ce soir", settings.Tonight.Broadcast, Path.Combine(folder(ImportRole.BandesAnnonces), AtelierService.TonightFile)),
+            ("essentiel", "L'essentiel du jour", settings.Essential.Broadcast, Path.Combine(folder(ImportRole.BandesAnnonces), AtelierService.EssentialFile)),
             ("interlude", "Interlude", settings.InterludeBroadcast, Path.Combine(folder(ImportRole.Habillage), AtelierService.InterludeFile))
         };
 

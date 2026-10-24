@@ -39,7 +39,13 @@ public interface IInfoService
     Task<string> SyncSources(NounoursSettings settings, CancellationToken cancellationToken);
 
     string ObsUrl(ObsSettings obs);
+
+    /// <summary>Le programme d'EBS (service public de la Commission) devient le titre des blocs EBS dans le guide.</summary>
+    Task<string> RefreshEbsGuide(CancellationToken cancellationToken);
 }
+
+/// <summary>Un sujet du programme d'EBS.</summary>
+public sealed record EbsProgramme(DateTimeOffset Start, DateTimeOffset Finish, string Title, bool Live);
 
 public sealed class InfoService(
     IHabillageService habillage,
@@ -47,7 +53,8 @@ public sealed class InfoService(
     IRegieService regie,
     IAutomationService automation,
     AtelierService atelier,
-    IDbContextFactory<TvContext> dbContextFactory) : IInfoService
+    IDbContextFactory<TvContext> dbContextFactory,
+    System.Threading.Channels.ChannelWriter<IBackgroundServiceRequest> worker) : IInfoService
 {
     public const string SceneSlug = "info-en-continu";
     private const string ObsFile = "obs-direct.yml";
@@ -126,12 +133,13 @@ public sealed class InfoService(
         InfoSettings info = NounoursSettings.Load().Info;
         var titles = new List<string>();
         var problems = new List<string>();
-        foreach (string url in (info.Feeds ?? string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach (string line in (info.Feeds ?? string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
+            (string prefix, string url) = FeedLine(line);
             try
             {
                 string body = await Http.GetStringAsync(url, cancellationToken);
-                titles.AddRange(ParseFeed(body).Take(Math.Clamp(info.FeedItems, 1, 30)));
+                titles.AddRange(ParseFeed(body).Take(Math.Clamp(info.FeedItems, 1, 30)).Select(t => WithPrefix(prefix, t)));
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or UriFormatException or InvalidOperationException)
             {
@@ -149,6 +157,36 @@ public sealed class InfoService(
             s.Info.FeedsResult = result;
         });
         return result;
+    }
+
+    /// <summary>
+    ///     Une ligne de la liste des flux : « https://… » ou « NSN | https://… » (le nom du site s'affiche devant
+    ///     chacun de ses titres : « NSN : … »).
+    /// </summary>
+    public static (string Prefix, string Url) FeedLine(string line)
+    {
+        int bar = line.IndexOf('|', StringComparison.Ordinal);
+        int scheme = line.IndexOf("://", StringComparison.Ordinal);
+        if (bar > 0 && (scheme < 0 || bar < scheme))
+        {
+            return (line[..bar].Trim(), line[(bar + 1)..].Trim());
+        }
+
+        return (string.Empty, line.Trim());
+    }
+
+    public static string WithPrefix(string prefix, string title) =>
+        string.IsNullOrWhiteSpace(prefix) || title.StartsWith(prefix + " :", StringComparison.OrdinalIgnoreCase) ? title : $"{prefix} : {title}";
+
+    /// <summary>Les titres du moment (les vôtres, puis ceux des flux), sans doublon.</summary>
+    public static List<string> CurrentHeadlines(InfoSettings info)
+    {
+        string feeds = File.Exists(FeedCache) ? File.ReadAllText(FeedCache) : string.Empty;
+        return ((info.Headlines ?? string.Empty) + "\n" + feeds)
+            .Replace("\r", string.Empty, StringComparison.Ordinal)
+            .Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     /// <summary>RSS (item/title), Atom (entry/title) ou texte brut (une ligne = un titre).</summary>
@@ -254,6 +292,151 @@ public sealed class InfoService(
             BackgroundColor = "#000000F2", HaloWidth = 0, ZIndex = 32
         }
     ];
+
+    // ------------------------------------------------------------------ programme d'EBS dans le guide
+
+    /// <summary>
+    ///     Le service qu'utilise la page « EBS schedule » du site audiovisuel de la Commission (JSON public, sans clé).
+    ///     Ce n'est pas une interface documentée : si elle change, le guide garde simplement « EBS · en continu ».
+    /// </summary>
+    private static string EbsGrid(DateTime day) =>
+        string.Create(CultureInfo.InvariantCulture, $"https://8hwk2cyeyb.execute-api.eu-west-1.amazonaws.com/parrotfish-prod/ebs/grid?channelName=EBS&dateFrom={day:yyyyMMdd}&dateTo={day:yyyyMMdd}");
+
+    public static bool IsEbs(InfoSource source) => (source?.Url ?? string.Empty).Contains("commavservices.eu/live/ebs", StringComparison.OrdinalIgnoreCase);
+
+    public static List<EbsProgramme> ParseEbs(string json)
+    {
+        var result = new List<EbsProgramme>();
+        foreach (System.Text.Json.Nodes.JsonNode day in System.Text.Json.Nodes.JsonNode.Parse(json)?.AsArray() ?? [])
+        {
+            foreach (System.Text.Json.Nodes.JsonNode programme in day?["programs"]?.AsArray() ?? [])
+            {
+                if (!DateTimeOffset.TryParse(programme?["startDatetime"]?.ToString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTimeOffset start))
+                {
+                    continue;
+                }
+
+                double seconds = programme["duration"]?.GetValue<double>() ?? 0;
+
+                // titre français s'il existe (dans les médias), sinon le titre anglais (première ligne)
+                string french = (programme["transmissions"]?.AsArray() ?? [])
+                    .SelectMany(t => t?["media"]?["titles"]?.AsArray() ?? [])
+                    .Where(t => t?["language"]?.ToString() == "FR")
+                    .Select(t => t?["content"]?.ToString())
+                    .FirstOrDefault(t => !string.IsNullOrWhiteSpace(t));
+                string english = (programme["titles"]?.AsArray() ?? [])
+                    .Where(t => t?["language"]?.ToString() == "EN")
+                    .Select(t => t?["content"]?.ToString())
+                    .FirstOrDefault();
+                string title = CleanEbs(french ?? english);
+                if (title.Length > 0)
+                {
+                    result.Add(new EbsProgramme(start, start.AddSeconds(Math.Max(60, seconds)), title, programme["broadcastStatus"]?.ToString() == "LIVE"));
+                }
+            }
+        }
+
+        return result.OrderBy(p => p.Start).ToList();
+    }
+
+    private static string CleanEbs(string html)
+    {
+        if (string.IsNullOrWhiteSpace(html))
+        {
+            return string.Empty;
+        }
+
+        string first = System.Text.RegularExpressions.Regex.Split(html, "</p>|<br ?/?>")
+            .Select(l => System.Text.RegularExpressions.Regex.Replace(l, "<[^>]+>", string.Empty))
+            .Select(l => System.Net.WebUtility.HtmlDecode(l).Trim())
+            .FirstOrDefault(l => l.Length > 0) ?? string.Empty;
+        return first.Length > 110 ? first[..107].TrimEnd() + "…" : first;
+    }
+
+    public async Task<string> RefreshEbsGuide(CancellationToken cancellationToken)
+    {
+        InfoSource ebs = NounoursSettings.Load().Info.Sources.FirstOrDefault(IsEbs);
+        if (ebs is null)
+        {
+            return "Pas de source EBS.";
+        }
+
+        var programmes = new List<EbsProgramme>();
+        foreach (DateTime day in new[] { DateTime.Today.AddDays(-1), DateTime.Today, DateTime.Today.AddDays(1), DateTime.Today.AddDays(2) })
+        {
+            try
+            {
+                programmes.AddRange(ParseEbs(await Http.GetStringAsync(EbsGrid(day), cancellationToken)));
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
+            {
+                // un jour sans réponse : on garde « en continu »
+            }
+        }
+
+        await using TvContext db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        string name = string.IsNullOrWhiteSpace(ebs.Name) ? "Flux" : ebs.Name.Trim();
+        List<int> streamIds = await db.RemoteStreamMetadata.Where(m => m.Title == name).Select(m => m.RemoteStreamId).ToListAsync(cancellationToken);
+        DateTime from = DateTime.UtcNow.AddHours(-1);
+        List<PlayoutItem> items = await db.PlayoutItems
+            .Include(i => i.Playout).ThenInclude(p => p.Channel)
+            .Where(i => streamIds.Contains(i.MediaItemId) && i.Finish > from)
+            .OrderBy(i => i.PlayoutId).ThenBy(i => i.Start)
+            .ToListAsync(cancellationToken);
+        if (items.Count == 0)
+        {
+            return $"{programmes.Count} sujet(s) EBS lus, mais aucun bloc EBS dans les grilles.";
+        }
+
+        // chaque bloc EBS prend le titre du sujet qui l'occupe le plus (programme d'EBS, heures UTC)
+        int group = await db.PlayoutItems.MaxAsync(i => i.GuideGroup, cancellationToken) + 1;
+        var titled = 0;
+        string previous = null;
+        int previousPlayout = 0;
+        foreach (PlayoutItem item in items)
+        {
+            DateTimeOffset start = new(item.Start, TimeSpan.Zero);
+            DateTimeOffset finish = new(item.Finish, TimeSpan.Zero);
+            EbsProgramme best = programmes
+                .Select(p => (p, overlap: (Min(p.Finish, finish) - Max(p.Start, start)).TotalSeconds))
+                .Where(x => x.overlap > 0)
+                .OrderByDescending(x => x.overlap)
+                .Select(x => x.p)
+                .FirstOrDefault();
+            string title = best is null ? "EBS · Images de l'actualité européenne" : $"EBS{(best.Live ? " · en direct" : string.Empty)} · {best.Title}";
+            if (best is not null)
+            {
+                titled++;
+            }
+
+            // un nouveau titre = une nouvelle case du guide (sinon les blocs de 30 min se fondent en une seule)
+            if (title != previous || item.PlayoutId != previousPlayout)
+            {
+                group++;
+            }
+
+            item.CustomTitle = title;
+            item.GuideGroup = group;
+            (previous, previousPlayout) = (title, item.PlayoutId);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        foreach (string number in items.Select(i => i.Playout.Channel.Number).Distinct())
+        {
+            await worker.WriteAsync(new Channels.RefreshChannelData(number), cancellationToken);
+        }
+
+        string result = $"{programmes.Count} sujet(s) EBS lus, {titled} bloc(s) du guide renommés sur {items.Count}.";
+        NounoursSettings.Update(s =>
+        {
+            s.Info.EbsGuideAt = DateTimeOffset.Now;
+            s.Info.EbsGuideResult = result;
+        });
+        return result;
+    }
+
+    private static DateTimeOffset Min(DateTimeOffset a, DateTimeOffset b) => a < b ? a : b;
+    private static DateTimeOffset Max(DateTimeOffset a, DateTimeOffset b) => a > b ? a : b;
 
     public string ObsUrl(ObsSettings obs) =>
         string.Equals(obs.Protocol, "udp", StringComparison.OrdinalIgnoreCase)

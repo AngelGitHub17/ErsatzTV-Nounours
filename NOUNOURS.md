@@ -183,9 +183,28 @@ Les 6 prochaines heures d'une chaîne. Choisissez une vidéo ou un flux, puis : 
 (elle finit pile quand il commence, à la place de la fin du précédent) ou **À la place** d'un programme (pendant toute sa durée).
 Les insertions s'affichent dans la liste et s'annulent d'un clic. La grille n'est pas reconstruite : tout reprend à l'heure.
 
+### Programmation automatique (`/programmation-auto`)
+- ErsatzTV regarde la médiathèque (genres et classifications : Animation, Famille, Documentaire…) et propose une **vraie grille de
+  télé** : matinale jeunesse, séries, journal, film famille l'après-midi, access, **film du soir à 20h45**, deuxième partie de soirée,
+  nuit en rediffusion — et un **week-end différent**.
+- 6 styles : généraliste, jeunesse, cinéma, séries, info, musique. Chaque famille affiche son nombre de programmes ; s'il n'y a rien
+  (ex. pas de dessins animés), un autre type de programme prend le relais (icône ⇄).
+- Grille **modifiable** avant d'appliquer : heure, famille, nom du rendez-vous (pour le guide), « un seul programme » ou « en continu »,
+  ajout / suppression, frise de la journée de 5h à 5h.
+- Options : jingle avant chaque programme (vos « Jingles »), pubs entre les programmes (vos « Pubs »), **débuts au quart d'heure**
+  (les pubs comblent), week-end différent (semaine type).
+- Appliquer : crée une nouvelle chaîne ou remplace la programmation d'une chaîne existante. Les familles deviennent des collections
+  intelligentes « Auto · … » qui suivent la médiathèque toutes seules. Le direct (EBS…) se cale pile dans ses créneaux, sans jingle
+  ni pubs autour (les fiches des flux d'info durent désormais 30 min).
+- Deux corrections d'ErsatzTV trouvées en testant (`PlayoutBuilder.cs`) : le jour des plannings alternés (week-end) se lit à
+  l'heure locale (avant, lundi 0h30 en France comptait encore pour dimanche, et **tout le lundi** passait la grille du week-end) ;
+  et le jour du changement d'heure, « minuit » n'est plus calculé à 23h (la journée suivante démarrait la veille).
+
 ### Journal de diffusion (`/journal`)
 Chaque minute, tout ce qui a commencé à l'antenne (programmes, intercalaires, régie, directs) est noté dans `journal/AAAA-MM-JJ.jsonl`.
 Page par jour, filtre par chaîne, intercalaires masquables, export **CSV** (ouvre dans Excel).
+**Statistiques de la semaine** : temps d'antenne par genre (films, épisodes, direct, intercalaires…), par chaîne, les programmes les
+plus diffusés (épisodes regroupés par série) et ce qui repasse le plus souvent.
 
 ### Même volume partout (Services automatiques)
 Un interrupteur active la normalisation du son (EBU R128, −16 LUFS) dans tous les profils FFmpeg : même niveau perçu entre films,
@@ -207,6 +226,12 @@ séries, pubs et chaînes.
 - **Titres automatiques** : adresses lues toutes les N minutes (RSS, Atom, ou une page de vos sites qui renvoie un titre par ligne
   ou un tableau JSON), ajoutées aux titres du bandeau. Exemple PHP : `<?php header('Content-Type: text/plain; charset=utf-8');
   echo "Titre 1\nTitre 2";`.
+- **Nom du site devant ses titres** : une ligne « `NSN | https://…` » affiche « NSN : … » devant chaque titre de ce site.
+- **Programme d'EBS dans le guide** : toutes les heures, le programme officiel d'EBS (le service JSON qu'utilise la page « EBS
+  schedule » de la Commission) renomme les blocs EBS du guide sujet par sujet (« EBS · en direct · Point de presse de midi… »).
+  Le week-end, EBS publie souvent un programme vide : le guide affiche « Images de l'actualité européenne ».
+- **Télécommande sur téléphone** (`/telecommande`) : avec un code (page Info), lancer un flash, changer le sujet « EN DIRECT »,
+  ajouter un titre, depuis le téléphone. 5 codes faux de suite = 5 minutes de pause.
 - **Jingle « Flash spécial »** : fabriqué en un clic, il passe tout seul sur les chaînes choisies dès qu'un nouveau flash est mis
   à l'antenne (une fois par flash).
 - **Caméras / scènes OBS** : télécommande d'OBS (obs-websocket v5, Outils › Paramètres du serveur WebSocket, mot de passe) ; les
@@ -226,9 +251,12 @@ Ce qu'ErsatzTV fait tout seul, vérifié chaque minute :
 - **Bande-annonce « Cette semaine »** : chaque semaine (jour et heure au choix), les films des 7 prochains jours trouvés dans le
   guide, deux extraits chacun avec le jour et l'heure de diffusion. Toujours le même fichier dans « Bandes-annonces ».
 - **Carte météo en quadrillage** : chaque jour, jusqu'à 6 villes (température, temps, mini / maxi) d'Open-Meteo, sans clé.
+- **« L'essentiel du jour »** : aux heures choisies (« 12:30, 19:00 »), les titres du moment (les vôtres + vos sites), un par écran
+  dans le quadrillage, le nom du site en étiquette, **lus par la voix off** (voix de Windows ou serveur de synthèse) : chaque titre
+  reste à l'écran le temps d'être lu. Toujours le même fichier dans « Bandes-annonces », diffusion automatique possible.
 - **Interlude quadrillé** : une boucle de carrés au rythme d'une musique, rangée dans « Habillage vidéo » ; un clic en fait le
   « remplissage de secours » des chaînes choisies (ce qui passe quand rien n'est prévu, au lieu d'un écran noir).
-- **Diffusion automatique** (dans chaque carte : Ce soir, Cette semaine, Météo, Interlude) : heures (« 07:00, 12:55, 19:55 »),
+- **Diffusion automatique** (dans chaque carte : Ce soir, Cette semaine, Météo, L'essentiel, Interlude) : heures (« 07:00, 12:55, 19:55 »),
   chaînes, et « juste avant le programme suivant » (la vidéo remplace la fin du programme en cours, souvent le générique) ou
   « à l'heure exacte ». Passage à la seconde près, via la régie.
 - **Rendez-vous d'antenne** : à l'heure dite (certains jours ou tous les jours), la régie passe une vidéo une fois — ouverture,

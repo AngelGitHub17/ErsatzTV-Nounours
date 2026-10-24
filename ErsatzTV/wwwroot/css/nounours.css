@@ -299,3 +299,21 @@ div.ersatztv-light.nounours {
 .n-auto-day > div { border-right: 2px solid var(--mud-palette-surface); bottom: 0; color: #fff; font-size: .72rem; font-weight: 700; overflow: hidden; padding: 4px 6px; position: absolute; top: 0; }
 .n-auto-day > div span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .n-style.is-active { outline: 2px solid var(--mud-palette-primary); }
+
+/* ---------- télécommande sur téléphone ---------- */
+.n-bare { background: #121212; color: #fff; min-height: 100vh; }
+.n-remote { margin: 0 auto; max-width: 520px; padding: 16px; }
+.n-remote-head { align-items: center; display: flex; font-size: 1.2rem; gap: 10px; margin-bottom: 18px; }
+.n-remote-dot { background: #FF3200; display: inline-block; height: 14px; width: 14px; }
+.n-remote-block { border-top: 1px solid #333; padding: 14px 0; }
+.n-remote-block label { color: #FFA800; display: block; font-size: .78rem; font-weight: 800; letter-spacing: .08em; margin-bottom: 6px; }
+.n-remote-now { background: #8C0A11; font-weight: 700; margin-top: 10px; padding: 8px 10px; }
+
+/* ---------- statistiques du journal ---------- */
+.n-stat-bar { border-radius: 4px; display: flex; height: 22px; margin-top: 4px; overflow: hidden; }
+.n-stat-bar > div { min-width: 2px; }
+.n-stat-row { align-items: center; display: flex; font-size: .88rem; gap: 10px; padding: 3px 0; }
+.n-stat-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.n-stat-track { background: var(--mud-palette-background-gray); border-radius: 3px; flex: 1; height: 10px; overflow: hidden; }
+.n-stat-track > span { background: var(--mud-palette-primary); display: block; height: 100%; }
+.n-remote-head .n-muted { font-size: .8rem; }

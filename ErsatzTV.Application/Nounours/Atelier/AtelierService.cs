@@ -552,6 +552,93 @@ public sealed class AtelierService(
         return job;
     }
 
+    // ------------------------------------------------------------------ l'essentiel du jour
+
+    public const string EssentialFile = FilePrefix + "essentiel-du-jour.mp4";
+
+    /// <summary>
+    ///     « L'essentiel du jour » : un titre de l'info par écran, en quadrillage, lu par la voix off si elle est choisie
+    ///     (chaque titre reste à l'écran le temps d'être lu). Toujours le même fichier, rangé dans « Bandes-annonces ».
+    /// </summary>
+    public AtelierJob StartEssential(EssentialSettings settings, IReadOnlyList<string> headlines)
+    {
+        var job = new AtelierJob { Name = "L'essentiel du jour" };
+        _jobs[job.Id] = job;
+        _ = Task.Run(() => Run(job, ct => RenderEssential(job, settings, headlines.ToList(), ct)));
+        return job;
+    }
+
+    private async Task RenderEssential(AtelierJob job, EssentialSettings settings, List<string> headlines, CancellationToken cancellationToken)
+    {
+        (_, string ffprobe) = await Tools(cancellationToken);
+        CultureInfo fr = CultureInfo.GetCultureInfo("fr-FR");
+        string dateLine = DateTime.Now.ToString("dddd d MMMM", fr);
+        const string Opening = "L'essentiel du jour.";
+        var starts = new List<double>();
+        double seconds;
+        string voiceFile = null;
+        VoiceOver voice = null;
+        if (settings.Voice is VoiceEngine.Windows or VoiceEngine.Server)
+        {
+            job.Step = "Voix off…";
+            List<string> spoken = headlines.Select(Spoken).ToList();
+            voice = new VoiceOver { Engine = settings.Voice, Text = Opening + " " + string.Join(" ", spoken), Start = 0.6, Duck = true };
+            voiceFile = await MakeVoice(voice, cancellationToken);
+            double length = await MediaSeconds(ffprobe, voiceFile, cancellationToken);
+
+            // chaque titre arrive quand la voix commence à le lire (au prorata du texte)
+            double perChar = length / Math.Max(1, voice.Text.Length);
+            double at = voice.Start + (Opening.Length + 1) * perChar;
+            foreach (string line in spoken)
+            {
+                starts.Add(Math.Max(2.2, at - 0.2));
+                at += (line.Length + 1) * perChar;
+            }
+
+            seconds = voice.Start + length + 1.6;
+        }
+        else
+        {
+            double each = Math.Clamp(settings.Seconds, 3, 20);
+            for (var i = 0; i < headlines.Count; i++)
+            {
+                starts.Add(3 + i * each);
+            }
+
+            seconds = 3 + headlines.Count * each + 0.8;
+        }
+
+        string output = Path.Combine(FileSystemLayout.ImportsFolder, FolderImportService.Label(ImportRole.BandesAnnonces), EssentialFile);
+        string title = string.IsNullOrWhiteSpace(settings.Title) ? "L'ESSENTIEL" : settings.Title;
+        await RenderAnimated(
+            job, Math.Min(seconds, 300), settings.Music, new AtelierStyle(), output, ImportRole.BandesAnnonces,
+            (r, canvas, frame) => r.DrawEssential(canvas, frame, title, dateLine, headlines, starts, settings.ChannelName),
+            cancellationToken, voiceFile, voice);
+    }
+
+    /// <summary>Un titre prêt à être lu : « NSN : … » devient « NSN. … », avec un point final.</summary>
+    private static string Spoken(string headline)
+    {
+        string text = headline.Trim().Replace(" : ", ". ", StringComparison.Ordinal);
+        return text.Length > 0 && ".!?…".Contains(text[^1], StringComparison.Ordinal) ? text : text + ".";
+    }
+
+    private static async Task<double> MediaSeconds(string ffprobe, string path, CancellationToken cancellationToken)
+    {
+        var psi = new ProcessStartInfo(ffprobe) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+        foreach (string arg in new[] { "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", path })
+        {
+            psi.ArgumentList.Add(arg);
+        }
+
+        using var process = Process.Start(psi)!;
+        string output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
+        await process.WaitForExitAsync(cancellationToken);
+        return double.TryParse(output.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double value) && value > 0
+            ? value
+            : throw new InvalidOperationException("Voix off illisible (durée inconnue).");
+    }
+
     /// <summary>Une vidéo animée au rythme d'une musique (ou d'une pulsation), dessinée image par image.</summary>
     private async Task RenderAnimated(
         AtelierJob job,
@@ -561,7 +648,9 @@ public sealed class AtelierService(
         string output,
         ImportRole role,
         Action<RetroRenderer, SKCanvas, int> draw,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string voiceFile = null,
+        VoiceOver voice = null)
     {
         (string ffmpeg, _) = await Tools(cancellationToken);
         string music = SourcePath(musicFile);
@@ -582,6 +671,16 @@ public sealed class AtelierService(
         using (var renderer = new RetroRenderer(style, audio, Fps, frames))
         {
             await Pipe(ffmpeg, args, frames, (canvas, frame) => draw(renderer, canvas, frame), p => job.Progress = p * 0.9, cancellationToken);
+        }
+
+        if (voiceFile is not null && voice is not null)
+        {
+            job.Step = "Mixage de la voix off…";
+            string mixed = TempPath(".mp4");
+            await MixVoice(ffmpeg, temp, voiceFile, voice, mixed, cancellationToken);
+            File.Delete(temp);
+            File.Delete(voiceFile);
+            temp = mixed;
         }
 
         await Finish(job, temp, output, role, cancellationToken);

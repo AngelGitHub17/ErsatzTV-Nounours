@@ -10,6 +10,55 @@ namespace ErsatzTV.Application.Nounours;
 /// <summary>Une ligne du journal : ce qui a commencé à l'antenne, sur quelle chaîne, à quelle heure.</summary>
 public sealed record JournalLine(DateTimeOffset Start, DateTimeOffset Finish, int ChannelId, string Channel, string Title, string Kind);
 
+/// <summary>Un total des statistiques : nom, temps d'antenne, nombre de passages.</summary>
+public sealed record JournalTotal(string Name, TimeSpan Time, int Count);
+
+/// <summary>Statistiques d'une période du journal.</summary>
+public sealed record JournalStats(
+    int Days,
+    TimeSpan Total,
+    List<JournalTotal> Kinds,
+    List<(string Channel, TimeSpan Total, List<JournalTotal> Kinds)> Channels,
+    List<JournalTotal> Programmes,
+    List<JournalTotal> Repeats)
+{
+    /// <summary>
+    ///     Regroupe les épisodes par série (« Série - s01e03 - … » → « Série »), compte le temps d'antenne
+    ///     par genre, par chaîne et par programme, et repère ce qui repasse le plus (hors intercalaires).
+    /// </summary>
+    public static JournalStats From(IReadOnlyCollection<JournalLine> lines, int days)
+    {
+        static TimeSpan Length(JournalLine l) => l.Finish > l.Start ? l.Finish - l.Start : TimeSpan.Zero;
+        static TimeSpan Sum(IEnumerable<JournalLine> ls) => ls.Aggregate(TimeSpan.Zero, (t, l) => t + Length(l));
+        static List<JournalTotal> Totals(IEnumerable<IGrouping<string, JournalLine>> groups) =>
+            groups.Select(g => new JournalTotal(g.Key, Sum(g), g.Count())).OrderByDescending(t => t.Time).ToList();
+
+        var programmes = lines.Where(l => l.Kind is not "Intercalaire").ToList();
+        return new JournalStats(
+            days,
+            Sum(lines),
+            Totals(lines.GroupBy(l => l.Kind)),
+            lines.GroupBy(l => l.Channel)
+                .Select(g => (g.Key, Sum(g), Totals(g.GroupBy(l => l.Kind))))
+                .OrderByDescending(c => c.Item2)
+                .ToList(),
+            Totals(programmes.GroupBy(l => Programme(l.Title))).Take(15).ToList(),
+            programmes.GroupBy(l => l.Title)
+                .Select(g => new JournalTotal(g.Key, Sum(g), g.Count()))
+                .Where(t => t.Count >= Math.Max(3, days * 2))
+                .OrderByDescending(t => t.Count)
+                .Take(10)
+                .ToList());
+    }
+
+    public static string Programme(string title)
+    {
+        System.Text.RegularExpressions.Match episode = System.Text.RegularExpressions.Regex.Match(
+            title ?? string.Empty, @"^(.*?)\s+-\s+s\d+e\d+", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return episode.Success ? episode.Groups[1].Value.Trim() : (title ?? string.Empty).Trim();
+    }
+}
+
 /// <summary>
 ///     Journal de diffusion : chaque minute, tout ce qui a commencé à l'antenne depuis la minute précédente
 ///     (programmes, intercalaires, prises d'antenne de la régie) est noté dans <c>journal/AAAA-MM-JJ.jsonl</c>.

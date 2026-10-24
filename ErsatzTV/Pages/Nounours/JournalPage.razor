@@ -18,6 +18,73 @@
         }
     </div>
 
+    <MudToggleGroup T="bool" @bind-Value="_stats" Outlined="true" Size="Size.Small" Color="Color.Primary" Class="mb-3">
+        <MudToggleItem Value="false" Text="Journal du jour"/>
+        <MudToggleItem Value="true" Text="Statistiques de la semaine"/>
+    </MudToggleGroup>
+
+    @if (_stats)
+    {
+        JournalStats stats = WeekStats();
+        <div class="n-card mb-3">
+            <div class="n-card-title">Du @_day.AddDays(-6).ToString("d MMMM", Fr) au @_day.ToString("d MMMM", Fr) · @Length(stats.Total) d'antenne notées</div>
+            <div class="n-stat-bar">
+                @foreach (JournalTotal kind in stats.Kinds)
+                {
+                    <div style="flex: @Share(kind.Time, stats.Total); background: @KindColor(kind.Name)" title="@($"{kind.Name} · {Length(kind.Time)}")"></div>
+                }
+            </div>
+            <div class="d-flex gap-3 flex-wrap mt-2" style="font-size: .85rem">
+                @foreach (JournalTotal kind in stats.Kinds)
+                {
+                    <span><span class="n-auto-dot" style="background: @KindColor(kind.Name)"></span> @kind.Name · <b>@Pct(kind.Time, stats.Total)</b> (@Length(kind.Time))</span>
+                }
+            </div>
+        </div>
+
+        <MudGrid Spacing="3">
+            <MudItem xs="12" lg="6">
+                <div class="n-card" style="height: 100%">
+                    <div class="n-card-title">Par chaîne</div>
+                    @foreach ((string channel, TimeSpan total, List<JournalTotal> kinds) in stats.Channels)
+                    {
+                        <div class="mt-2" style="font-size: .9rem"><b>@channel</b> <span class="n-muted">· @Length(total)</span></div>
+                        <div class="n-stat-bar" style="height: 14px">
+                            @foreach (JournalTotal kind in kinds)
+                            {
+                                <div style="flex: @Share(kind.Time, total); background: @KindColor(kind.Name)" title="@($"{kind.Name} · {Length(kind.Time)}")"></div>
+                            }
+                        </div>
+                    }
+                </div>
+            </MudItem>
+            <MudItem xs="12" lg="6">
+                <div class="n-card" style="height: 100%">
+                    <div class="n-card-title">Les programmes les plus diffusés</div>
+                    @{ TimeSpan top = stats.Programmes.Count == 0 ? TimeSpan.FromSeconds(1) : stats.Programmes[0].Time; }
+                    @foreach (JournalTotal programme in stats.Programmes)
+                    {
+                        <div class="n-stat-row">
+                            <span class="n-stat-name">@programme.Name</span>
+                            <span class="n-stat-track"><span style="width: @Pct(programme.Time, top)"></span></span>
+                            <span class="n-muted" style="width: 120px; text-align: right">@Length(programme.Time) · @(programme.Count)×</span>
+                        </div>
+                    }
+                    @if (stats.Repeats.Count > 0)
+                    {
+                        <div class="n-card-title mt-4">Ce qui repasse le plus</div>
+                        <MudText Typo="Typo.caption" Class="n-muted d-block mb-1">Le même épisode ou film plusieurs fois par jour en moyenne : de quoi élargir la collection ou passer en « mélange ».</MudText>
+                        @foreach (JournalTotal repeat in stats.Repeats)
+                        {
+                            <div class="n-stat-row"><span class="n-stat-name">@repeat.Name</span><b>@(repeat.Count)×</b></div>
+                        }
+                    }
+                </div>
+            </MudItem>
+        </MudGrid>
+    }
+    else
+    {
     <div class="n-card mb-3">
         <div class="d-flex gap-3 flex-wrap align-center">
             <MudSelect T="DateOnly" Value="@_day" ValueChanged="@SelectDay" Label="Jour" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 220px">
@@ -54,6 +121,7 @@
             </div>
         }
     </div>
+    }
 </div>
 
 @code {
@@ -63,6 +131,36 @@
     private List<JournalLine> _all = [];
     private string _channel = string.Empty;
     private bool _hideFiller;
+    private bool _stats;
+
+    private JournalStats WeekStats()
+    {
+        var lines = new List<JournalLine>();
+        for (var i = 0; i < 7; i++)
+        {
+            lines.AddRange(Journal.Read(_day.AddDays(-i)));
+        }
+
+        int days = Enumerable.Range(0, 7).Count(i => _days.Contains(_day.AddDays(-i)));
+        return JournalStats.From(lines, Math.Max(1, days));
+    }
+
+    private static string Share(TimeSpan part, TimeSpan total) =>
+        (total.TotalSeconds <= 0 ? 0 : part.TotalSeconds / total.TotalSeconds).ToString("0.####", CultureInfo.InvariantCulture);
+
+    private static string Pct(TimeSpan part, TimeSpan total) =>
+        (total.TotalSeconds <= 0 ? 0 : Math.Min(100, part.TotalSeconds * 100 / total.TotalSeconds)).ToString("0", CultureInfo.InvariantCulture) + "%";
+
+    private static string KindColor(string kind) =>
+        kind switch
+        {
+            "Film" => "#8C0A11",
+            "Épisode" => "#0B2B70",
+            "Clip" => "#B04FC0",
+            "Direct" => "#FF3200",
+            "Intercalaire" => "#555B66",
+            _ => "#008A22"
+        };
 
     private List<JournalLine> _lines =>
         _all.Where(l => (_channel.Length == 0 || l.Channel == _channel) && (!_hideFiller || l.Kind != "Intercalaire")).ToList();

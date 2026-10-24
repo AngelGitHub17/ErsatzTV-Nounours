@@ -30,8 +30,8 @@
                 <MudTextField @bind-Value="_s.Info.Topic" Label="Sujet en cours (bandeau « EN DIRECT », vide = caché)" Placeholder="Conseil municipal de Saintes" Variant="Variant.Outlined" Margin="Margin.Dense"/>
                 <MudTextField @bind-Value="_s.Info.Flash" Label="Flash info (bandeau rouge, vide = caché)" Placeholder="Coupure de courant dans le centre-ville" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"/>
                 <MudTextField @bind-Value="_s.Info.Headlines" Label="Titres qui défilent (un par ligne)" Lines="5" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"/>
-                <MudTextField @bind-Value="_s.Info.Feeds" Label="Titres automatiques : adresses à lire (une par ligne)" Lines="2" Placeholder="https://www.didikaria.fr/infos.php&#10;https://…/rss.xml" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"
-                              HelperText="Flux RSS / Atom, ou une page de vos sites qui renvoie un titre par ligne (ou un tableau JSON)"/>
+                <MudTextField @bind-Value="_s.Info.Feeds" Label="Titres automatiques : adresses à lire (une par ligne)" Lines="3" Placeholder="NSN | https://www.didikaria.fr/infos.php&#10;Railboard | https://…/rss.xml" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"
+                              HelperText="Flux RSS / Atom, ou une page qui renvoie un titre par ligne (ou un tableau JSON). « NSN | adresse » affiche « NSN : … » devant chaque titre de ce site."/>
                 <div class="d-flex gap-2 align-center">
                     <MudNumericField @bind-Value="_s.Info.FeedMinutes" Label="Relire toutes les (min)" Min="2" Max="240" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 170px"/>
                     <MudNumericField @bind-Value="_s.Info.FeedItems" Label="Titres par adresse" Min="1" Max="30" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 150px"/>
@@ -41,6 +41,14 @@
                 {
                     <MudText Typo="Typo.caption" Class="n-muted d-block">Dernière lecture @_s.Info.FeedsAt?.ToLocalTime().ToString("HH:mm") : @_s.Info.FeedsResult</MudText>
                 }
+                <div class="d-flex gap-2 align-center mt-2 flex-wrap">
+                    <MudTextField @bind-Value="_s.Info.RemotePin" Label="Télécommande sur téléphone : code" InputType="InputType.Password" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 260px"
+                                  HelperText="4 chiffres ou plus ; vide = fermée"/>
+                    @if ((_s.Info.RemotePin ?? string.Empty).Trim().Length >= 4)
+                    {
+                        <MudLink Href="telecommande" Target="_blank" Typo="Typo.body2">@($"{NounoursSettings.Load().PublicAddress.TrimEnd('/')}/telecommande")</MudLink>
+                    }
+                </div>
                 <MudSwitch T="bool" @bind-Value="_s.Info.FlashJingle" Color="Color.Error" Label="Un nouveau flash lance le jingle « Flash spécial »" Class="mt-2"/>
                 @if (_s.Info.FlashJingle)
                 {
@@ -134,6 +142,17 @@
                             <div>✓ @step</div>
                         }
                     </div>
+                }
+                @if (_s.Info.Sources.Any(InfoService.IsEbs))
+                {
+                    <div class="d-flex gap-2 align-center flex-wrap mt-2">
+                        <MudSwitch T="bool" @bind-Value="_s.Info.EbsGuide" Color="Color.Primary" Label="Le programme d'EBS dans le guide (sujet par sujet, mis à jour toutes les heures)"/>
+                        <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@EbsGuide" Disabled="@_busy">Mettre à jour</MudButton>
+                    </div>
+                    @if (!string.IsNullOrEmpty(_s.Info.EbsGuideResult))
+                    {
+                        <MudText Typo="Typo.caption" Class="n-muted d-block">@_s.Info.EbsGuideAt?.ToLocalTime().ToString("HH:mm") : @_s.Info.EbsGuideResult</MudText>
+                    }
                 }
                 <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">
                     Autres chaînes d'info (France 24, DW…) : leur flux public est fait pour être regardé chez soi ; pour le rediffuser sur votre site il faut leur accord de distribution.
@@ -268,6 +287,13 @@
         _s.Info.Flash = string.Empty;
         return Publish();
     }
+
+    private Task EbsGuide() => Busy(async () =>
+    {
+        SaveSettings();
+        Snackbar.Add(await Info.RefreshEbsGuide(CancellationToken.None), Severity.Info);
+        _s = NounoursSettings.Load();
+    });
 
     private Task ReadFeeds() => Busy(async () =>
     {

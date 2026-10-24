@@ -1,0 +1,9 @@
+@inherits LayoutComponentBase
+
+@* mise en page nue (téléphone) : pas de menu, thème sombre *@
+<MudThemeProvider IsDarkMode="true"/>
+<MudSnackbarProvider/>
+<MudPopoverProvider/>
+<div class="nounours n-bare">
+    @Body
+</div>
