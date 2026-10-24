@@ -325,3 +325,4 @@ div.ersatztv-light.nounours {
 .n-saga-films { font-size: .85rem; margin: 4px 0 4px 22px; padding: 0; }
 .n-saga-films li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .n-remote-scenes { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }
+.n-saga-status { border-left: 3px solid var(--mud-palette-primary); font-size: .8rem; margin: 4px 0; padding-left: 8px; }

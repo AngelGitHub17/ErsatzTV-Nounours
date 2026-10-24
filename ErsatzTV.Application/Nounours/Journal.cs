@@ -114,7 +114,9 @@ public sealed class JournalService(IGuideService guideService, IDbContextFactory
                         GuideEntryKind.MusicVideo => "Clip",
                         _ => "Vidéo"
                     };
-                    var line = new JournalLine(e.Start.ToLocalTime(), e.Finish.ToLocalTime(), e.ChannelId, names.GetValueOrDefault(e.ChannelId) ?? $"Chaîne {e.ChannelId}", e.DisplayTitle, kind);
+                    var line = new JournalLine(e.Start.ToLocalTime(), e.Finish.ToLocalTime(), e.ChannelId, names.GetValueOrDefault(e.ChannelId) ?? $"Chaîne {e.ChannelId}",
+                        // le vrai titre (pas le nom du rendez-vous « Le film du soir ») : statistiques et sagas s'y retrouvent
+                        string.IsNullOrWhiteSpace(e.Title) ? e.DisplayTitle : e.Title, kind);
                     text.AppendLine(JsonSerializer.Serialize(line, Json));
                 }
 

@@ -36,6 +36,9 @@ public sealed class RecurringSlot
     public DateOnly? From { get; set; }
 
     public DateOnly? Until { get; set; }
+
+    /// <summary>Soirée spéciale : carton d'ouverture avec le film du soir, « la suite… » à la fin.</summary>
+    public bool Special { get; set; }
 }
 
 /// <summary>
@@ -156,6 +159,21 @@ public sealed class RecurringSlotService(
         }
 
         steps.Insert(0, $"« {label} » {when} sur {template.ChannelName}");
+        if (slot.Special)
+        {
+            NounoursSettings.Update(s =>
+            {
+                s.Sagas.Evenings.RemoveAll(e => e.SmartCollectionId == slot.SmartCollectionId && e.ChannelId == slot.ChannelId);
+                s.Sagas.Evenings.Add(new SagaEvening
+                {
+                    SmartCollectionId = slot.SmartCollectionId, Name = slot.CollectionName.Replace(MovieCollectionService.SagaPrefix, string.Empty, StringComparison.Ordinal),
+                    ChannelId = slot.ChannelId, Days = days, At = slot.Start.ToString(@"hh\:mm", CultureInfo.InvariantCulture)
+                });
+                s.Sagas.LastMade = null; // cartons fabriqués tout de suite
+            });
+            steps.Add("Soirée spéciale : les cartons « Soirée spéciale » et « La suite » se fabriquent maintenant, puis chaque matin");
+        }
+
         steps.Add(slot.Mode switch
         {
             RecurringMode.One => "Un film à chaque fois, dans l'ordre de sortie : la saga continue la fois suivante",

@@ -9,6 +9,7 @@
 @inject AtelierService Atelier
 @inject IMediator Mediator
 @inject ISnackbar Snackbar
+@inject ErsatzTV.Nounours.SagaEventService SagaEvents
 
 <PageTitle>Services automatiques · ErsatzTV</PageTitle>
 
@@ -202,6 +203,67 @@
             </div>
         </MudItem>
 
+        @* ------------------------------------------------ sagas : bande-annonce et anniversaires *@
+        <MudItem xs="12" lg="6">
+            <div class="n-card" style="height: 100%">
+                <div class="n-card-title">Bande-annonce du prochain film de saga</div>
+                <MudText Typo="Typo.body2" Class="n-muted mb-2">Chaque matin, la saga qui passe le plus tôt dans la semaine (page « Sagas et collections ») : trois extraits du film, « LA SAGA HARRY POTTER · CE VENDREDI 20H45 · 2/7 ».</MudText>
+                <MudSwitch T="bool" @bind-Value="_s.Sagas.Promo" Color="Color.Primary" Label="La fabriquer automatiquement"/>
+                <div class="d-flex gap-2 mt-2">
+                    <MudTextField @bind-Value="_s.Sagas.At" Label="Fabriquée à" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 140px"/>
+                    <MudTextField @bind-Value="_s.Sagas.ChannelName" Label="Nom de la chaîne" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                </div>
+                <div class="mt-2"><SourcePicker Value="@_s.Sagas.PromoMusic" ValueChanged="@(v => _s.Sagas.PromoMusic = v)" EmptyLabel="Son des extraits"/></div>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Movie" OnClick="@MakeSagaPromo" Disabled="@_busy" Class="mt-3">Fabriquer maintenant</MudButton>
+                @if (!string.IsNullOrEmpty(_s.Sagas.PromoResult))
+                {
+                    <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Dernière fois : @_s.Sagas.PromoResult</MudText>
+                }
+                @BroadcastEditor(_s.Sagas.PromoBroadcast)
+            </div>
+        </MudItem>
+
+        <MudItem xs="12" lg="6">
+            <div class="n-card" style="height: 100%">
+                <div class="n-card-title">« Il y a 30 ans sortait… »</div>
+                <MudText Typo="Typo.body2" Class="n-muted mb-2">Le jour anniversaire de la sortie d'un de vos films (30 ans de préférence, puis 20, 25…) : un carton « IL Y A 30 ANS · SORTAIT LE 24 OCTOBRE 1996 », puis le film, à l'heure choisie, à la place de la grille.</MudText>
+                <MudSwitch T="bool" @bind-Value="_s.Sagas.Anniversary.Enabled" Color="Color.Primary" Label="Chaque jour où il y a un anniversaire"/>
+                <div class="d-flex gap-2 mt-2 flex-wrap">
+                    <MudSelect T="int" @bind-Value="_s.Sagas.Anniversary.ChannelId" Label="Chaîne" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 200px">
+                        @foreach (ChannelViewModel channel in _channels)
+                        {
+                            <MudSelectItem Value="@channel.Id">@channel.Number · @channel.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudTextField @bind-Value="_s.Sagas.Anniversary.At" Label="Heure" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 110px"/>
+                    <MudNumericField @bind-Value="_s.Sagas.Anniversary.MinYears" Label="Au moins (ans)" Min="1" Max="100" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 130px"/>
+                </div>
+                <MudTextField @bind-Value="_s.Sagas.Anniversary.ChannelName" Label="Nom de la chaîne (carton)" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"/>
+                <div class="d-flex gap-2 mt-3 flex-wrap">
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Cake" OnClick="@PreviewAnniversaries" Disabled="@_busy">Voir les anniversaires du jour</MudButton>
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Movie" OnClick="@MakeAnniversary" Disabled="@_busy">Fabriquer maintenant</MudButton>
+                </div>
+                @if (_anniversaries is not null)
+                {
+                    <div class="mt-2" style="font-size: .9rem">
+                        @if (_anniversaries.Count == 0)
+                        {
+                            <div class="n-muted">Aucun film sorti un @DateTime.Today.ToString("d MMMM", Fr).</div>
+                        }
+                        @foreach ((int _, string title, DateTime released, int years) in _anniversaries.Take(6))
+                        {
+                            <div><b>@years ans</b> · @title · sorti le @released.ToString("d MMMM yyyy", Fr)</div>
+                        }
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(_s.Sagas.Anniversary.LastResult))
+                {
+                    <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Dernière fois (@_s.Sagas.Anniversary.LastMade?.ToString("dd/MM", Fr)) : @_s.Sagas.Anniversary.LastResult@(_s.Sagas.Anniversary.Scheduled ? " · programmé" : "")</MudText>
+                }
+                <MudText Typo="Typo.body2" Class="n-muted mt-2">Il faut la vraie date de sortie (« premiered » des .nfo, Jellyfin, Plex) : un film dont on ne connaît que l'année n'a pas d'anniversaire.</MudText>
+            </div>
+        </MudItem>
+
         @* ------------------------------------------------ interlude *@
         <MudItem xs="12" lg="6">
             <div class="n-card" style="height: 100%">
@@ -369,6 +431,11 @@
             (DateOnly? weatherMade, string weatherResult) = (s.Weather.LastMade, s.Weather.LastResult);
             s.Weather = current.Weather;
             (s.Weather.LastMade, s.Weather.LastResult) = (weatherMade, weatherResult);
+            (s.Sagas.Promo, s.Sagas.At, s.Sagas.ChannelName, s.Sagas.PromoMusic, s.Sagas.PromoBroadcast) =
+                (current.Sagas.Promo, current.Sagas.At, current.Sagas.ChannelName, current.Sagas.PromoMusic, current.Sagas.PromoBroadcast);
+            AnniversarySettings anniversary = current.Sagas.Anniversary;
+            (s.Sagas.Anniversary.Enabled, s.Sagas.Anniversary.ChannelId, s.Sagas.Anniversary.At, s.Sagas.Anniversary.MinYears, s.Sagas.Anniversary.ChannelName) =
+                (anniversary.Enabled, anniversary.ChannelId, anniversary.At, anniversary.MinYears, anniversary.ChannelName);
             (DateTimeOffset? essentialMade, string essentialResult) = (s.Essential.LastMadeAt, s.Essential.LastResult);
             s.Essential = current.Essential;
             (s.Essential.LastMadeAt, s.Essential.LastResult) = (essentialMade, essentialResult);
@@ -540,6 +607,25 @@
         _weatherJob = await Automation.MakeWeather(CancellationToken.None);
         _s = NounoursSettings.Load();
         _ = Poll(() => _weatherJob);
+    });
+
+    private List<(int MovieId, string Title, DateTime Released, int Years)> _anniversaries;
+
+    private Task MakeSagaPromo() => Busy(async () =>
+    {
+        Save();
+        Snackbar.Add(await SagaEvents.MakePromo(CancellationToken.None), Severity.Info);
+        _s = NounoursSettings.Load();
+    });
+
+    private Task PreviewAnniversaries() => Busy(async () =>
+        _anniversaries = await SagaEvents.AnniversaryCandidates(_s.Sagas.Anniversary.MinYears, DateTime.Today, CancellationToken.None));
+
+    private Task MakeAnniversary() => Busy(async () =>
+    {
+        Save();
+        Snackbar.Add(await SagaEvents.MakeAnniversary(CancellationToken.None), Severity.Info);
+        _s = NounoursSettings.Load();
     });
 
     private AtelierJob _essentialJob;

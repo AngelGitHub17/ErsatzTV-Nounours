@@ -484,6 +484,7 @@ public sealed class AutomationService(
             ("semaine", "Cette semaine", settings.Weekly.Broadcast, Path.Combine(folder(ImportRole.BandesAnnonces), "atelier-cette-semaine.mp4")),
             ("cesoir", "Ce soir", settings.Tonight.Broadcast, Path.Combine(folder(ImportRole.BandesAnnonces), AtelierService.TonightFile)),
             ("essentiel", "L'essentiel du jour", settings.Essential.Broadcast, Path.Combine(folder(ImportRole.BandesAnnonces), AtelierService.EssentialFile)),
+            ("saga", "Prochaine saga", settings.Sagas.PromoBroadcast, Path.Combine(folder(ImportRole.BandesAnnonces), AtelierService.FilePrefix + "prochaine-saga.mp4")),
             ("interlude", "Interlude", settings.InterludeBroadcast, Path.Combine(folder(ImportRole.Habillage), AtelierService.InterludeFile))
         };
 

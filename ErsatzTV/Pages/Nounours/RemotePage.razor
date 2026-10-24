@@ -37,9 +37,11 @@
         <div class="n-remote-block">
             <label>FLASH (bandeau rouge)</label>
             <MudTextField @bind-Value="_flash" Immediate="true" Lines="2" Variant="Variant.Outlined" Placeholder="Coupure de courant dans le centre-ville"/>
-            <MudButton Variant="Variant.Filled" Style="background: #8C0A11; color: #fff" FullWidth="true" Size="Size.Large" Class="mt-2" Disabled="@(_busy || string.IsNullOrWhiteSpace(_flash))" OnClick="@(() => Send(s => s.Flash = _flash.Trim()))">
+            <MudButton Variant="Variant.Filled" Style="background: #8C0A11; color: #fff" FullWidth="true" Size="Size.Large" Class="mt-2" Disabled="@(_busy || string.IsNullOrWhiteSpace(_flash))" OnClick="@(() => Send(s => { s.Flash = _flash.Trim(); s.FlashJingle = _jingle; }))">
                 FLASH À L'ANTENNE
             </MudButton>
+            <MudSwitch T="bool" @bind-Value="_jingle" Color="Color.Error" Label="@(_s.Info.FlashChannelIds.Count == 0 ? "Jingle « Flash spécial » (choisissez ses chaînes sur la page Info)" : "Avec le jingle « Flash spécial »")"
+                       Disabled="@(_s.Info.FlashChannelIds.Count == 0)" Class="mt-1"/>
             @if (!string.IsNullOrWhiteSpace(_s.Info.Flash))
             {
                 <div class="n-remote-now">À l'antenne : @_s.Info.Flash</div>
@@ -122,11 +124,13 @@
     private string _flash = string.Empty;
     private string _topic = string.Empty;
     private string _headline = string.Empty;
+    private bool _jingle;
 
     protected override void OnInitialized()
     {
         _s = NounoursSettings.Load();
         _topic = _s.Info.Topic;
+        _jingle = _s.Info.FlashJingle;
     }
 
     private async Task Unlock()

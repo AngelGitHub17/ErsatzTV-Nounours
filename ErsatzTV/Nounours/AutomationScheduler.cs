@@ -132,6 +132,16 @@ public sealed class AutomationScheduler(
             }
         }
 
+        // sagas : cartons des soirées spéciales, bande-annonce, anniversaire de sortie
+        try
+        {
+            await scope.ServiceProvider.GetRequiredService<SagaEventService>().Tick(cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Sagas : erreur");
+        }
+
         PublishSettings publish = settings.Publish;
         if (publish.Enabled && !string.IsNullOrWhiteSpace(publish.Url) &&
             (publish.LastSent is null || DateTimeOffset.Now - publish.LastSent >= TimeSpan.FromMinutes(Math.Max(5, publish.IntervalMinutes))))

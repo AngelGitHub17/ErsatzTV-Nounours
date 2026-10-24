@@ -19,6 +19,7 @@ public sealed class NounoursSettings
     public WeeklySettings Weekly { get; set; } = new();
     public WeatherSettings Weather { get; set; } = new();
     public EssentialSettings Essential { get; set; } = new();
+    public SagaSettings Sagas { get; set; } = new();
     public List<Appointment> Appointments { get; set; } = [];
 
     /// <summary>Diffusion automatique de l'interlude à heures fixes (en plus du remplissage de secours).</summary>
@@ -173,6 +174,64 @@ public sealed class WeatherSettings
     public double Seconds { get; set; } = 12;
     public DateOnly? LastMade { get; set; }
     public string LastResult { get; set; }
+}
+
+/// <summary>Les sagas à l'antenne : soirées spéciales, bande-annonce du prochain rendez-vous, anniversaires de sortie.</summary>
+public sealed class SagaSettings
+{
+    /// <summary>Soirées spéciales : carton d'ouverture avant le film, « la suite… » après.</summary>
+    public List<SagaEvening> Evenings { get; set; } = [];
+
+    /// <summary>Heure de fabrication des cartons du jour.</summary>
+    public string At { get; set; } = "05:30";
+
+    public DateOnly? LastMade { get; set; }
+    public string LastResult { get; set; }
+
+    /// <summary>Bande-annonce du prochain film de saga (« Ce vendredi 20h45 : … »).</summary>
+    public bool Promo { get; set; }
+
+    public BroadcastSettings PromoBroadcast { get; set; } = new() { Times = "13:55, 19:55" };
+    public string PromoMusic { get; set; } = string.Empty;
+    public string ChannelName { get; set; } = string.Empty;
+    public string PromoResult { get; set; }
+
+    public AnniversarySettings Anniversary { get; set; } = new();
+}
+
+public sealed class SagaEvening
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..8];
+    public bool Enabled { get; set; } = true;
+    public int SmartCollectionId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public int ChannelId { get; set; }
+    public List<DayOfWeek> Days { get; set; } = [];
+    public string At { get; set; } = "20:45";
+    public string LastResult { get; set; }
+}
+
+/// <summary>« Il y a 30 ans sortait… » : le jour anniversaire de la sortie d'un film, un carton puis le film.</summary>
+public sealed class AnniversarySettings
+{
+    public bool Enabled { get; set; }
+    public int ChannelId { get; set; }
+
+    /// <summary>Heure de passage (carton puis film, à la place de la grille).</summary>
+    public string At { get; set; } = "20:45";
+
+    /// <summary>Pas d'anniversaire en dessous de ce nombre d'années.</summary>
+    public int MinYears { get; set; } = 10;
+
+    public string ChannelName { get; set; } = string.Empty;
+    public DateOnly? LastMade { get; set; }
+    public string LastResult { get; set; }
+
+    // en attente : le carton est fabriqué, le passage est posé quand il est dans la médiathèque
+    public DateOnly? PendingDay { get; set; }
+    public int PendingMovieId { get; set; }
+    public string PendingTitle { get; set; }
+    public bool Scheduled { get; set; }
 }
 
 /// <summary>« L'essentiel du jour » : les titres de l'info en quadrillage, lus par la voix off, refait aux heures choisies.</summary>

@@ -731,6 +731,7 @@ public class Startup
         services.AddScoped<ErsatzTV.Nounours.AutoProgrammingService>();
         services.AddScoped<ErsatzTV.Nounours.MovieCollectionService>();
         services.AddScoped<ErsatzTV.Nounours.RecurringSlotService>();
+        services.AddScoped<ErsatzTV.Nounours.SagaEventService>();
         services.AddScoped<ErsatzTV.Nounours.UiPreferences>();
 
         ErsatzTV.Nounours.Plugins.PluginRegistry registry = ErsatzTV.Nounours.Plugins.PluginRegistry.Load(

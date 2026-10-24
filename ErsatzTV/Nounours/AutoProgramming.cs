@@ -68,7 +68,7 @@ public sealed class AutoPlan
 }
 
 /// <summary>Ce que la médiathèque contient pour une famille : la requête retenue (ou son repli) et le nombre de programmes.</summary>
-public sealed record CategoryInfo(AutoCategory Category, string Name, string Query, int Count, bool Fallback);
+public sealed record CategoryInfo(AutoCategory Category, string Name, string Query, int Count, bool Fallback, double AvgMinutes = 0);
 
 public sealed record AutoStyle(string Key, string Name, string Description);
 
@@ -160,12 +160,128 @@ public sealed class AutoProgrammingService(
                 int count = await Count(queries[i]);
                 if (count > 0 || i == queries.Length - 1)
                 {
-                    chosen = new CategoryInfo(category, CategoryName(category), queries[i], count, i > 0);
+                    chosen = new CategoryInfo(category, CategoryName(category), queries[i], count, i > 0, count > 0 ? await AverageMinutes(queries[i]) : 0);
                     break;
                 }
             }
 
             result[category] = chosen;
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    ///     « Remplir les trous » : ce qui passe quand la grille d'une chaîne n'a rien de prévu (remplissage de secours),
+    ///     pris dans une collection intelligente.
+    /// </summary>
+    public async Task<string> FillGaps(int channelId, int smartCollectionId, CancellationToken cancellationToken)
+    {
+        await using TvContext db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        SmartCollection collection = await db.SmartCollections.FirstOrDefaultAsync(c => c.Id == smartCollectionId, cancellationToken);
+        ErsatzTV.Core.Domain.Channel channel = await db.Channels.FirstOrDefaultAsync(c => c.Id == channelId, cancellationToken);
+        if (collection is null || channel is null)
+        {
+            return "Chaîne ou collection introuvable.";
+        }
+
+        string name = $"Combler les trous · {collection.Name}";
+        FillerPreset preset = await db.FillerPresets.FirstOrDefaultAsync(p => p.Name == name, cancellationToken);
+        if (preset is null)
+        {
+            preset = new FillerPreset { Name = name };
+            await db.FillerPresets.AddAsync(preset, cancellationToken);
+        }
+
+        preset.FillerKind = FillerKind.Fallback;
+        preset.FillerMode = FillerMode.None;
+        preset.CollectionType = CollectionType.SmartCollection;
+        preset.SmartCollectionId = smartCollectionId;
+        preset.CollectionId = null;
+        preset.MultiCollectionId = null;
+        preset.MediaItemId = null;
+        preset.PlaylistId = null;
+        await db.SaveChangesAsync(cancellationToken);
+        channel.FallbackFillerId = preset.Id;
+        await db.SaveChangesAsync(cancellationToken);
+        return $"Les trous de « {channel.Name} » sont comblés par « {collection.Name} ».";
+    }
+
+    /// <summary>Durée moyenne d'un programme de la famille (pour estimer tous les combien il revient).</summary>
+    private async Task<double> AverageMinutes(string query)
+    {
+        try
+        {
+            SearchResultAllItemsViewModel items = await mediator.Send(new QuerySearchIndexAllItems(query));
+            await using TvContext db = await dbContextFactory.CreateDbContextAsync();
+            var durations = new List<TimeSpan>();
+            List<int> movies = items.MovieIds.Take(2000).ToList();
+            List<int> episodes = items.EpisodeIds.Take(2000).ToList();
+            List<int> others = items.OtherVideoIds.Take(2000).ToList();
+            List<int> clips = items.MusicVideoIds.Take(2000).ToList();
+            durations.AddRange(await db.Movies.Where(m => movies.Contains(m.Id)).Select(m => m.MediaVersions.Select(v => v.Duration).FirstOrDefault()).ToListAsync());
+            durations.AddRange(await db.Episodes.Where(m => episodes.Contains(m.Id)).Select(m => m.MediaVersions.Select(v => v.Duration).FirstOrDefault()).ToListAsync());
+            durations.AddRange(await db.OtherVideos.Where(m => others.Contains(m.Id)).Select(m => m.MediaVersions.Select(v => v.Duration).FirstOrDefault()).ToListAsync());
+            durations.AddRange(await db.MusicVideos.Where(m => clips.Contains(m.Id)).Select(m => m.MediaVersions.Select(v => v.Duration).FirstOrDefault()).ToListAsync());
+            var valid = durations.Where(d => d > TimeSpan.Zero).ToList();
+            // les directs n'ont pas de durée : 30 min (taille des blocs)
+            return valid.Count == 0 ? 30 : valid.Average(d => d.TotalMinutes);
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Programmation auto : durée moyenne de {Query} impossible", query);
+            return 0;
+        }
+    }
+
+    /// <summary>
+    ///     Pour chaque famille : combien de programmes la grille consomme par semaine, et donc tous les combien de jours
+    ///     un même programme revient (plus c'est court, plus ça se voit).
+    /// </summary>
+    public static Dictionary<AutoCategory, double> RepeatDays(AutoPlan plan, Dictionary<AutoCategory, CategoryInfo> library)
+    {
+        var minutes = new Dictionary<AutoCategory, double>();
+        void Add(List<AutoBlock> blocks, int daysPerWeek)
+        {
+            var ordered = blocks.OrderBy(b => (b.Start - TimeSpan.FromHours(5)).Ticks < 0 ? b.Start.Add(TimeSpan.FromHours(19)) : b.Start - TimeSpan.FromHours(5)).ToList();
+            for (var i = 0; i < ordered.Count; i++)
+            {
+                AutoBlock block = ordered[i];
+                TimeSpan start = block.Start;
+                TimeSpan end = i + 1 < ordered.Count ? ordered[i + 1].Start : ordered[0].Start;
+                double span = (end - start).TotalMinutes;
+                if (span <= 0)
+                {
+                    span += 24 * 60;
+                }
+
+                double avg = Math.Max(1, library[block.Category].AvgMinutes);
+                double perDay = block.One ? avg : span;
+                minutes[block.Category] = minutes.GetValueOrDefault(block.Category) + perDay * daysPerWeek;
+            }
+        }
+
+        if (plan.WeekendDifferent && plan.Weekend.Count > 0)
+        {
+            Add(plan.Week, 5);
+            Add(plan.Weekend, 2);
+        }
+        else
+        {
+            Add(plan.Week, 7);
+        }
+
+        var result = new Dictionary<AutoCategory, double>();
+        foreach ((AutoCategory category, double perWeek) in minutes)
+        {
+            CategoryInfo info = library[category];
+            if (info.Count <= 0 || info.AvgMinutes <= 0 || category is AutoCategory.Info)
+            {
+                continue;
+            }
+
+            double programmesPerWeek = perWeek / info.AvgMinutes;
+            result[category] = programmesPerWeek <= 0 ? double.PositiveInfinity : 7 * info.Count / programmesPerWeek;
         }
 
         return result;

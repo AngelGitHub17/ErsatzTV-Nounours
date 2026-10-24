@@ -6,6 +6,7 @@
 @using ErsatzTV.Nounours
 @inject MovieCollectionService Collections
 @inject RecurringSlotService Recurring
+@inject SagaEventService SagaEvents
 @inject IMediator Mediator
 @inject ISnackbar Snackbar
 
@@ -85,6 +86,7 @@
                     </MudSelect>
                     <MudTextField @bind-Value="_slot.Label" Label="Nom dans le guide" Placeholder="La saga Harry Potter" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex: 1; min-width: 200px"/>
                 </div>
+                <MudSwitch T="bool" @bind-Value="_slot.Special" Color="Color.Primary" Label="Soirée spéciale : carton d'ouverture avec le film du soir, et « La suite… » à la fin" Class="mt-1"/>
                 <MudSwitch T="bool" @bind-Value="_period" Color="Color.Primary" Label="Seulement pendant une période (ex. les vendredis de décembre)" Class="mt-1"/>
                 @if (_period)
                 {
@@ -104,6 +106,19 @@
                 @if (_steps.Count > 0)
                 {
                     <MudButton Href="planning" Variant="Variant.Outlined" Size="Size.Small" Class="mt-2" StartIcon="@Icons.Material.Filled.CalendarMonth">Voir le planning</MudButton>
+                }
+                @if (_evenings.Count > 0)
+                {
+                    <div class="n-card-title mt-4">Soirées spéciales</div>
+                    @foreach (SagaEvening evening in _evenings)
+                    {
+                        <div class="n-stat-row">
+                            <MudSwitch T="bool" Value="@evening.Enabled" ValueChanged="@(v => ToggleEvening(evening, v))" Color="Color.Primary" Size="Size.Small"/>
+                            <span class="n-stat-name"><b>@evening.Name</b> · @RecurringSlotService.DaysLabel(evening.Days) à @evening.At<br/><span class="n-muted" style="font-size: .8rem">@evening.LastResult</span></span>
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="@(() => RemoveEvening(evening))"/>
+                        </div>
+                    }
+                    <MudButton Size="Size.Small" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Movie" OnClick="@MakeCards" Disabled="@_busy">Refaire les cartons maintenant</MudButton>
                 }
                 <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Le rendez-vous remplace ce qui commençait à cette heure-là ces jours-là (ex. le film du soir), avec les mêmes jingles et pubs. Les autres jours ne changent pas. Une saga passe dans l'ordre de sortie et reprend où elle s'était arrêtée la fois suivante.</MudText>
             </div>
@@ -159,6 +174,23 @@
                                         <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => Preview(saga))">Voir les films trouvés</MudButton>
                                     </MudExpansionPanel>
                                 </MudExpansionPanels>
+                                @if (saga.CollectionId is not null && _status.TryGetValue(saga.CollectionId.Value, out SagaStatus st))
+                                {
+                                    <div class="n-saga-status">
+                                        @if (st.NextStart is { } next)
+                                        {
+                                            <div>▶ <b>@SagaEventService.When(next).ToLowerInvariant()</b> · @st.NextTitle (@st.NextIndex/@st.Count) · @st.NextChannel</div>
+                                        }
+                                        else
+                                        {
+                                            <div class="n-muted">Pas programmée dans les 2 prochains jours</div>
+                                        }
+                                        @if (st.LastStart is { } last)
+                                        {
+                                            <div class="n-muted">Dernier passage : @last.ToString("ddd d/MM HH:mm", Fr) · @st.LastTitle</div>
+                                        }
+                                    </div>
+                                }
                                 <div class="d-flex align-center gap-2 mt-1">
                                     <span class="n-muted" style="font-size: .8rem; flex: 1">@saga.Films.Count film(s) · @(saga.CollectionId is null ? "à créer" : "✓ créée")</span>
                                     <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Event" OnClick="@(() => PlanSaga(saga))" Disabled="@_busy">Programmer</MudButton>
@@ -184,6 +216,39 @@
     private List<ChannelViewModel> _channels = [];
     private RecurringSlot _slot = new();
     private bool _period;
+    private List<SagaEvening> _evenings = [];
+    private Dictionary<int, SagaStatus> _status = [];
+
+    private async Task LoadStatus()
+    {
+        _evenings = NounoursSettings.Load().Sagas.Evenings;
+        var status = new Dictionary<int, SagaStatus>();
+        foreach (Saga saga in _sagas.Where(s => s.CollectionId is not null))
+        {
+            status[saga.CollectionId!.Value] = await SagaEvents.Status(saga.CollectionId!.Value, saga.Query, CancellationToken.None);
+        }
+
+        _status = status;
+    }
+
+    private void ToggleEvening(SagaEvening evening, bool enabled)
+    {
+        evening.Enabled = enabled;
+        NounoursSettings.Update(s => s.Sagas.Evenings.Where(e => e.Id == evening.Id).ToList().ForEach(e => e.Enabled = enabled));
+    }
+
+    private void RemoveEvening(SagaEvening evening)
+    {
+        NounoursSettings.Update(s => s.Sagas.Evenings.RemoveAll(e => e.Id == evening.Id));
+        _evenings = NounoursSettings.Load().Sagas.Evenings;
+        Snackbar.Add("Soirée spéciale retirée (les cartons déjà branchés restent jusqu'à ce que vous changiez le rendez-vous).", Severity.Info);
+    }
+
+    private Task MakeCards() => Busy(async () =>
+    {
+        Snackbar.Add(await SagaEvents.MakeCards(CancellationToken.None), Severity.Info);
+        _evenings = NounoursSettings.Load().Sagas.Evenings;
+    });
     private DateTime? _from = new DateTime(DateTime.Today.Year, 12, 1);
     private DateTime? _until = new DateTime(DateTime.Today.Year, 12, 31);
     private readonly List<string> _steps = [];
@@ -200,6 +265,7 @@
         await LoadSmart();
         _ages = await Collections.Ages(CancellationToken.None);
         _sagas = await Collections.DetectSagas(CancellationToken.None);
+        await LoadStatus();
     }
 
     private async Task LoadSmart()
@@ -257,7 +323,11 @@
         await LoadSmart();
     });
 
-    private Task Detect() => Busy(async () => _sagas = await Collections.DetectSagas(CancellationToken.None));
+    private Task Detect() => Busy(async () =>
+    {
+        _sagas = await Collections.DetectSagas(CancellationToken.None);
+        await LoadStatus();
+    });
 
     private Task Preview(Saga saga) => Busy(async () => saga.Films = await Collections.Films(saga.Query, CancellationToken.None));
 
@@ -341,5 +411,6 @@
                 Snackbar.Add("Rendez-vous ajouté : la grille se reconstruit.", Severity.Success);
             },
             error => Snackbar.Add(error.ToString(), Severity.Error));
+        _evenings = NounoursSettings.Load().Sagas.Evenings;
     });
 }

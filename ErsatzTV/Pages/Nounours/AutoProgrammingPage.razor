@@ -1,8 +1,12 @@
 @page "/programmation-auto"
 @using System.Globalization
 @using ErsatzTV.Application.Channels
+@using ErsatzTV.Application.MediaCollections
+@using ErsatzTV.Application.Nounours
 @using ErsatzTV.Nounours
 @inject AutoProgrammingService Auto
+@inject IGuideService Guide
+@inject IDbContextFactory<TvContext> DbFactory
 @inject IMediator Mediator
 @inject ISnackbar Snackbar
 
@@ -93,6 +97,57 @@
                         </div>
                     }
                     <MudText Typo="Typo.caption" Class="n-muted d-block mt-1">Reconnu grâce aux genres et classifications de vos films et séries (Animation, Famille, Documentaire…).</MudText>
+                }
+            </div>
+
+            @if (_plan is not null && _library is not null)
+            {
+                <div class="n-card">
+                    <div class="n-card-title">Rotation : tous les combien ça revient</div>
+                    @foreach ((AutoCategory category, double days) in AutoProgrammingService.RepeatDays(_plan, _library).OrderBy(r => r.Value))
+                    {
+                        <div class="d-flex align-center gap-2" style="font-size: .9rem; padding: 2px 0">
+                            <span class="n-auto-dot" style="background: @Tint(category)"></span>
+                            <span style="flex: 1">@AutoProgrammingService.CategoryName(category)</span>
+                            <b style="color: @(days < 3 ? "#FF3200" : days < 7 ? "#FFA800" : "inherit")">@RepeatText(days)</b>
+                        </div>
+                    }
+                    <MudText Typo="Typo.caption" Class="n-muted d-block mt-1">Estimation d'après la grille et la durée moyenne des programmes : orange = le même programme revient dans la semaine, rouge = presque tous les jours. Pour espacer : plus de programmes dans la famille, ou moins d'heures dans la grille.</MudText>
+                </div>
+            }
+
+            <div class="n-card">
+                <div class="n-card-title">Trous dans les grilles (48 h)</div>
+                @if (_gaps is null)
+                {
+                    <MudProgressLinear Indeterminate="true"/>
+                }
+                else
+                {
+                    @foreach ((ChannelViewModel channel, TimeSpan total, int count, string fallback) in _gaps)
+                    {
+                        <div class="n-stat-row">
+                            <span class="n-stat-name"><b>@channel.Number · @channel.Name</b><br/>
+                                <span class="n-muted" style="font-size: .8rem">
+                                    @(count == 0 ? "aucun trou" : $"{count} trou(s), {(int)total.TotalHours} h {total.Minutes:00} sans rien de prévu")@(string.IsNullOrEmpty(fallback) ? "" : $" · comblés par « {fallback} »")
+                                </span>
+                            </span>
+                            @if (count > 0)
+                            {
+                                <MudButton Size="Size.Small" Variant="Variant.Outlined" Disabled="@(_busy || _fillWith == 0)" OnClick="@(() => Fill(channel.Id))">Combler</MudButton>
+                            }
+                        </div>
+                    }
+                    @if (_gaps.Any(g => g.Count > 0))
+                    {
+                        <MudSelect T="int" @bind-Value="_fillWith" Label="Combler avec" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2">
+                            @foreach (SmartCollectionViewModel c in _smart)
+                            {
+                                <MudSelectItem Value="@c.Id">@c.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                    <MudText Typo="Typo.caption" Class="n-muted d-block mt-1">Un trou = un moment où la grille n'a rien (écran noir). « Combler » fait passer des programmes de la collection choisie pendant ces moments-là (remplissage de secours).</MudText>
                 }
             </div>
         </div>
@@ -187,6 +242,46 @@
     private bool _done;
     private readonly List<string> _steps = [];
 
+    private List<(ChannelViewModel Channel, TimeSpan Total, int Count, string Fallback)> _gaps;
+    private List<SmartCollectionViewModel> _smart = [];
+    private int _fillWith;
+
+    private static string RepeatText(double days) =>
+        double.IsInfinity(days) || days > 60 ? "rarement" : days < 1 ? $"toutes les {Math.Max(1, days * 24):0} h" : $"tous les {days:0.#} j";
+
+    private async Task LoadGaps()
+    {
+        DateTimeOffset now = DateTimeOffset.Now;
+        List<GuideEntry> entries = await Guide.GetEntries(now, now.AddHours(48), [], includeFiller: true, CancellationToken.None);
+        await using TvContext db = await DbFactory.CreateDbContextAsync();
+        Dictionary<int, string> fallbacks = (await db.Channels.Where(c => c.FallbackFillerId != null)
+                .Select(c => new { c.Id, Name = c.FallbackFiller.Name })
+                .ToListAsync())
+            .ToDictionary(c => c.Id, c => c.Name ?? string.Empty);
+        _gaps = _channels.Select(c =>
+        {
+            var gaps = entries.Where(e => e.ChannelId == c.Id && e.Kind == GuideEntryKind.Gap).ToList();
+            TimeSpan total = gaps.Aggregate(TimeSpan.Zero, (t, g) => t + (g.Finish - g.Start));
+            return (c, total, gaps.Count, fallbacks.GetValueOrDefault(c.Id, string.Empty).Replace("Combler les trous · ", string.Empty, StringComparison.Ordinal));
+        }).ToList();
+        _smart = (await Mediator.Send(new GetAllSmartCollections())).OrderBy(c => c.Name).ToList();
+        _fillWith = _smart.FirstOrDefault(c => c.Name.StartsWith("Auto · Nuit", StringComparison.Ordinal))?.Id ?? _smart.FirstOrDefault()?.Id ?? 0;
+    }
+
+    private async Task Fill(int channelId)
+    {
+        _busy = true;
+        try
+        {
+            Snackbar.Add(await Auto.FillGaps(channelId, _fillWith, CancellationToken.None), Severity.Success);
+            await LoadGaps();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
     private List<AutoBlock> Blocks => _weekend && _plan.WeekendDifferent ? _plan.Weekend : _plan.Week;
 
     protected override async Task OnInitializedAsync()
@@ -197,6 +292,7 @@
         _channelId = _channels.FirstOrDefault()?.Id ?? 0;
         _library = await Auto.Analyze(CancellationToken.None);
         Propose("generaliste");
+        await LoadGaps();
     }
 
     private void Propose(string style)

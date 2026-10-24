@@ -200,6 +200,12 @@ Les insertions s'affichent dans la liste et s'annulent d'un clic. La grille n'es
   l'heure locale (avant, lundi 0h30 en France comptait encore pour dimanche, et **tout le lundi** passait la grille du week-end) ;
   et le jour du changement d'heure, « minuit » n'est plus calculé à 23h (la journée suivante démarrait la veille).
 
+### Rotation et trous (programmation automatique)
+- **Rotation** : pour chaque famille de la grille, tous les combien un même programme revient (d'après la grille et la durée
+  moyenne des programmes) — orange s'il revient dans la semaine, rouge s'il revient presque tous les jours.
+- **Trous dans les grilles (48 h)** : les moments où une chaîne n'a rien de prévu, et un bouton « Combler » qui fait passer une
+  collection au choix pendant ces moments-là (remplissage de secours).
+
 ### Sagas et collections de films (`/collections-films`)
 - **Par époque** : 4 collections intelligentes d'après la date de sortie — nouveautés (moins de 5 ans), récents (moins de 10 ans),
   un peu anciens (10 à 20 ans), très anciens (plus de 20 ans). Elles avancent avec le temps et servent aussi dans la
@@ -213,12 +219,18 @@ Les insertions s'affichent dans la liste et s'annulent d'un clic. La grille n'es
   suivant », et en option **une période** (« les vendredis de décembre »). Le rendez-vous remplace ce qui commençait à cette heure
   ces jours-là (avec les mêmes jingles et pubs) ; les autres jours ne changent pas (planning copié « … · le vendredi » et semaine
   type mise à jour, ou règle de période prioritaire).
+- **Où en est la saga** : sur chaque saga, le prochain passage (« vendredi 20h45 · Harry Potter et la Chambre des secrets
+  (2/7) · Auto Test ») et le dernier (journal de diffusion).
+- **Soirée spéciale** (case à cocher en programmant) : un carton « SOIRÉE SPÉCIALE · HARRY POTTER · CE SOIR 20H45 · le film ·
+  2/7 » passe juste avant le film, et un carton « LA SUITE · le film suivant · VENDREDI PROCHAIN 20H45 » juste après. Refaits
+  chaque matin (même fichier), branchés tout seuls sur les rendez-vous de la saga.
 - Corrigé au passage : la mise à jour d'un film perdait le type de ses étiquettes (pays, saga) ; l'heure des rendez-vous de la
   programmation auto ne se modifiait pas (champ masqué).
 
 ### Journal de diffusion (`/journal`)
 Chaque minute, tout ce qui a commencé à l'antenne (programmes, intercalaires, régie, directs) est noté dans `journal/AAAA-MM-JJ.jsonl`.
 Page par jour, filtre par chaîne, intercalaires masquables, export **CSV** (ouvre dans Excel).
+Le journal note désormais le vrai titre (« Scream 2 ») et plus le nom du rendez-vous (« Le film du soir »).
 **Statistiques de la semaine** : temps d'antenne par genre (films, épisodes, direct, intercalaires…), par chaîne, les programmes les
 plus diffusés (épisodes regroupés par série) et ce qui repasse le plus souvent.
 
@@ -247,7 +259,8 @@ séries, pubs et chaînes.
   schedule » de la Commission) renomme les blocs EBS du guide sujet par sujet (« EBS · en direct · Point de presse de midi… »).
   Le week-end, EBS publie souvent un programme vide : le guide affiche « Images de l'actualité européenne ».
 - **Télécommande sur téléphone** (`/telecommande`) : avec un code (page Info), lancer un flash, changer le sujet « EN DIRECT »,
-  ajouter un titre, **prendre l'antenne avec OBS / la rendre et changer de caméra** (scènes OBS), depuis le téléphone. 5 codes faux de suite = 5 minutes de pause.
+  ajouter un titre, **prendre l'antenne avec OBS / la rendre et changer de caméra** (scènes OBS), avec ou sans le jingle « Flash spécial »,
+  depuis le téléphone. 5 codes faux de suite = 5 minutes de pause.
 - **Jingle « Flash spécial »** : fabriqué en un clic, il passe tout seul sur les chaînes choisies dès qu'un nouveau flash est mis
   à l'antenne (une fois par flash).
 - **Caméras / scènes OBS** : télécommande d'OBS (obs-websocket v5, Outils › Paramètres du serveur WebSocket, mot de passe) ; les
@@ -270,6 +283,11 @@ Ce qu'ErsatzTV fait tout seul, vérifié chaque minute :
 - **« L'essentiel du jour »** : aux heures choisies (« 12:30, 19:00 »), les titres du moment (les vôtres + vos sites), un par écran
   dans le quadrillage, le nom du site en étiquette, **lus par la voix off** (voix de Windows ou serveur de synthèse) : chaque titre
   reste à l'écran le temps d'être lu. Toujours le même fichier dans « Bandes-annonces », diffusion automatique possible.
+- **Bande-annonce du prochain film de saga** : chaque matin, la saga qui passe le plus tôt dans la semaine, trois extraits du
+  film avec « CE VENDREDI 20H45 · 2/7 » (fichier « prochaine-saga » dans « Bandes-annonces », diffusion automatique possible).
+- **« Il y a 30 ans sortait… »** : le jour anniversaire de la sortie d'un de vos films (30 ans de préférence, puis 20, 25…), un
+  carton puis le film à l'heure choisie, à la place de la grille. Il faut la vraie date de sortie (`premiered` des .nfo, Jellyfin,
+  Plex).
 - **Interlude quadrillé** : une boucle de carrés au rythme d'une musique, rangée dans « Habillage vidéo » ; un clic en fait le
   « remplissage de secours » des chaînes choisies (ce qui passe quand rien n'est prévu, au lieu d'un écran noir).
 - **Diffusion automatique** (dans chaque carte : Ce soir, Cette semaine, Météo, L'essentiel, Interlude) : heures (« 07:00, 12:55, 19:55 »),
