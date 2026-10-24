@@ -26,7 +26,16 @@ public enum AutoCategory
     Documentaires,
     Clips,
     Info,
-    Nuit
+    Nuit,
+
+    /// <summary>Films de moins de 10 ans.</summary>
+    FilmRecent,
+
+    /// <summary>Films de 10 à 20 ans.</summary>
+    FilmAncien,
+
+    /// <summary>Films de plus de 20 ans.</summary>
+    FilmClassique
 }
 
 /// <summary>Un bloc de la grille : à partir de telle heure, telle famille de programmes (jusqu'au bloc suivant, ou un seul film).</summary>
@@ -102,6 +111,9 @@ public sealed class AutoProgrammingService(
             AutoCategory.Documentaires => "Documentaires et magazines",
             AutoCategory.Clips => "Clips",
             AutoCategory.Info => "Info en direct",
+            AutoCategory.FilmRecent => "Films récents (moins de 10 ans)",
+            AutoCategory.FilmAncien => "Films de 10 à 20 ans",
+            AutoCategory.FilmClassique => "Grands classiques (plus de 20 ans)",
             _ => "Nuit (rediffusions)"
         };
 
@@ -133,7 +145,10 @@ public sealed class AutoProgrammingService(
             (AutoCategory.Documentaires, [$"({docs} OR (type:other_video{notHabillage}))", "type:episode"]),
             (AutoCategory.Clips, ["type:music_video", "type:episode"]),
             (AutoCategory.Info, [direct is null ? "type:remote_stream AND NOT title:obs" : $"(type:remote_stream AND library_id:{direct} AND NOT title:obs)", $"({docs} OR (type:other_video{notHabillage}))", "type:episode"]),
-            (AutoCategory.Nuit, ["(type:movie OR type:episode)", "type:episode"])
+            (AutoCategory.Nuit, ["(type:movie OR type:episode)", "type:episode"]),
+            (AutoCategory.FilmRecent, [MovieCollectionService.AgeQuery("recents"), "type:movie"]),
+            (AutoCategory.FilmAncien, [MovieCollectionService.AgeQuery("anciens"), "type:movie"]),
+            (AutoCategory.FilmClassique, [MovieCollectionService.AgeQuery("classiques"), "type:movie"])
         };
 
         var result = new Dictionary<AutoCategory, CategoryInfo>();
@@ -203,14 +218,14 @@ public sealed class AutoProgrammingService(
             case "cinema":
                 plan.Week =
                 [
-                    B(6, 0, AutoCategory.Film, label: "Cinéma du matin"), B(14, 0, AutoCategory.FilmFamille, true, "Séance de 14h"),
-                    B(16, 0, AutoCategory.Film, label: "Cinéma"), B(20, 45, AutoCategory.Film, true, "Le film du soir"),
+                    B(6, 0, AutoCategory.FilmClassique, label: "Les grands classiques"), B(14, 0, AutoCategory.FilmFamille, true, "Séance de 14h"),
+                    B(16, 0, AutoCategory.FilmAncien, label: "Cinéma"), B(20, 45, AutoCategory.FilmRecent, true, "Le film du soir"),
                     B(22, 45, AutoCategory.Film, label: "Seconde séance"), B(1, 0, AutoCategory.Nuit, label: "Nuit")
                 ];
                 plan.Weekend =
                 [
                     B(7, 0, AutoCategory.FilmFamille, label: "Films en famille"), B(14, 0, AutoCategory.FilmFamille, true, "Séance de 14h"),
-                    B(16, 0, AutoCategory.Film), B(20, 45, AutoCategory.Film, true, "Le grand film"), B(22, 45, AutoCategory.Film, label: "Seconde séance"),
+                    B(16, 0, AutoCategory.FilmClassique, true, "Le classique du week-end"), B(20, 45, AutoCategory.FilmRecent, true, "Le grand film"), B(22, 45, AutoCategory.Film, label: "Seconde séance"),
                     B(1, 0, AutoCategory.Nuit, label: "Nuit")
                 ];
                 break;
@@ -413,7 +428,7 @@ public sealed class AutoProgrammingService(
         return steps;
     }
 
-    private async Task<Either<BaseError, int>> EnsureCollection(string name, string query, CancellationToken cancellationToken)
+    public async Task<Either<BaseError, int>> EnsureCollection(string name, string query, CancellationToken cancellationToken)
     {
         await using TvContext db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         SmartCollection existing = await db.SmartCollections.AsNoTracking().FirstOrDefaultAsync(c => c.Name == name, cancellationToken);

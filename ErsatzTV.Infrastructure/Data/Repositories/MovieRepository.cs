@@ -154,8 +154,9 @@ public class MovieRepository : IMovieRepository
     {
         await using TvContext dbContext = await _dbContextFactory.CreateDbContextAsync();
         return await dbContext.Connection.ExecuteAsync(
-            "INSERT INTO Tag (Name, MovieMetadataId, ExternalCollectionId) VALUES (@Name, @MetadataId, @ExternalCollectionId)",
-            new { tag.Name, MetadataId = metadata.Id, tag.ExternalCollectionId }).Map(result => result > 0);
+            // Nounours : garder aussi le type (pays, saga des .nfo) lors d'une mise à jour
+            "INSERT INTO Tag (Name, MovieMetadataId, ExternalCollectionId, ExternalTypeId) VALUES (@Name, @MetadataId, @ExternalCollectionId, @ExternalTypeId)",
+            new { tag.Name, MetadataId = metadata.Id, tag.ExternalCollectionId, tag.ExternalTypeId }).Map(result => result > 0);
     }
 
     public async Task<bool> AddStudio(MovieMetadata metadata, Studio studio)

@@ -5,6 +5,7 @@
 @using System.Security.Cryptography
 @using System.Text
 @inject IInfoService Info
+@inject IRegieService Regie
 @inject ISnackbar Snackbar
 
 <PageTitle>Télécommande info</PageTitle>
@@ -60,6 +61,48 @@
             <MudTextField @bind-Value="_headline" Immediate="true" Variant="Variant.Outlined"/>
             <MudButton Variant="Variant.Outlined" FullWidth="true" Class="mt-2" Disabled="@(_busy || string.IsNullOrWhiteSpace(_headline))"
                        OnClick="@(() => Send(s => s.Headlines = _headline.Trim() + "\n" + (s.Headlines ?? string.Empty)))">Ajouter le titre</MudButton>
+        </div>
+
+        <div class="n-remote-block">
+            <label>DIRECT OBS</label>
+            @if (_channels.Count == 0)
+            {
+                <MudButton Variant="Variant.Outlined" FullWidth="true" Disabled="@_busy" OnClick="@LoadLive">Afficher les commandes du direct</MudButton>
+            }
+            else
+            {
+                <MudSelect T="int" @bind-Value="_playoutId" Label="Chaîne" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    @foreach (RegieChannel channel in _channels)
+                    {
+                        <MudSelectItem Value="@channel.PlayoutId">@channel.Number · @channel.Name@(channel.OnAir ? " · À L'ANTENNE" : "")</MudSelectItem>
+                    }
+                </MudSelect>
+                @if (_obs is null)
+                {
+                    <MudText Typo="Typo.caption" Class="n-muted d-block mt-1">Source « OBS (direct) » introuvable : enregistrez OBS sur la page Info (Sources en direct).</MudText>
+                }
+                else
+                {
+                    <div class="d-flex gap-2 mt-2">
+                        <MudButton Variant="Variant.Filled" Style="flex: 1; background: #FF3200; color: #fff" Size="Size.Large" Disabled="@(_busy || _playoutId == 0)" OnClick="@TakeObs">PRENDRE L'ANTENNE</MudButton>
+                        <MudButton Variant="Variant.Outlined" Size="Size.Large" Disabled="@(_busy || _playoutId == 0)" OnClick="@ReleaseAir">Rendre</MudButton>
+                    </div>
+                }
+                @if (_scenes is { Scenes.Count: > 0 })
+                {
+                    <div class="n-remote-scenes mt-2">
+                        @foreach (string scene in _scenes.Scenes)
+                        {
+                            <MudButton Variant="@(scene == _scenes.Current ? Variant.Filled : Variant.Outlined)" Color="@(scene == _scenes.Current ? Color.Primary : Color.Default)"
+                                       Disabled="@_busy" OnClick="@(() => SetScene(scene))">@scene</MudButton>
+                        }
+                    </div>
+                }
+                else if (!string.IsNullOrEmpty(_obsMessage))
+                {
+                    <MudText Typo="Typo.caption" Class="n-muted d-block mt-1">@_obsMessage</MudText>
+                }
+            }
         </div>
 
         <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => { _unlocked = false; _pin = string.Empty; })">Verrouiller</MudButton>
@@ -121,6 +164,71 @@
         _message = "Code incorrect.";
         _pin = string.Empty;
     }
+
+    private List<RegieChannel> _channels = [];
+    private int _playoutId;
+    private RegieSource _obs;
+    private ObsRemote.ObsScenes _scenes;
+    private string _obsMessage;
+
+    private async Task Guarded(Func<Task> work)
+    {
+        if (!_unlocked)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            await work();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private Task LoadLive() => Guarded(async () =>
+    {
+        _channels = await Regie.GetChannels(CancellationToken.None);
+        // la chaîne d'info d'abord (celle du flash), sinon la première
+        _playoutId = _channels.FirstOrDefault(c => _s.Info.FlashChannelIds.Contains(c.ChannelId) || c.Name.Contains("info", StringComparison.OrdinalIgnoreCase))?.PlayoutId
+                     ?? _channels.FirstOrDefault()?.PlayoutId ?? 0;
+        _obs = (await Regie.Search("OBS", CancellationToken.None)).FirstOrDefault(r => r.IsLive);
+        try
+        {
+            _scenes = await ObsRemote.GetScenes(_s.Obs, CancellationToken.None);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _obsMessage = $"Caméras indisponibles : {ex.Message}";
+        }
+    });
+
+    private Task TakeObs() => Guarded(async () =>
+    {
+        Either<BaseError, Unit> result = await Regie.TakeAir(_playoutId, _obs.MediaItemId, RegieMode.UntilRelease, 0, "Direct OBS", CancellationToken.None);
+        result.Match(_ => Snackbar.Add("Direct à l'antenne (les bandeaux restent par-dessus).", Severity.Success), e => Snackbar.Add(e.ToString(), Severity.Error));
+        _channels = await Regie.GetChannels(CancellationToken.None);
+    });
+
+    private Task ReleaseAir() => Guarded(async () =>
+    {
+        Either<BaseError, Unit> result = await Regie.Release(_playoutId, CancellationToken.None);
+        result.Match(_ => Snackbar.Add("Antenne rendue à la grille.", Severity.Success), e => Snackbar.Add(e.ToString(), Severity.Error));
+        _channels = await Regie.GetChannels(CancellationToken.None);
+    });
+
+    private Task SetScene(string scene) => Guarded(async () =>
+    {
+        await ObsRemote.SetScene(_s.Obs, scene, CancellationToken.None);
+        _scenes = await ObsRemote.GetScenes(_s.Obs, CancellationToken.None);
+    });
 
     private async Task Send(Action<InfoSettings> change)
     {

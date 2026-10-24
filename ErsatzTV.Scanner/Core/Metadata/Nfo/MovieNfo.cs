@@ -14,6 +14,9 @@ public class MovieNfo
     // public string? Tagline { get; set; }
     public List<string> Genres { get; } = [];
     public List<string> Tags { get; } = [];
+
+    /// <summary>Saga (&lt;set&gt;&lt;name&gt;…&lt;/name&gt;&lt;/set&gt; ou &lt;set&gt;…&lt;/set&gt;).</summary>
+    public string? Set { get; set; }
     public List<string> Studios { get; } = [];
     public List<ActorNfo> Actors { get; } = [];
     public List<string> Writers { get; } = [];

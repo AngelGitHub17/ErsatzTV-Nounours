@@ -1,0 +1,345 @@
+@page "/collections-films"
+@using System.Globalization
+@using ErsatzTV.Application.Channels
+@using ErsatzTV.Application.MediaCollections
+@using ErsatzTV.Application.Nounours
+@using ErsatzTV.Nounours
+@inject MovieCollectionService Collections
+@inject RecurringSlotService Recurring
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+
+<PageTitle>Collections de films · ErsatzTV</PageTitle>
+
+<div class="n-page" style="height: 100%; overflow-y: auto">
+    <div class="n-page-header">
+        <div>
+            <h1>Collections de films</h1>
+            <p>Vos films rangés tout seuls : par époque (récents, un peu anciens, très anciens) et par <b>saga</b> (Harry Potter, Scream…). Ce sont des collections intelligentes : un nouveau film y entre tout seul. Ensuite, programmez une saga en un clic : « tous les vendredis à 20h45, un Harry Potter ».</p>
+        </div>
+    </div>
+
+    <MudGrid Spacing="3">
+        @* ------------------------------------------------ époques *@
+        <MudItem xs="12" lg="5">
+            <div class="n-card" style="height: 100%">
+                <div class="n-card-title">Par époque</div>
+                @if (_ages is null)
+                {
+                    <MudProgressLinear Indeterminate="true"/>
+                }
+                else
+                {
+                    @foreach (FilmAge age in _ages)
+                    {
+                        <div class="n-stat-row">
+                            <span class="n-stat-name">@age.Name</span>
+                            <b>@age.Count</b>
+                            <span class="n-muted" style="width: 90px; text-align: right">@(age.CollectionId is null ? "à créer" : "✓ créée")</span>
+                            <MudIconButton Icon="@Icons.Material.Filled.Event" Size="Size.Small" Disabled="@(age.CollectionId is null)" title="Programmer"
+                                           OnClick="@(() => Plan(age.CollectionId, MovieCollectionService.AgePrefix + age.Name, age.Name))"/>
+                        </div>
+                    }
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.AutoAwesomeMotion" Class="mt-3" OnClick="@CreateAges" Disabled="@_busy">
+                        Créer / mettre à jour les 4 collections
+                    </MudButton>
+                    <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">D'après la date de sortie des films : elles avancent avec le temps (un film de 2016 passera tout seul dans « 10 à 20 ans »). Aussi utilisables dans la programmation automatique.</MudText>
+                }
+            </div>
+        </MudItem>
+
+        @* ------------------------------------------------ programmer *@
+        <MudItem xs="12" lg="7">
+            <div class="n-card" style="height: 100%" id="programmer">
+                <div class="n-card-title">Programmer un rendez-vous</div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <MudSelect T="int" @bind-Value="_slot.SmartCollectionId" Label="Saga ou collection" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 240px; flex: 1">
+                        @foreach (SmartCollectionViewModel c in _smart)
+                        {
+                            <MudSelectItem Value="@c.Id">@c.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudSelect T="int" @bind-Value="_slot.ChannelId" Label="Chaîne" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 200px; flex: 1">
+                        @foreach (ChannelViewModel channel in _channels)
+                        {
+                            <MudSelectItem Value="@channel.Id">@channel.Number · @channel.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+                <div class="d-flex gap-1 flex-wrap align-center mt-3">
+                    @foreach (DayOfWeek day in WeekTemplateService.Week)
+                    {
+                        DayOfWeek d = day;
+                        <MudChip T="string" Size="Size.Small" Color="@(_slot.Days.Contains(d) ? Color.Primary : Color.Default)" Variant="@(_slot.Days.Contains(d) ? Variant.Filled : Variant.Outlined)"
+                                 OnClick="@(() => Toggle(d))">@Fr.DateTimeFormat.GetAbbreviatedDayName(d)</MudChip>
+                    }
+                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => _slot.Days = [.. WeekTemplateService.Week])">Tous les soirs</MudButton>
+                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => _slot.Days = [DayOfWeek.Saturday, DayOfWeek.Sunday])">Week-end</MudButton>
+                </div>
+                <div class="d-flex gap-2 flex-wrap mt-2">
+                    <MudTextField @bind-Value="_hour" Label="Heure" Placeholder="20:45" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 110px"/>
+                    <MudSelect T="RecurringMode" @bind-Value="_slot.Mode" Label="À chaque fois" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 260px">
+                        <MudSelectItem Value="RecurringMode.One">Un film, dans l'ordre de sortie</MudSelectItem>
+                        <MudSelectItem Value="RecurringMode.TwoFilms">Deux films à la suite</MudSelectItem>
+                        <MudSelectItem Value="RecurringMode.Marathon">Marathon jusqu'au rendez-vous suivant</MudSelectItem>
+                    </MudSelect>
+                    <MudTextField @bind-Value="_slot.Label" Label="Nom dans le guide" Placeholder="La saga Harry Potter" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex: 1; min-width: 200px"/>
+                </div>
+                <MudSwitch T="bool" @bind-Value="_period" Color="Color.Primary" Label="Seulement pendant une période (ex. les vendredis de décembre)" Class="mt-1"/>
+                @if (_period)
+                {
+                    <div class="d-flex gap-2">
+                        <MudDatePicker @bind-Date="_from" Label="Du" Variant="Variant.Outlined" Margin="Margin.Dense" Culture="@Fr"/>
+                        <MudDatePicker @bind-Date="_until" Label="Au" Variant="Variant.Outlined" Margin="Margin.Dense" Culture="@Fr"/>
+                    </div>
+                }
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.EventRepeat" Class="mt-3" OnClick="@AddSlot"
+                           Disabled="@(_busy || _slot.SmartCollectionId == 0 || _slot.ChannelId == 0 || _slot.Days.Count == 0)">
+                    Ajouter à la grille
+                </MudButton>
+                @foreach (string step in _steps)
+                {
+                    <div style="font-size: .9rem" class="mt-1">✓ @step</div>
+                }
+                @if (_steps.Count > 0)
+                {
+                    <MudButton Href="planning" Variant="Variant.Outlined" Size="Size.Small" Class="mt-2" StartIcon="@Icons.Material.Filled.CalendarMonth">Voir le planning</MudButton>
+                }
+                <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Le rendez-vous remplace ce qui commençait à cette heure-là ces jours-là (ex. le film du soir), avec les mêmes jingles et pubs. Les autres jours ne changent pas. Une saga passe dans l'ordre de sortie et reprend où elle s'était arrêtée la fois suivante.</MudText>
+            </div>
+        </MudItem>
+
+        @* ------------------------------------------------ sagas *@
+        <MudItem xs="12">
+            <div class="n-card">
+                <div class="d-flex align-center gap-2 flex-wrap">
+                    <div class="n-card-title" style="margin: 0; flex: 1">Sagas trouvées</div>
+                    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Refresh" OnClick="@Detect" Disabled="@_busy">Rechercher à nouveau</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CollectionsBookmark" OnClick="@CreateSagas"
+                               Disabled="@(_busy || _sagas is null || !_sagas.Any(s => s.Selected))">
+                        Créer les sagas cochées
+                    </MudButton>
+                </div>
+                <MudText Typo="Typo.caption" Class="n-muted d-block mb-2">
+                    Trouvées grâce aux collections de Jellyfin / Plex, au &lt;set&gt; des fichiers .nfo (Kodi, Jellyfin), ou aux titres qui se ressemblent
+                    (« Scream », « Scream 2 »…). Renommez, corrigez la recherche, décochez ce qui n'est pas une saga.
+                </MudText>
+                @if (_sagas is null)
+                {
+                    <MudProgressLinear Indeterminate="true"/>
+                }
+                else
+                {
+                    @if (_sagas.Count == 0)
+                    {
+                        <div class="n-empty" style="padding: 16px">Aucune saga trouvée : ajoutez-en une ci-dessous.</div>
+                    }
+                    <div class="n-sagas">
+                        @foreach (Saga saga in _sagas)
+                        {
+                            <div class="n-saga @(saga.Selected ? "" : "is-off")" @key="saga">
+                                <div class="d-flex align-center gap-1">
+                                    <MudCheckBox T="bool" @bind-Value="saga.Selected" Size="Size.Small" Color="Color.Primary"/>
+                                    <MudTextField @bind-Value="saga.Name" Variant="Variant.Text" Margin="Margin.Dense" Style="font-weight: 700"/>
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@Source(saga.Source)</MudChip>
+                                </div>
+                                <ol class="n-saga-films">
+                                    @foreach (CollectionFilm film in saga.Films.Take(12))
+                                    {
+                                        <li><span class="n-muted">@film.Year</span> @film.Title</li>
+                                    }
+                                    @if (saga.Films.Count > 12)
+                                    {
+                                        <li class="n-muted">… et @(saga.Films.Count - 12) autre(s)</li>
+                                    }
+                                </ol>
+                                <MudExpansionPanels Elevation="0" Dense="true">
+                                    <MudExpansionPanel Text="Recherche">
+                                        <MudTextField @bind-Value="saga.Query" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2"/>
+                                        <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => Preview(saga))">Voir les films trouvés</MudButton>
+                                    </MudExpansionPanel>
+                                </MudExpansionPanels>
+                                <div class="d-flex align-center gap-2 mt-1">
+                                    <span class="n-muted" style="font-size: .8rem; flex: 1">@saga.Films.Count film(s) · @(saga.CollectionId is null ? "à créer" : "✓ créée")</span>
+                                    <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Event" OnClick="@(() => PlanSaga(saga))" Disabled="@_busy">Programmer</MudButton>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    <div class="d-flex gap-2 align-center mt-3 flex-wrap">
+                        <MudTextField @bind-Value="_newSaga" Label="Ajouter une saga : mots du titre" Placeholder="Retour vers le futur" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 360px"/>
+                        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" OnClick="@AddSaga" Disabled="@(_busy || string.IsNullOrWhiteSpace(_newSaga))">Ajouter</MudButton>
+                    </div>
+                }
+            </div>
+        </MudItem>
+    </MudGrid>
+</div>
+
+@code {
+    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
+    private List<FilmAge> _ages;
+    private List<Saga> _sagas;
+    private List<SmartCollectionViewModel> _smart = [];
+    private List<ChannelViewModel> _channels = [];
+    private RecurringSlot _slot = new();
+    private bool _period;
+    private DateTime? _from = new DateTime(DateTime.Today.Year, 12, 1);
+    private DateTime? _until = new DateTime(DateTime.Today.Year, 12, 31);
+    private readonly List<string> _steps = [];
+    private string _newSaga = string.Empty;
+    private string _hour = "20:45";
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _channels = (await Mediator.Send(new GetAllChannels()))
+            .OrderBy(c => double.TryParse(c.Number, NumberStyles.Number, CultureInfo.InvariantCulture, out double n) ? n : 0)
+            .ToList();
+        _slot.ChannelId = _channels.FirstOrDefault()?.Id ?? 0;
+        await LoadSmart();
+        _ages = await Collections.Ages(CancellationToken.None);
+        _sagas = await Collections.DetectSagas(CancellationToken.None);
+    }
+
+    private async Task LoadSmart()
+    {
+        _smart = (await Mediator.Send(new GetAllSmartCollections()))
+            .OrderBy(c => c.Name.StartsWith(MovieCollectionService.SagaPrefix, StringComparison.Ordinal) ? 0 : c.Name.StartsWith(MovieCollectionService.AgePrefix, StringComparison.Ordinal) ? 1 : 2)
+            .ThenBy(c => c.Name)
+            .ToList();
+        if (_slot.SmartCollectionId == 0 || _smart.All(c => c.Id != _slot.SmartCollectionId))
+        {
+            _slot.SmartCollectionId = _smart.FirstOrDefault()?.Id ?? 0;
+        }
+    }
+
+    private static string Source(SagaSource source) =>
+        source switch
+        {
+            SagaSource.Server => "Jellyfin / Plex",
+            SagaSource.Nfo => "fichier .nfo",
+            SagaSource.Titles => "titres",
+            _ => "ajoutée"
+        };
+
+    private void Toggle(DayOfWeek day)
+    {
+        if (!_slot.Days.Remove(day))
+        {
+            _slot.Days.Add(day);
+        }
+    }
+
+
+    private async Task Busy(Func<Task> work)
+    {
+        _busy = true;
+        try
+        {
+            await work();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private Task CreateAges() => Busy(async () =>
+    {
+        Either<BaseError, int> result = await Collections.CreateAges(CancellationToken.None);
+        result.Match(n => Snackbar.Add($"{n} collections d'époque prêtes.", Severity.Success), e => Snackbar.Add(e.ToString(), Severity.Error));
+        _ages = await Collections.Ages(CancellationToken.None);
+        await LoadSmart();
+    });
+
+    private Task Detect() => Busy(async () => _sagas = await Collections.DetectSagas(CancellationToken.None));
+
+    private Task Preview(Saga saga) => Busy(async () => saga.Films = await Collections.Films(saga.Query, CancellationToken.None));
+
+    private void AddSaga()
+    {
+        string words = _newSaga.Trim();
+        var saga = new Saga { Name = words, Source = SagaSource.Manual, Query = MovieCollectionService.TitleQuery(words) };
+        _sagas.Insert(0, saga);
+        _newSaga = string.Empty;
+        _ = InvokeAsync(() => Preview(saga));
+    }
+
+    private Task CreateSagas() => Busy(async () =>
+    {
+        var done = 0;
+        foreach (Saga saga in _sagas.Where(s => s.Selected))
+        {
+            Either<BaseError, int> result = await Collections.CreateSaga(saga, CancellationToken.None);
+            foreach (BaseError error in result.LeftToSeq())
+            {
+                Snackbar.Add($"{saga.Name} : {error}", Severity.Error);
+            }
+
+            done += result.IsRight ? 1 : 0;
+        }
+
+        Snackbar.Add($"{done} saga(s) prête(s) : elles sont dans les collections intelligentes.", Severity.Success);
+        await LoadSmart();
+    });
+
+    private Task PlanSaga(Saga saga) => Busy(async () =>
+    {
+        if (saga.CollectionId is null)
+        {
+            Either<BaseError, int> result = await Collections.CreateSaga(saga, CancellationToken.None);
+            foreach (BaseError error in result.LeftToSeq())
+            {
+                Snackbar.Add(error.ToString(), Severity.Error);
+                return;
+            }
+
+            await LoadSmart();
+        }
+
+        Plan(saga.CollectionId, saga.CollectionName, $"La saga {saga.Name}");
+    });
+
+    private void Plan(int? collectionId, string name, string label)
+    {
+        if (collectionId is null)
+        {
+            return;
+        }
+
+        _slot.SmartCollectionId = collectionId.Value;
+        _slot.CollectionName = name;
+        _slot.Label = label;
+        _steps.Clear();
+        Snackbar.Add($"« {name} » choisie : réglez les jours et l'heure, puis « Ajouter à la grille ».", Severity.Info);
+    }
+
+    private Task AddSlot() => Busy(async () =>
+    {
+        _steps.Clear();
+        string hour = (_hour ?? string.Empty).Trim().Replace('h', ':').Replace('H', ':');
+        if (!TimeSpan.TryParse(hour.EndsWith(':') ? hour + "00" : hour, CultureInfo.InvariantCulture, out TimeSpan start) || start >= TimeSpan.FromDays(1))
+        {
+            Snackbar.Add("Heure à écrire comme « 20:45 ».", Severity.Warning);
+            return;
+        }
+
+        _slot.Start = start;
+        _slot.CollectionName = _smart.FirstOrDefault(c => c.Id == _slot.SmartCollectionId)?.Name ?? _slot.CollectionName;
+        _slot.From = _period && _from is { } f ? DateOnly.FromDateTime(f) : null;
+        _slot.Until = _period && _until is { } u ? DateOnly.FromDateTime(u) : null;
+        Either<BaseError, List<string>> result = await Recurring.Add(_slot, CancellationToken.None);
+        result.Match(
+            steps =>
+            {
+                _steps.AddRange(steps);
+                Snackbar.Add("Rendez-vous ajouté : la grille se reconstruit.", Severity.Success);
+            },
+            error => Snackbar.Add(error.ToString(), Severity.Error));
+    });
+}

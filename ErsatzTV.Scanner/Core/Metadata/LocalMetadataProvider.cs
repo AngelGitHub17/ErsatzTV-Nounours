@@ -1457,6 +1457,11 @@ public class LocalMetadataProvider : ILocalMetadataProvider
                 }
 
                 var tags = nfo.Tags.Map(t => new Tag { Name = t }).ToList();
+                if (!string.IsNullOrWhiteSpace(nfo.Set))
+                {
+                    tags.Add(new Tag { Name = nfo.Set, ExternalTypeId = Tag.NfoSetTypeId });
+                }
+
                 foreach (string country in nfo.Countries)
                 {
                     tags.Add(

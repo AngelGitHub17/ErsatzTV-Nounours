@@ -317,3 +317,11 @@ div.ersatztv-light.nounours {
 .n-stat-track { background: var(--mud-palette-background-gray); border-radius: 3px; flex: 1; height: 10px; overflow: hidden; }
 .n-stat-track > span { background: var(--mud-palette-primary); display: block; height: 100%; }
 .n-remote-head .n-muted { font-size: .8rem; }
+
+/* ---------- collections de films / sagas ---------- */
+.n-sagas { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.n-saga { border: 1px solid var(--mud-palette-lines-default); border-radius: 8px; padding: 8px 12px; }
+.n-saga.is-off { opacity: .5; }
+.n-saga-films { font-size: .85rem; margin: 4px 0 4px 22px; padding: 0; }
+.n-saga-films li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.n-remote-scenes { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }

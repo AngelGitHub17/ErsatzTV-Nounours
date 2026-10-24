@@ -34,6 +34,12 @@ public interface IWeekTemplateService
     /// <summary>Enregistre la semaine type et reconstruit la grille de la chaîne.</summary>
     Task<Either<BaseError, Unit>> Save(int playoutId, Dictionary<DayOfWeek, int> days, CancellationToken cancellationToken);
 
+    /// <summary>
+    ///     Pendant une période (ex. décembre), certains jours utilisent un autre planning. La règle passe en tête
+    ///     (prioritaire) ; la semaine type et les autres règles sont gardées.
+    /// </summary>
+    Task<Either<BaseError, Unit>> AddPeriod(int playoutId, int scheduleId, List<DayOfWeek> days, DateOnly from, DateOnly until, CancellationToken cancellationToken);
+
     /// <summary>Copie un planning (ex. pour faire une version « week-end ») et renvoie le nouveau.</summary>
     Task<Either<BaseError, WeekScheduleOption>> Duplicate(int scheduleId, string name, CancellationToken cancellationToken);
 }
@@ -137,6 +143,57 @@ public sealed class WeekTemplateService(
             new ReplacePlayoutAlternateScheduleItems(playoutId, items),
             cancellationToken);
 
+        if (result.IsRight)
+        {
+            await workerChannel.WriteAsync(new BuildPlayout(playoutId, PlayoutBuildMode.Reset), cancellationToken);
+        }
+
+        return result;
+    }
+
+    public async Task<Either<BaseError, Unit>> AddPeriod(
+        int playoutId,
+        int scheduleId,
+        List<DayOfWeek> days,
+        DateOnly from,
+        DateOnly until,
+        CancellationToken cancellationToken)
+    {
+        await using TvContext dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        Playout playout = await dbContext.Playouts
+            .AsNoTracking()
+            .Include(p => p.ProgramScheduleAlternates)
+            .FirstOrDefaultAsync(p => p.Id == playoutId, cancellationToken);
+        if (playout?.ProgramScheduleId is null)
+        {
+            return BaseError.New("Chaîne introuvable ou sans planning classique");
+        }
+
+        if (until < from)
+        {
+            (from, until) = (until, from);
+        }
+
+        var items = new List<ReplacePlayoutAlternateSchedule>
+        {
+            new(0, 1, scheduleId, days.Count == 0 ? AlternateScheduleSelector.AllDaysOfWeek() : days,
+                AlternateScheduleSelector.AllDaysOfMonth(), AlternateScheduleSelector.AllMonthsOfYear(),
+                true, from.Month, from.Day, from.Year, until.Month, until.Day, until.Year)
+        };
+        var index = 2;
+        foreach (ProgramScheduleAlternate a in playout.ProgramScheduleAlternates.OrderBy(a => a.Index))
+        {
+            items.Add(new ReplacePlayoutAlternateSchedule(
+                a.Id, index++, a.ProgramScheduleId, a.DaysOfWeek.ToList(), a.DaysOfMonth.ToList(), a.MonthsOfYear.ToList(),
+                a.LimitToDateRange, a.StartMonth, a.StartDay, a.StartYear, a.EndMonth, a.EndDay, a.EndYear));
+        }
+
+        if (playout.ProgramScheduleAlternates.Count == 0)
+        {
+            items.Add(Rule(index, playout.ProgramScheduleId.Value, AlternateScheduleSelector.AllDaysOfWeek()));
+        }
+
+        Either<BaseError, Unit> result = await mediator.Send(new ReplacePlayoutAlternateScheduleItems(playoutId, items), cancellationToken);
         if (result.IsRight)
         {
             await workerChannel.WriteAsync(new BuildPlayout(playoutId, PlayoutBuildMode.Reset), cancellationToken);

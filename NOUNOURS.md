@@ -200,6 +200,22 @@ Les insertions s'affichent dans la liste et s'annulent d'un clic. La grille n'es
   l'heure locale (avant, lundi 0h30 en France comptait encore pour dimanche, et **tout le lundi** passait la grille du week-end) ;
   et le jour du changement d'heure, « minuit » n'est plus calculé à 23h (la journée suivante démarrait la veille).
 
+### Sagas et collections de films (`/collections-films`)
+- **Par époque** : 4 collections intelligentes d'après la date de sortie — nouveautés (moins de 5 ans), récents (moins de 10 ans),
+  un peu anciens (10 à 20 ans), très anciens (plus de 20 ans). Elles avancent avec le temps et servent aussi dans la
+  programmation automatique (style Cinéma : grands classiques le matin, film récent à 20h45, classique du week-end).
+- **Sagas** trouvées toutes seules : collections Jellyfin / Plex / Emby, `<set>` des fichiers .nfo (Kodi, Jellyfin — désormais lu
+  par le scanner), ou titres qui se ressemblent (« Scream », « Scream 2 », « Scream VI » ; « Harry Potter à l'école… »,
+  « Harry Potter et la Chambre… » ; « Les Bronzés », « Les Bronzés font du ski »). Films dans l'ordre de sortie ; nom et recherche
+  modifiables, sagas à ajouter à la main (« mots du titre »). Chaque saga devient la collection intelligente « Saga · … ».
+- **Programmer un rendez-vous** : saga ou collection, chaîne, jours (« Tous les soirs », « Week-end », ou ven. seul…), heure, « un
+  film dans l'ordre » (la saga reprend où elle s'était arrêtée la fois suivante), « deux films » ou « marathon jusqu'au rendez-vous
+  suivant », et en option **une période** (« les vendredis de décembre »). Le rendez-vous remplace ce qui commençait à cette heure
+  ces jours-là (avec les mêmes jingles et pubs) ; les autres jours ne changent pas (planning copié « … · le vendredi » et semaine
+  type mise à jour, ou règle de période prioritaire).
+- Corrigé au passage : la mise à jour d'un film perdait le type de ses étiquettes (pays, saga) ; l'heure des rendez-vous de la
+  programmation auto ne se modifiait pas (champ masqué).
+
 ### Journal de diffusion (`/journal`)
 Chaque minute, tout ce qui a commencé à l'antenne (programmes, intercalaires, régie, directs) est noté dans `journal/AAAA-MM-JJ.jsonl`.
 Page par jour, filtre par chaîne, intercalaires masquables, export **CSV** (ouvre dans Excel).
@@ -231,7 +247,7 @@ séries, pubs et chaînes.
   schedule » de la Commission) renomme les blocs EBS du guide sujet par sujet (« EBS · en direct · Point de presse de midi… »).
   Le week-end, EBS publie souvent un programme vide : le guide affiche « Images de l'actualité européenne ».
 - **Télécommande sur téléphone** (`/telecommande`) : avec un code (page Info), lancer un flash, changer le sujet « EN DIRECT »,
-  ajouter un titre, depuis le téléphone. 5 codes faux de suite = 5 minutes de pause.
+  ajouter un titre, **prendre l'antenne avec OBS / la rendre et changer de caméra** (scènes OBS), depuis le téléphone. 5 codes faux de suite = 5 minutes de pause.
 - **Jingle « Flash spécial »** : fabriqué en un clic, il passe tout seul sur les chaînes choisies dès qu'un nouveau flash est mis
   à l'antenne (une fois par flash).
 - **Caméras / scènes OBS** : télécommande d'OBS (obs-websocket v5, Outils › Paramètres du serveur WebSocket, mot de passe) ; les

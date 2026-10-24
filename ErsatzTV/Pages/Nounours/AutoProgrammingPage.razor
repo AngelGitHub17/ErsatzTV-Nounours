@@ -130,7 +130,7 @@
                         {
                             <div class="n-auto-row" @key="block">
                                 <span class="n-auto-dot" style="background: @Tint(block.Category)"></span>
-                                <MudTextField T="string" Value="@AutoProgrammingService.Hour(block.Start)" ValueChanged="@(v => SetHour(block, v))" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 90px; flex: none" Mask="@(new PatternMask("00:00"))"/>
+                                <MudTextField T="string" Value="@AutoProgrammingService.Hour(block.Start)" ValueChanged="@(v => SetHour(block, v))" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 90px; flex: none"/>
                                 <MudSelect T="AutoCategory" @bind-Value="block.Category" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 210px; flex: none">
                                     @foreach (AutoCategory category in Enum.GetValues<AutoCategory>())
                                     {
@@ -237,12 +237,16 @@
             AutoCategory.Documentaires => "#008A22",
             AutoCategory.Clips => "#B04FC0",
             AutoCategory.Info => "#3C3632",
+            AutoCategory.FilmRecent => "#C2185B",
+            AutoCategory.FilmAncien => "#6D4C41",
+            AutoCategory.FilmClassique => "#A1887F",
             _ => "#555B66"
         };
 
     private static void SetHour(AutoBlock block, string value)
     {
-        if (TimeSpan.TryParseExact(value, @"hh\:mm", CultureInfo.InvariantCulture, out TimeSpan t) && t < TimeSpan.FromDays(1))
+        string text = (value ?? string.Empty).Trim().Replace('h', ':').Replace('H', ':');
+        if (TimeSpan.TryParse(text.EndsWith(':') ? text + "00" : text, CultureInfo.InvariantCulture, out TimeSpan t) && t < TimeSpan.FromDays(1))
         {
             block.Start = t;
         }

@@ -112,6 +112,19 @@ public class MovieNfoReader : NfoReader<MovieNfo>, IMovieNfoReader
                             case "actor":
                                 ReadActor(reader, nfo, (movie, actor) => movie.Actors.Add(actor), fileName);
                                 break;
+                            case "set":
+                                if (nfo is not null)
+                                {
+                                    // Kodi : <set><name>Harry Potter</name>…</set> ; ancien format : <set>Harry Potter</set>
+                                    var set = (System.Xml.Linq.XElement)System.Xml.Linq.XNode.ReadFrom(reader);
+                                    string? setName = (set.Element("name")?.Value ?? (set.HasElements ? null : set.Value))?.Trim();
+                                    if (!string.IsNullOrWhiteSpace(setName))
+                                    {
+                                        nfo.Set = setName;
+                                    }
+                                }
+
+                                break;
                             case "credits":
                                 await ReadStringContent(
                                     reader,
