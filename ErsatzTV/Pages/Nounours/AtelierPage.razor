@@ -179,11 +179,11 @@
                     <div class="n-card">
                         <div class="n-card-title">La musique</div>
                         <MudText Typo="Typo.caption" Class="n-muted d-block">Jingles</MudText>
-                        <SourcePicker Value="@_pack.Music" ValueChanged="@(v => _pack.Music = v)" EmptyLabel="Automatique : une musique « Énergique »"/>
+                        <SourcePicker Value="@_pack.Music" ValueChanged="@(v => _pack.Music = v)" EmptyLabel="Automatique : un indicatif différent par jingle"/>
                         @if (_pack.Pubs)
                         {
                             <MudText Typo="Typo.caption" Class="n-muted d-block mt-3">Cartons pub</MudText>
-                            <SourcePicker Value="@_pack.PubMusic" ValueChanged="@(v => _pack.PubMusic = v)" EmptyLabel="Automatique : une musique « Pub »"/>
+                            <SourcePicker Value="@_pack.PubMusic" ValueChanged="@(v => _pack.PubMusic = v)" EmptyLabel="Automatique : un son « Pub »"/>
                         }
                     </div>
                     <div class="n-card">

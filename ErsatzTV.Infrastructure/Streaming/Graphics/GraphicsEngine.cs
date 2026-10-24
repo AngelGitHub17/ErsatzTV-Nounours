@@ -169,7 +169,11 @@ public class GraphicsEngine(
                 {
                     foreach (var preparedImage in result)
                     {
-                        preparedElementImages.Add(preparedImage);
+                        // une image vide (texte vide…) ferait tomber tout l'habillage : on l'ignore
+                        if (preparedImage.Image is { Width: > 0, Height: > 0 } && preparedImage.Image.GetPixels() != IntPtr.Zero)
+                        {
+                            preparedElementImages.Add(preparedImage);
+                        }
                     }
                 }
 
@@ -225,9 +229,14 @@ public class GraphicsEngine(
                 frameCount++;
             }
         }
-        catch (Exception)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // do nothing; don't want to throw on a background task
+            // pas d'exception sur une tâche de fond, mais on veut savoir pourquoi l'habillage s'est arrêté
+            logger.LogWarning(ex, "Moteur graphique arrêté après {Frames} images", frameCount);
+        }
+        catch (OperationCanceledException)
+        {
+            // arrêt normal
         }
         finally
         {

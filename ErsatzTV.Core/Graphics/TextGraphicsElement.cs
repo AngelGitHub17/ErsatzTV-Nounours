@@ -43,6 +43,18 @@ public class TextGraphicsElement : BaseGraphicsElement
     public int EpgEntries { get; set; }
 
     public string Text { get; set; }
+
+    /// <summary>Fond derrière le texte (#AARRGGBB), à la taille du texte : vide = pas de fond.</summary>
+    [YamlMember(Alias = "box_color", ApplyNamingConventions = false)]
+    public string BoxColor { get; set; }
+
+    /// <summary>Marge intérieure du fond, en fraction de la hauteur d'une ligne.</summary>
+    [YamlMember(Alias = "box_padding", ApplyNamingConventions = false)]
+    public double BoxPadding { get; set; } = 0.35;
+
+    /// <summary>La largeur du fond s'arrondit à ce pas (en % de la largeur de l'image) : les cartouches restent alignés sur une grille.</summary>
+    [YamlMember(Alias = "box_snap_percent", ApplyNamingConventions = false)]
+    public double BoxSnapPercent { get; set; }
 }
 
 public enum TextFit

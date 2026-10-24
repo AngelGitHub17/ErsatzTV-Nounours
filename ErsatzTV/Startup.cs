@@ -724,6 +724,7 @@ public class Startup
         services.AddScoped<ErsatzTV.Application.Nounours.IRegieService, ErsatzTV.Application.Nounours.RegieService>();
         services.AddSingleton<ErsatzTV.Application.Nounours.Atelier.AtelierService>();
         services.AddScoped<ErsatzTV.Application.Nounours.IAutomationService, ErsatzTV.Application.Nounours.AutomationService>();
+        services.AddScoped<ErsatzTV.Application.Nounours.IInfoService, ErsatzTV.Application.Nounours.InfoService>();
         services.AddHostedService<ErsatzTV.Nounours.AutomationScheduler>();
         services.AddScoped<ErsatzTV.Nounours.ChannelWizardService>();
         services.AddScoped<ErsatzTV.Nounours.UiPreferences>();

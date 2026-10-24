@@ -297,6 +297,13 @@ public class GetPlayoutItemProcessByChannelNumberHandler : FFmpegProcessHandler<
                 effectiveRealtime = true;
             }
 
+            // un direct (OBS, flux d'info) ne peut pas être préparé à l'avance : un seul processus continu,
+            // sans se reconnecter à la source toutes les 44 s (ce qui couperait l'image d'OBS)
+            if (playoutItemWithPath.PlayoutItem.MediaItem is RemoteStream { IsLive: true })
+            {
+                effectiveRealtime = true;
+            }
+
             TimeSpan limit = TimeSpan.Zero;
 
             if (!effectiveRealtime)

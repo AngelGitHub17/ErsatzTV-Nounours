@@ -80,6 +80,11 @@ public sealed class HabillageItem
     public string Align { get; set; } = "Left";
     public int EpgEntries { get; set; }
 
+    /// <summary>Cartouche derrière le texte, à sa taille (vide = aucun) ; aligné sur des huitièmes d'écran si BoxSnap.</summary>
+    public string BoxColor { get; set; } = string.Empty;
+
+    public bool BoxSnap { get; set; } = true;
+
     /// <summary>Compte à rebours : n'afficher que pendant les X dernières minutes avant le programme suivant (0 = toujours).</summary>
     public double CountdownMaxMinutes { get; set; }
 
@@ -99,6 +104,9 @@ public sealed class HabillageItem
 
     // bandeau défilant (Kind = Ticker) : couleur du fond = BackgroundColor, hauteur = Height
     public string TickerMessages { get; set; } = string.Empty;
+
+    /// <summary>Bandeau d'info en direct : « titres », « flash » ou « sujet » (lu toutes les 5 s, modifiable depuis la page Info) ; vide = non.</summary>
+    public string TickerLive { get; set; } = string.Empty;
     public string RssUrl { get; set; } = string.Empty;
     public string WeatherCity { get; set; } = string.Empty;
     public double? WeatherLatitude { get; set; }
@@ -817,6 +825,20 @@ public sealed partial class HabillageService(
                 sb.AppendLine(CultureInfo.InvariantCulture, $"background_color: {Quote(ToSkiaColor(item.BackgroundColor))}");
                 sb.AppendLine(CultureInfo.InvariantCulture, $"speed: {Num(item.TickerSpeed)}");
                 sb.AppendLine(CultureInfo.InvariantCulture, $"messages: {Quote((item.TickerMessages ?? string.Empty).Replace("\r", string.Empty).Replace('\n', '|'))}");
+                if (!string.IsNullOrWhiteSpace(item.TickerLive))
+                {
+                    sb.AppendLine(CultureInfo.InvariantCulture, $"messages_file: {Quote(InfoFiles.For(item.TickerLive))}");
+                    sb.AppendLine("refresh_seconds: 5");
+                    if (item.TickerLive is "flash" or "sujet")
+                    {
+                        sb.AppendLine("hide_when_empty: true");
+                    }
+
+                    if (item.TickerLive == "sujet")
+                    {
+                        sb.AppendLine("fixed: true");
+                    }
+                }
                 if (!string.IsNullOrWhiteSpace(item.RssUrl))
                 {
                     sb.AppendLine(CultureInfo.InvariantCulture, $"rss_url: {Quote(item.RssUrl.Trim())}");
@@ -896,6 +918,15 @@ public sealed partial class HabillageService(
                 }
 
                 sb.AppendLine(CultureInfo.InvariantCulture, $"text_align: {item.Align switch { "Center" => "Center", "Right" => "Right", _ => "Left" }}");
+                if (!string.IsNullOrWhiteSpace(item.BoxColor))
+                {
+                    sb.AppendLine(CultureInfo.InvariantCulture, $"box_color: {Quote(ToSkiaColor(item.BoxColor))}");
+                    sb.AppendLine("box_padding: 0.32");
+                    if (item.BoxSnap)
+                    {
+                        sb.AppendLine("box_snap_percent: 6.25");
+                    }
+                }
                 sb.AppendLine("include_fonts_from: " + Quote(FileSystemLayout.FontsCacheFolder));
                 sb.AppendLine("base_style: base");
                 sb.AppendLine("styles:");

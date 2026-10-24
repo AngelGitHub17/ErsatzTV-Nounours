@@ -37,6 +37,7 @@ public class TickerElement(
     private DateTimeOffset _nextRefresh;
     private Task _refreshing;
     private SKBitmap _pendingStrip;
+    private bool _pendingReady;
     private Option<NCalc.Expression> _maybeOpacityExpression;
     private float _opacity;
 
@@ -99,7 +100,7 @@ public class TickerElement(
         _labelImage = string.IsNullOrWhiteSpace(ticker.Label) ? null : RenderLabel(ticker.Label);
         List<string> lines = await CollectLines(cancellationToken);
         _strip = RenderStrip(lines);
-        _nextRefresh = DateTimeOffset.Now.AddMinutes(Math.Max(1, ticker.RefreshMinutes));
+        _nextRefresh = DateTimeOffset.Now + RefreshEvery();
     }
 
     public override ValueTask<Option<PreparedElementImage>> PrepareImage(
@@ -115,29 +116,51 @@ public class TickerElement(
             opacity = OpacityExpressionHelper.GetOpacity(expression, timeOfDay, contentTime, contentTotalTime, channelTime);
         }
 
+        // relu même quand il est masqué : un flash vide peut se remplir en cours de programme
+        RefreshIfNeeded();
         if (opacity == 0 || _strip is null)
         {
             return ValueTask.FromResult(Option<PreparedElementImage>.None);
         }
-
-        RefreshIfNeeded();
 
         SKBitmap frame = _frames[_frameIndex];
         _frameIndex = (_frameIndex + 1) % _frames.Length;
 
         using (var canvas = new SKCanvas(frame))
         {
-            canvas.Clear(_background);
             int labelWidth = _labelImage?.Width ?? 0;
+            float pad = _barHeight * 0.35f;
+            bool fits = ticker.Fixed && _strip.Width + pad <= _barWidth - labelWidth;
+            if (fits)
+            {
+                // texte fixe : le fond s'arrête au texte (pas de bandeau vide), arrondi à 1/32 d'écran
+                float snap = _context.FrameSize.Width / 32f;
+                float used = Math.Min(_barWidth, (float)Math.Ceiling((labelWidth + pad + _strip.Width) / snap) * snap);
+                canvas.Clear(SKColors.Transparent);
+                using var fill = new SKPaint { Color = _background };
+                canvas.DrawRect(new SKRect(0, 0, used, _barHeight), fill);
+            }
+            else
+            {
+                canvas.Clear(_background);
+            }
+
             float loop = _strip.Width;
             double seconds = (_context.ContentStartTime + contentTime).ToUnixTimeMilliseconds() / 1000.0;
             var offset = (float)(seconds * ticker.Speed * _scale % loop);
 
             canvas.Save();
             canvas.ClipRect(new SKRect(labelWidth, 0, _barWidth, _barHeight));
-            for (float x = labelWidth - offset; x < _barWidth; x += loop)
+            if (fits)
             {
-                canvas.DrawBitmap(_strip, x, 0);
+                canvas.DrawBitmap(_strip, labelWidth + pad, 0); // tient dans le bandeau : texte fixe
+            }
+            else
+            {
+                for (float x = labelWidth - offset; x < _barWidth; x += loop)
+                {
+                    canvas.DrawBitmap(_strip, x, 0);
+                }
             }
 
             canvas.Restore();
@@ -154,12 +177,16 @@ public class TickerElement(
 
     private void RefreshIfNeeded()
     {
-        if (_pendingStrip is not null)
+        if (_pendingReady)
         {
             SKBitmap old = _strip;
             _strip = _pendingStrip;
             _pendingStrip = null;
-            old?.Dispose();
+            _pendingReady = false;
+            if (!ReferenceEquals(old, _strip))
+            {
+                old?.Dispose();
+            }
         }
 
         if (DateTimeOffset.Now < _nextRefresh || _refreshing is { IsCompleted: false })
@@ -167,13 +194,14 @@ public class TickerElement(
             return;
         }
 
-        _nextRefresh = DateTimeOffset.Now.AddMinutes(Math.Max(1, ticker.RefreshMinutes));
+        _nextRefresh = DateTimeOffset.Now + RefreshEvery();
         _refreshing = Task.Run(async () =>
         {
             try
             {
                 List<string> lines = await CollectLines(CancellationToken.None);
                 _pendingStrip = RenderStrip(lines);
+                _pendingReady = true;
             }
             catch (Exception ex)
             {
@@ -182,10 +210,29 @@ public class TickerElement(
         });
     }
 
+    private TimeSpan RefreshEvery() =>
+        ticker.RefreshSeconds > 0 ? TimeSpan.FromSeconds(Math.Max(2, ticker.RefreshSeconds)) : TimeSpan.FromMinutes(Math.Max(1, ticker.RefreshMinutes));
+
     private async Task<List<string>> CollectLines(CancellationToken cancellationToken)
     {
         var lines = new List<string>();
         lines.AddRange((ticker.Messages ?? string.Empty).Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        if (!string.IsNullOrWhiteSpace(ticker.MessagesFile))
+        {
+            try
+            {
+                if (File.Exists(ticker.MessagesFile))
+                {
+                    lines.AddRange((await File.ReadAllLinesAsync(ticker.MessagesFile, cancellationToken))
+                        .Select(l => l.Trim())
+                        .Where(l => l.Length > 0));
+                }
+            }
+            catch (IOException ex)
+            {
+                logger.LogDebug(ex, "Bandeau : fichier {File} illisible", ticker.MessagesFile);
+            }
+        }
 
         if (ticker.WeatherLatitude.HasValue && ticker.WeatherLongitude.HasValue)
         {
@@ -199,7 +246,7 @@ public class TickerElement(
             lines.AddRange(titles.Take(Math.Max(1, ticker.RssItems)));
         }
 
-        if (lines.Count == 0)
+        if (lines.Count == 0 && !ticker.HideWhenEmpty)
         {
             lines.Add(ticker.Text ?? "…");
         }
@@ -301,7 +348,12 @@ public class TickerElement(
 
     private SKBitmap RenderStrip(List<string> lines)
     {
-        string text = string.Join(ticker.Separator ?? "  •  ", lines) + (ticker.Separator ?? "  •  ");
+        if (lines.Count == 0)
+        {
+            return null; // rien à dire : bandeau masqué
+        }
+
+        string text = string.Join(ticker.Separator ?? "  •  ", lines) + (ticker.Fixed ? "    " : ticker.Separator ?? "  •  ");
         using var font = new SKFont(Typeface(), _barHeight * 0.58f);
         float width = Math.Min(30000, font.MeasureText(text) + 1);
         var bitmap = new SKBitmap((int)Math.Ceiling(width), _barHeight, SKColorType.Bgra8888, SKAlphaType.Premul);

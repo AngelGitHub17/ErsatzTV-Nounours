@@ -158,11 +158,43 @@ Fabrique des vidéos au style « Rétro 95 » — un cadre clair, des **rectangl
   « Rétro 95 » dans le calque pour les mettre à jour.
 
 ### Quadrillage en direct (studio d'habillage)
+- **Cartouches à la taille du texte** : un calque texte peut avoir un fond qui s'adapte à son texte (largeur alignée sur des
+  seizièmes d'écran) et qui ne s'affiche pas quand le texte est vide. Le modèle « Rétro 95 » s'en sert pour le nom de la chaîne,
+  le titre et le sous-titre (titre de l'épisode, dans un cartouche rouge vif).
 Deux nouveaux calques, aussi présents dans le modèle « Rétro 95 » :
 - **Rideau quadrillé** : à la fin de chaque programme, des cases de couleur couvrent l'image une à une ; au début du suivant, elles
   la découvrent. Durée, ouverture / fermeture, couleurs et liserés réglables ; ignoré pour les programmes courts (jingles, pubs).
 - **Tout de suite** : dans les dernières secondes, un bloc de cases « TOUT DE SUITE » + titre et heure du programme suivant (guide).
 - Sous le capot : nouveau type d'élément graphique `quadrillage` (Kind 7, dossier `graphics-elements/quadrillage`).
+
+- **Sons intégrés v2** : un petit studio « années 90 » synthétise 12 sons originaux (aucun emprunt) : 8 **indicatifs** courts
+  qui finissent sur un coup (orchestre, cuivres, cloches, timbales) — boîte à rythmes façon 909, caisse claire « gated », basse synthé,
+  cuivres, piano électrique FM, montée de souffle, réverbération — et 4 **boucles** (interlude, météo, cartons). Nouvelle ambiance
+  « Indicatif ». Les sons sont tirés au hasard en évitant les derniers utilisés ; l'habillage complet donne un indicatif différent
+  à chaque jingle, joué jusqu'à son coup final.
+- **Niveaux** : toutes les musiques sont normalisées (−16 LUFS, crêtes −1,5 dB). Dans les bandes-annonces, la musique est pleine à
+  l'ouverture et à la fermeture et **s'efface sous les extraits** (−16 dB si l'on garde leur son, sinon légèrement baissée).
+- **Titres calés sur la grille** : le titre se place dans un bloc noir de la largeur qu'il lui faut (en cases entières, sur deux
+  lignes au besoin), le sous-titre dans un bloc de couleur dessous, les blocs apparaissent case par case ; cartouche de la chaîne en
+  bas à droite, bandeaux des bandes-annonces en demi-cases. Fini les rectangles vides de largeur fixe.
+
+### Conducteur en direct (`/conducteur`)
+Les 6 prochaines heures d'une chaîne. Choisissez une vidéo ou un flux, puis : **Passer maintenant**, **Juste avant** un programme
+(elle finit pile quand il commence, à la place de la fin du précédent) ou **À la place** d'un programme (pendant toute sa durée).
+Les insertions s'affichent dans la liste et s'annulent d'un clic. La grille n'est pas reconstruite : tout reprend à l'heure.
+
+### Info en continu (`/info`)
+- **Bandeaux en direct** : sujet « EN DIRECT » (texte fixe, le fond s'arrête au texte), **flash** (bandeau bordeaux, caché s'il est
+  vide), **titres** qui défilent (+ RSS). « Mettre à l'antenne » : visible en 5 à 30 s environ (tampon du lecteur), sans couper l'image.
+- **Habillage info** créé et appliqué en un clic (nom de la chaîne, heure, les trois bandeaux), modifiable ensuite dans le studio.
+- **Prendre l'antenne** avec un flux en direct ou une vidéo : les bandeaux restent par-dessus.
+- **Sources** : **OBS** (caméra, invités…) en **SRT** — dans OBS : Paramètres › Stream › Personnalisé, serveur
+  `srt://0.0.0.0:9710?mode=listener&latency=300000` (adresse et port réglables, UDP possible sur le même réseau) — et des **flux de
+  chaînes d'info** (lien direct .m3u8 / .ts que la chaîne autorise à reprendre). Ils deviennent des « flux en direct » (bibliothèque
+  « Flux en direct ») utilisables aussi dans la Régie et le Conducteur.
+- Un direct tourne désormais en un seul processus continu (au lieu de se reconnecter à la source toutes les 44 s).
+- Corrigé : un texte vide (ex. titre d'un flux en direct) faisait disparaître tout l'habillage ; le moteur graphique journalise
+  maintenant ses erreurs au lieu de s'arrêter en silence.
 
 ### Services automatiques (`/services`)
 Ce qu'ErsatzTV fait tout seul, vérifié chaque minute :
@@ -177,6 +209,9 @@ Ce qu'ErsatzTV fait tout seul, vérifié chaque minute :
 - **Carte météo en quadrillage** : chaque jour, jusqu'à 6 villes (température, temps, mini / maxi) d'Open-Meteo, sans clé.
 - **Interlude quadrillé** : une boucle de carrés au rythme d'une musique, rangée dans « Habillage vidéo » ; un clic en fait le
   « remplissage de secours » des chaînes choisies (ce qui passe quand rien n'est prévu, au lieu d'un écran noir).
+- **Diffusion automatique** (dans chaque carte : Ce soir, Cette semaine, Météo, Interlude) : heures (« 07:00, 12:55, 19:55 »),
+  chaînes, et « juste avant le programme suivant » (la vidéo remplace la fin du programme en cours, souvent le générique) ou
+  « à l'heure exacte ». Passage à la seconde près, via la régie.
 - **Rendez-vous d'antenne** : à l'heure dite (certains jours ou tous les jours), la régie passe une vidéo une fois — ouverture,
   fermeture d'antenne… — puis la grille reprend où elle en était. Rattrapage de 10 minutes si ErsatzTV était arrêté.
 - Adresses des serveurs de voix off et de sous-titres (facultatifs). Réglages dans `nounours-reglages.json` (dossier de config).

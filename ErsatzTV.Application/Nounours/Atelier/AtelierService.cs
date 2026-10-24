@@ -189,7 +189,8 @@ public sealed class AtelierService(
 
         // la musique s'éteint à la fin du jingle ; le carton final (s'il y en a un) est silencieux
         double fadeStart = Math.Max(0, duration - 0.4);
-        args.AddRange(["-map", "0:v", "-map", "1:a", "-af", $"aresample=48000,aformat=channel_layouts=stereo,afade=t=out:st={fadeStart.ToString("0.###", Inv)}:d=0.4,apad"]);
+        // niveau homogène d'un jingle à l'autre (−16 LUFS, crêtes sous −1,5 dB), quelle que soit la musique
+        args.AddRange(["-map", "0:v", "-map", "1:a", "-af", $"aresample=48000,aformat=channel_layouts=stereo,{(hasAudio ? Loudness + "," : "")}afade=t=out:st={fadeStart.ToString("0.###", Inv)}:d=0.4,apad"]);
         args.AddRange(EncodeArgs());
         args.AddRange(["-t", total.ToString("0.###", Inv), temp]);
 
@@ -226,21 +227,26 @@ public sealed class AtelierService(
     /// </summary>
     public List<AtelierJob> StartPack(PackSpec pack)
     {
-        string music = string.IsNullOrWhiteSpace(pack.Music) ? AtelierSounds.FirstOf("Énergique") : pack.Music;
-        string pubMusic = string.IsNullOrWhiteSpace(pack.PubMusic) ? AtelierSounds.FirstOf("Pub") : pack.PubMusic;
+        // sans musique choisie : un indicatif différent par jingle (joué en entier, jusqu'à son coup final)
+        List<string> labels = pack.Labels.Where(l => !string.IsNullOrWhiteSpace(l)).Distinct().ToList();
+        bool autoMusic = string.IsNullOrWhiteSpace(pack.Music);
+        List<string> musics = autoMusic ? AtelierSounds.Pick("Indicatif", Math.Max(1, labels.Count), "Énergique", "Cinéma") : [pack.Music];
+        bool autoPub = string.IsNullOrWhiteSpace(pack.PubMusic);
+        List<string> pubMusics = autoPub ? AtelierSounds.Pick("Pub", 2, "Jeunesse", "Indicatif") : [pack.PubMusic, pack.PubMusic];
         string slug = HabillageService.Slugify(string.IsNullOrWhiteSpace(pack.ChannelName) ? "chaine" : pack.ChannelName);
         double seconds = Math.Clamp(pack.Seconds, 3, 30);
         var specs = new List<(JingleSpec Spec, ImportRole Role)>();
 
         int seed = pack.Style.Seed;
-        foreach (string label in pack.Labels.Where(l => !string.IsNullOrWhiteSpace(l)).Distinct())
+        for (var i = 0; i < labels.Count; i++)
         {
+            string label = labels[i];
             AtelierStyle style = Clone(pack.Style);
             style.Seed = seed++; // une chorégraphie différente par jingle
             specs.Add((new JingleSpec
             {
-                Kind = AtelierKind.Jingle, Label = label.Trim().ToUpperInvariant(), Title = pack.ChannelName, AudioFile = music,
-                Duration = seconds, Style = style, OutputName = $"pack-{slug}-{HabillageService.Slugify(label)}.mp4"
+                Kind = AtelierKind.Jingle, Label = label.Trim().ToUpperInvariant(), Title = pack.ChannelName, AudioFile = musics.Count == 0 ? string.Empty : musics[i % musics.Count],
+                Duration = autoMusic ? 0 : seconds, Style = style, OutputName = $"pack-{slug}-{HabillageService.Slugify(label)}.mp4"
             }, ImportRole.Jingles));
         }
 
@@ -250,7 +256,9 @@ public sealed class AtelierService(
             {
                 specs.Add((new JingleSpec
                 {
-                    Kind = kind, Title = string.Empty, ChannelName = pack.ChannelName, AudioFile = pubMusic, Duration = Math.Min(seconds, 5),
+                    Kind = kind, Title = string.Empty, ChannelName = pack.ChannelName,
+                    AudioFile = pubMusics.Count == 0 ? string.Empty : pubMusics[kind == AtelierKind.DebutPub ? 0 : pubMusics.Count - 1],
+                    Duration = autoPub ? 0 : Math.Min(seconds, 5),
                     Style = Clone(pack.Style), OutputName = $"pack-{slug}-{(kind == AtelierKind.DebutPub ? "debut-pub" : "fin-pub")}.mp4"
                 }, ImportRole.Pubs));
             }
@@ -388,7 +396,7 @@ public sealed class AtelierService(
                     + $"pad={RetroRenderer.Width}:{RetroRenderer.Height}:{wx}:{wy}:color={frameColor}[v];"
                     + "[v][1:v]overlay=0:0:shortest=1,format=yuv420p[vo];"
                     + (audioStream
-                        ? $"[0:a]aresample=48000,aformat=channel_layouts=stereo,afade=t=in:d=0.15,afade=t=out:st={fadeOut}:d=0.25[ao]"
+                        ? $"[0:a]aresample=48000,aformat=channel_layouts=stereo,{Loudness},afade=t=in:d=0.15,afade=t=out:st={fadeOut}:d=0.25[ao]"
                         : "[2:a]anull[ao]"),
                     "-map", "[vo]", "-map", "[ao]", "-t", len
                 };
@@ -433,9 +441,15 @@ public sealed class AtelierService(
                 job.Step = "Mixage de la musique…";
                 string t = total.ToString("0.###", Inv);
                 string fade = Math.Max(0, total - 1.5).ToString("0.###", Inv);
-                string music = $"[1:a]aresample=48000,aformat=channel_layouts=stereo,apad,atrim=0:{t},afade=t=out:st={fade}:d=1.5[m]";
+                // la musique plein pot à l'ouverture et à la fermeture ; sous les extraits, elle s'efface
+                // (fond discret si on garde leur son, sinon simplement un peu plus bas)
+                double duck = spec.KeepOriginalAudio ? 0.16 : 0.7;
+                string a = intro.ToString("0.###", Inv);
+                string b = (total - outro).ToString("0.###", Inv);
+                string envelope = $"volume='1-{(1 - duck).ToString("0.###", Inv)}*clip(min((t-{a})/0.35,({b}-t)/0.35),0,1)':eval=frame";
+                string music = $"[1:a]aresample=48000,aformat=channel_layouts=stereo,{Loudness},apad,atrim=0:{t},{envelope},afade=t=out:st={fade}:d=1.5[m]";
                 string filter = spec.KeepOriginalAudio
-                    ? music + ";[0:a]volume=0.35[o];[m][o]amix=inputs=2:duration=first:normalize=0[a]"
+                    ? music + ";[0:a]anull[o];[m][o]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.89[a]"
                     : music + ";[m]anull[a]";
                 await RunFfmpeg(
                     ffmpeg,
@@ -492,7 +506,7 @@ public sealed class AtelierService(
         args.AddRange(hasMusic
             ? ["-t", seconds.ToString("0.###", Inv), "-i", music]
             : ["-f", "lavfi", "-t", seconds.ToString("0.###", Inv), "-i", "anullsrc=r=48000:cl=stereo"]);
-        args.AddRange(["-map", "0:v", "-map", "1:a", "-af", $"aresample=48000,aformat=channel_layouts=stereo,apad,afade=t=out:st={Math.Max(0, seconds - 1).ToString("0.###", Inv)}:d=1"]);
+        args.AddRange(["-map", "0:v", "-map", "1:a", "-af", $"aresample=48000,aformat=channel_layouts=stereo,{(hasMusic ? Loudness + "," : "")}apad,afade=t=out:st={Math.Max(0, seconds - 1).ToString("0.###", Inv)}:d=1"]);
         args.AddRange(EncodeArgs());
         args.AddRange(["-t", seconds.ToString("0.###", Inv), temp]);
 
@@ -560,7 +574,7 @@ public sealed class AtelierService(
         args.AddRange(hasMusic
             ? ["-stream_loop", "-1", "-t", seconds.ToString("0.###", Inv), "-i", music]
             : ["-f", "lavfi", "-t", seconds.ToString("0.###", Inv), "-i", "anullsrc=r=48000:cl=stereo"]);
-        args.AddRange(["-map", "0:v", "-map", "1:a", "-af", $"aresample=48000,aformat=channel_layouts=stereo,apad,afade=t=out:st={Math.Max(0, seconds - 1).ToString("0.###", Inv)}:d=1"]);
+        args.AddRange(["-map", "0:v", "-map", "1:a", "-af", $"aresample=48000,aformat=channel_layouts=stereo,{(hasMusic ? Loudness + "," : "")}apad,afade=t=out:st={Math.Max(0, seconds - 1).ToString("0.###", Inv)}:d=1"]);
         args.AddRange(EncodeArgs());
         args.AddRange(["-t", seconds.ToString("0.###", Inv), temp]);
 
@@ -803,6 +817,9 @@ public sealed class AtelierService(
         args.AddRange(["-shortest", output]);
         await Pipe(ffmpeg, args, frames, (canvas, frame) => draw(canvas, frameOffset + frame, frame / (float)Math.Max(1, frames - 1)), progress, cancellationToken);
     }
+
+    /// <summary>Normalisation du volume (EBU R128) : tous les sons de l'atelier au même niveau perçu.</summary>
+    private const string Loudness = "loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000";
 
     private static IEnumerable<string> EncodeArgs() =>
     [

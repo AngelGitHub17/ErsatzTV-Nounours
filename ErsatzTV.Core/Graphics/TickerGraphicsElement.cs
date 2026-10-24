@@ -52,4 +52,20 @@ public class TickerGraphicsElement : TextGraphicsElement
     /// <summary>Rafraîchissement du RSS et de la météo, en minutes.</summary>
     [YamlMember(Alias = "refresh_minutes", ApplyNamingConventions = false)]
     public int RefreshMinutes { get; set; } = 15;
+
+    /// <summary>Fichier texte relu régulièrement (une phrase par ligne) : bandeaux modifiables en direct.</summary>
+    [YamlMember(Alias = "messages_file", ApplyNamingConventions = false)]
+    public string MessagesFile { get; set; }
+
+    /// <summary>Relecture en secondes (prioritaire sur refresh_minutes), ex. 5 pour un bandeau d'info en direct.</summary>
+    [YamlMember(Alias = "refresh_seconds", ApplyNamingConventions = false)]
+    public int RefreshSeconds { get; set; }
+
+    /// <summary>Rien à afficher (fichier vide) : le bandeau disparaît (flash info).</summary>
+    [YamlMember(Alias = "hide_when_empty", ApplyNamingConventions = false)]
+    public bool HideWhenEmpty { get; set; }
+
+    /// <summary>Texte fixe (ne défile que s'il est trop long) : sujet en cours, « EN DIRECT »…</summary>
+    [YamlMember(Alias = "fixed", ApplyNamingConventions = false)]
+    public bool Fixed { get; set; }
 }

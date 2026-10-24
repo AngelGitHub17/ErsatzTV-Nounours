@@ -1,0 +1,222 @@
+@page "/conducteur"
+@using System.Globalization
+@using ErsatzTV.Application.Nounours
+@implements IDisposable
+@inject IRegieService Regie
+@inject IGuideService GuideService
+@inject ISnackbar Snackbar
+
+<PageTitle>Conducteur en direct · ErsatzTV</PageTitle>
+
+<div class="n-page" style="height: 100%; overflow-y: auto">
+    <div class="n-page-header">
+        <div>
+            <h1>Conducteur en direct</h1>
+            <p>Les prochaines heures d'une chaîne, et ce que vous voulez y glisser : une vidéo maintenant, juste avant un programme, ou à la place d'un programme. La grille n'est pas reconstruite : tout reprend à l'heure prévue.</p>
+        </div>
+    </div>
+
+    <div class="n-card mb-3">
+        <div class="d-flex gap-3 flex-wrap align-start">
+            <MudSelect T="int" Value="@_playoutId" ValueChanged="@SelectChannel" Label="Chaîne" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 220px; max-width: 280px">
+                @foreach (RegieChannel channel in _channels)
+                {
+                    <MudSelectItem Value="@channel.PlayoutId">@channel.Number · @channel.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudAutocomplete T="RegieSource" Value="@_source" ValueChanged="@(v => _source = v)" SearchFunc="@Search" ToStringFunc="@(x => x?.Title)" Label="Vidéo ou flux à glisser"
+                             Variant="Variant.Outlined" Margin="Margin.Dense" DebounceInterval="300" MinCharacters="0" Style="flex: 1; min-width: 260px">
+                <ItemTemplate Context="item"><div><b>@item.Title</b> <span class="n-muted">· @item.Detail</span></div></ItemTemplate>
+            </MudAutocomplete>
+            <MudButton Variant="Variant.Filled" Color="Color.Error" StartIcon="@Icons.Material.Filled.PlayArrow" OnClick="@AirNow" Disabled="@(_source is null || _busy)" Style="margin-top: 4px">Passer maintenant</MudButton>
+        </div>
+        @if (Current is { OnAir: true } on)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-3" ContentAlignment="HorizontalAlignment.Left">
+                <div class="d-flex align-center gap-3">
+                    <span>À l'antenne en régie : <b>@on.Title</b>@(on.Until is { } u ? $" jusqu'à {u.ToLocalTime():HH:mm:ss}" : "")</span>
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@Release" Disabled="@_busy">Rendre l'antenne</MudButton>
+                </div>
+            </MudAlert>
+        }
+        <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">
+            Choisissez la vidéo, puis sur la ligne d'un programme : <b>Juste avant</b> (elle finit pile quand il commence, à la place de la fin du programme précédent) ou <b>À la place</b> (elle tourne pendant toute sa durée).
+        </MudText>
+    </div>
+
+    <div class="n-card">
+        <div class="n-card-title">Les 6 prochaines heures</div>
+        @if (_rows.Count == 0)
+        {
+            <div class="n-empty" style="padding: 20px">Rien de prévu sur cette chaîne.</div>
+        }
+        @foreach (Row row in _rows)
+        {
+            if (row.Insert is { } insert)
+            {
+                <div class="n-cond-row n-cond-insert" @key="@($"i{insert.Id}")">
+                    <b>@row.Start.ToString("HH:mm:ss", Fr)</b>
+                    <span style="flex: 1"><MudIcon Icon="@Icons.Material.Filled.SubdirectoryArrowRight" Size="Size.Small"/> @insert.Name · @insert.MediaTitle@(insert.Minutes > 0 ? $" · {insert.Minutes} min" : "")</span>
+                    <span class="n-muted">@(insert.Enabled ? "prévu" : insert.LastResult)</span>
+                    @if (insert.Enabled && insert.Date is not null)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="@(() => Cancel(insert))"/>
+                    }
+                </div>
+                continue;
+            }
+
+            GuideEntry entry = row.Entry;
+            bool now = entry.Start <= DateTimeOffset.Now && entry.Finish > DateTimeOffset.Now;
+            <div class="n-cond-row @(now ? "is-now" : "") @(entry.IsFiller ? "is-filler" : "")" @key="@($"e{entry.Start.Ticks}")">
+                <b>@entry.Start.ToLocalTime().ToString("HH:mm:ss", Fr)</b>
+                <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">
+                    @if (now)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Filled">EN COURS</MudChip>
+                    }
+                    @entry.DisplayTitle
+                    <span class="n-muted">· @Length(entry.Finish - entry.Start)@(entry.IsFiller ? " · intercalaire" : "")</span>
+                </span>
+                @if (entry.Start > DateTimeOffset.Now.AddSeconds(30))
+                {
+                    <MudButton Size="Size.Small" Variant="Variant.Text" Disabled="@(_source is null)" OnClick="@(() => InsertBefore(entry))">Juste avant</MudButton>
+                    <MudButton Size="Size.Small" Variant="Variant.Text" Disabled="@(_source is null)" OnClick="@(() => Replace(entry))">À la place</MudButton>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
+
+    private sealed record Row(DateTimeOffset Start, GuideEntry Entry, Appointment Insert);
+
+    private List<RegieChannel> _channels = [];
+    private int _playoutId;
+    private RegieSource _source;
+    private List<Row> _rows = [];
+    private bool _busy;
+    private Timer _timer;
+
+    private RegieChannel Current => _channels.Find(c => c.PlayoutId == _playoutId);
+
+    protected override async Task OnInitializedAsync()
+    {
+        // ménage : les insertions de plus de deux jours
+        NounoursSettings.Update(s => s.Appointments.RemoveAll(a => a.Date is { } d && d < DateOnly.FromDateTime(DateTime.Today.AddDays(-2))));
+        _channels = await Regie.GetChannels(CancellationToken.None);
+        _playoutId = _channels.FirstOrDefault()?.PlayoutId ?? 0;
+        await Load();
+        _timer = new Timer(_ => InvokeAsync(async () => { await Load(); StateHasChanged(); }), null, TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(20));
+    }
+
+    private async Task SelectChannel(int playoutId)
+    {
+        _playoutId = playoutId;
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        RegieChannel channel = Current;
+        if (channel is null)
+        {
+            _rows = [];
+            return;
+        }
+
+        _channels = await Regie.GetChannels(CancellationToken.None);
+        DateTimeOffset now = DateTimeOffset.Now;
+        List<GuideEntry> entries = await GuideService.GetEntries(now.AddMinutes(-30), now.AddHours(6), [channel.ChannelId], includeFiller: true, CancellationToken.None);
+        var rows = entries
+            .Where(e => e.Kind != GuideEntryKind.Gap && e.Finish > now)
+            .Select(e => new Row(e.Start.ToLocalTime(), e, null))
+            .ToList();
+
+        // insertions prévues (aujourd'hui / demain) pour cette chaîne
+        foreach (Appointment a in NounoursSettings.Load().Appointments.Where(a => a.PlayoutId == _playoutId && a.Date is not null))
+        {
+            if (TimeSpan.TryParse(a.At, CultureInfo.InvariantCulture, out TimeSpan at))
+            {
+                var when = new DateTimeOffset(a.Date!.Value.ToDateTime(TimeOnly.MinValue) + at, now.Offset);
+                if (when > now.AddMinutes(-30) && when < now.AddHours(6))
+                {
+                    rows.Add(new Row(when, null, a));
+                }
+            }
+        }
+
+        _rows = rows.OrderBy(r => r.Start).ThenBy(r => r.Insert is null ? 1 : 0).ToList();
+    }
+
+    private async Task<IEnumerable<RegieSource>> Search(string text, CancellationToken token) =>
+        string.IsNullOrWhiteSpace(text) ? await Regie.Suggestions(token) : await Regie.Search(text, token);
+
+    private async Task AirNow()
+    {
+        _busy = true;
+        try
+        {
+            Either<BaseError, Unit> result = await Regie.TakeAir(_playoutId, _source.MediaItemId, _source.IsLive ? RegieMode.UntilRelease : RegieMode.Once, 0, _source.Title, CancellationToken.None);
+            result.Match(_ => Snackbar.Add($"« {_source.Title} » à l'antenne.", Severity.Success), e => Snackbar.Add(e.ToString(), Severity.Error));
+            await Load();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task Release()
+    {
+        _busy = true;
+        try
+        {
+            await Regie.Release(_playoutId, CancellationToken.None);
+            await Load();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private Task InsertBefore(GuideEntry entry)
+    {
+        double seconds = Math.Max(1, _source.Duration.TotalSeconds);
+        DateTimeOffset at = entry.Start.ToLocalTime().AddSeconds(-seconds);
+        return Plan(at, 0, $"Avant « {entry.DisplayTitle} »");
+    }
+
+    private Task Replace(GuideEntry entry)
+    {
+        var minutes = (int)Math.Max(1, Math.Round((entry.Finish - entry.Start).TotalMinutes));
+        return Plan(entry.Start.ToLocalTime(), minutes, $"À la place de « {entry.DisplayTitle} »");
+    }
+
+    private async Task Plan(DateTimeOffset at, int minutes, string name)
+    {
+        var appointment = new Appointment
+        {
+            Name = name, At = at.ToString("HH:mm:ss", CultureInfo.InvariantCulture), Date = DateOnly.FromDateTime(at.Date),
+            PlayoutId = _playoutId, MediaItemId = _source.MediaItemId, MediaTitle = _source.Title,
+            DurationSeconds = _source.Duration.TotalSeconds, Minutes = minutes
+        };
+        NounoursSettings.Update(s => s.Appointments.Add(appointment));
+        Snackbar.Add($"Prévu à {at:HH:mm:ss} : {_source.Title}", Severity.Success);
+        await Load();
+    }
+
+    private async Task Cancel(Appointment appointment)
+    {
+        NounoursSettings.Update(s => s.Appointments.RemoveAll(a => a.Id == appointment.Id));
+        await Load();
+    }
+
+    private static string Length(TimeSpan t) =>
+        t.TotalHours >= 1 ? $"{(int)t.TotalHours} h {t.Minutes:00}" : t.TotalMinutes >= 1 ? $"{(int)t.TotalMinutes} min {t.Seconds:00}" : $"{t.Seconds} s";
+
+    public void Dispose() => _timer?.Dispose();
+}

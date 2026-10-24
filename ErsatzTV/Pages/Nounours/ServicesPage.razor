@@ -93,6 +93,7 @@
                         }
                     </div>
                 }
+                @BroadcastEditor(_s.Tonight.Broadcast)
                 <JobCard Job="@_job"/>
                 <MudText Typo="Typo.body2" Class="n-muted mt-2">Le carton est toujours le même fichier (« Bandes-annonces ») : mettez-le une fois dans un programme ou un créneau avant la soirée, il se met à jour tout seul chaque jour.</MudText>
             </div>
@@ -124,6 +125,7 @@
                 {
                     <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Dernière fois (@_s.Weekly.LastMade?.ToString("dd/MM", Fr)) : @_s.Weekly.LastResult</MudText>
                 }
+                @BroadcastEditor(_s.Weekly.Broadcast)
                 <JobCard Job="@_weeklyJob"/>
                 <MudText Typo="Typo.body2" Class="n-muted mt-2">Les films des 7 prochains jours trouvés dans le guide : deux extraits chacun, avec le jour et l'heure de diffusion. Toujours le même fichier (« Bandes-annonces ») : mettez-le une fois dans vos programmes.</MudText>
             </div>
@@ -159,6 +161,7 @@
                 {
                     <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Dernière fois (@_s.Weather.LastMade?.ToString("dd/MM", Fr)) : @_s.Weather.LastResult</MudText>
                 }
+                @BroadcastEditor(_s.Weather.Broadcast)
                 <JobCard Job="@_weatherJob"/>
                 <MudText Typo="Typo.body2" Class="n-muted mt-2">Températures d'Open-Meteo (gratuit, sans clé). Toujours le même fichier (« Bandes-annonces ») : placez-le dans un programme du matin.</MudText>
             </div>
@@ -179,6 +182,7 @@
                 <JobCard Job="@_interludeJob"/>
                 @ChannelChips(_interludeChannels)
                 <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Check" OnClick="@UseInterlude" Disabled="@(_busy || _interludeChannels.Count == 0)" Class="mt-2">L'utiliser sur ces chaînes</MudButton>
+                @BroadcastEditor(_s.InterludeBroadcast)
                 <MudText Typo="Typo.body2" Class="n-muted mt-2">Il devient le « remplissage de secours » de ces chaînes. L'heure s'affiche si l'habillage de la chaîne a une horloge et « Afficher aussi pendant les intercalaires ».</MudText>
             </div>
         </MudItem>
@@ -331,6 +335,7 @@
             }
 
             s.Appointments = current.Appointments;
+            s.InterludeBroadcast = current.InterludeBroadcast;
         });
         Snackbar.Add("Réglages enregistrés.", Severity.Success);
     }
@@ -393,6 +398,21 @@
                 bool on = ids.Contains(channel.Id);
                 <MudChip T="int" Size="Size.Small" Color="@(on ? Color.Primary : Color.Default)" Variant="@(on ? Variant.Filled : Variant.Outlined)"
                          OnClick="@(() => { if (!ids.Remove(channel.Id)) { ids.Add(channel.Id); } })">@channel.Number · @channel.Name</MudChip>
+            }
+        </div>
+    };
+
+    /// <summary>« Diffuser automatiquement » : heures, chaînes, juste avant le programme suivant.</summary>
+    private RenderFragment BroadcastEditor(BroadcastSettings b) => __builder =>
+    {
+        <div class="n-broadcast mt-3" style="border-top: 1px solid var(--mud-palette-lines-default); padding-top: 10px">
+            <MudSwitch T="bool" @bind-Value="b.Enabled" Color="Color.Secondary" Label="Diffuser automatiquement à l'antenne"/>
+            @if (b.Enabled)
+            {
+                <MudTextField @bind-Value="b.Times" Label="Heures (séparées par des virgules)" Placeholder="07:00, 12:55, 19:55" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                @ChannelChips(b.ChannelIds)
+                <MudSwitch T="bool" @bind-Value="b.BeforeNext" Color="Color.Primary"
+                           Label="@(b.BeforeNext ? "Juste avant le programme suivant (remplace la fin du programme en cours)" : "À l'heure exacte (coupe le programme en cours)")"/>
             }
         </div>
     };

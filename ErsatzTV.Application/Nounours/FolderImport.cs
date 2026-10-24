@@ -18,7 +18,10 @@ public enum ImportRole
     Films,
     Series,
     Clips,
-    Videos
+    Videos,
+
+    /// <summary>Flux en direct (OBS, chaînes d'info…) : des fichiers .yml lus comme « flux distants ».</summary>
+    Direct
 }
 
 public sealed record ImportGroup(
@@ -75,6 +78,7 @@ public sealed class FolderImportService(IDbContextFactory<TvContext> dbContextFa
             ImportRole.Films => "Films",
             ImportRole.Series => "Séries",
             ImportRole.Clips => "Clips",
+            ImportRole.Direct => "Flux en direct",
             _ => "Vidéos"
         };
 
@@ -97,10 +101,11 @@ public sealed class FolderImportService(IDbContextFactory<TvContext> dbContextFa
             ImportRole.Films => LibraryMediaKind.Movies,
             ImportRole.Series => LibraryMediaKind.Shows,
             ImportRole.Clips => LibraryMediaKind.MusicVideos,
+            ImportRole.Direct => LibraryMediaKind.RemoteStreams,
             _ => LibraryMediaKind.OtherVideos
         };
 
-    private static string LibraryName(ImportRole role) => IsContent(role) ? Label(role) : $"Habillage · {Label(role)}";
+    private static string LibraryName(ImportRole role) => IsContent(role) || role == ImportRole.Direct ? Label(role) : $"Habillage · {Label(role)}";
 
     /// <summary>
     ///     Bibliothèque utilisée pour un type : pour les films / séries / clips, la première bibliothèque locale

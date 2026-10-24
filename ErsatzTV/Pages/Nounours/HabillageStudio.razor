@@ -241,6 +241,12 @@
                             }
                             else if (item.Kind == HabillageItemKind.Ticker)
                             {
+                                <MudSelect T="string" @bind-Value="item.TickerLive" Label="Textes en direct (page Info)" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" @bind-Value:after="@MarkDirty">
+                                    <MudSelectItem Value="@string.Empty">Non : seulement les phrases ci-dessous</MudSelectItem>
+                                    <MudSelectItem Value="@("titres")">Titres de l'info (défilent)</MudSelectItem>
+                                    <MudSelectItem Value="@("flash")">Flash info (caché s'il est vide)</MudSelectItem>
+                                    <MudSelectItem Value="@("sujet")">Sujet en cours (texte fixe, caché s'il est vide)</MudSelectItem>
+                                </MudSelect>
                                 <MudTextField @bind-Value="item.TickerMessages" Label="Phrases (une par ligne)" Lines="3" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" @bind-Value:after="@MarkDirty"/>
                                 <MudTextField @bind-Value="item.RssUrl" Label="Flux RSS (titres de l'actu, facultatif)" Placeholder="https://…/rss.xml" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" @bind-Value:after="@MarkDirty"/>
                                 <div class="d-flex gap-2 align-start mt-2">
@@ -400,6 +406,18 @@
                                                 Label="Couleur du texte" Variant="Variant.Outlined" Margin="Margin.Dense" ShowAlpha="true" Class="mt-2"/>
                                 <MudColorPicker Value="@(new MudBlazor.Utilities.MudColor(item.HaloColor))" ValueChanged="@(c => { item.HaloColor = c.Value; MarkDirty(); })"
                                                 Label="Couleur du contour" Variant="Variant.Outlined" Margin="Margin.Dense" ShowAlpha="true" Class="mt-2"/>
+                                @if (item.Kind == HabillageItemKind.Text)
+                                {
+                                    <MudSwitch T="bool" Value="@(!string.IsNullOrEmpty(item.BoxColor))" ValueChanged="@((bool v) => { item.BoxColor = v ? "#000000FF" : string.Empty; MarkDirty(); })" Color="Color.Primary"
+                                               Label="Cartouche derrière le texte (à sa taille)" Class="mt-2"/>
+                                    @if (!string.IsNullOrEmpty(item.BoxColor))
+                                    {
+                                        <MudColorPicker Value="@(new MudBlazor.Utilities.MudColor(item.BoxColor))" ValueChanged="@(c => { item.BoxColor = c.Value; MarkDirty(); })"
+                                                        Label="Couleur du cartouche" Variant="Variant.Outlined" Margin="Margin.Dense" ShowAlpha="true"/>
+                                        <MudSwitch T="bool" @bind-Value="item.BoxSnap" Color="Color.Primary" Label="Largeur alignée sur la grille (1/16 d'écran)" @bind-Value:after="@MarkDirty"/>
+                                        <MudText Typo="Typo.caption" Class="n-muted">Sans texte (ex. pas de sous-titre pour un film), le cartouche ne s'affiche pas.</MudText>
+                                    }
+                                }
                                 <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Épaisseur du contour : @Num(item.HaloWidth)</MudText>
                                 <MudSlider T="double" @bind-Value="item.HaloWidth" Min="0" Max="12" Step="0.5" Color="Color.Primary" @bind-Value:after="@MarkDirty"/>
                                 <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Largeur max : @(item.Width <= 0 ? "libre" : $"{Num(item.Width)} % (le texte rétrécit pour tenir)")</MudText>
@@ -751,11 +769,12 @@
                 Kind = HabillageItemKind.Banner, Label = label, X = x, Y = y, Width = w, Height = h, CornerRadius = 0,
                 BackgroundColor = color, Visibility = visibility, VisibleSeconds = seconds
             };
-        HabillageItem Caps(string label, string text, double x, double y, double size, int weight, HabillageVisibility visibility, int seconds, int epg = 0) =>
+        HabillageItem Caps(string label, string text, double x, double y, double size, int weight, HabillageVisibility visibility, int seconds, string box = ink) =>
             new()
             {
                 Kind = HabillageItemKind.Text, Label = label, Text = text, X = x, Y = y, Width = 0, FontFamily = font, FontSize = size,
-                FontWeight = weight, Italic = true, Color = "#FFFFFF", HaloWidth = 0, Visibility = visibility, VisibleSeconds = seconds, EpgEntries = epg
+                FontWeight = weight, Italic = false, Color = "#FFFFFF", HaloWidth = 0, Visibility = visibility, VisibleSeconds = seconds,
+                BoxColor = box, BoxSnap = true
             };
 
         return new HabillageScene
@@ -769,11 +788,11 @@
                     Kind = HabillageItemKind.Frame, Label = "Cadre", BackgroundColor = "#E1E8CDFF", FrameSide = 5.5, FrameTop = 7,
                     FrameBottom = 9, CornerRadius = 0, FrameShadow = true, Visibility = HabillageVisibility.ProgramStart, VisibleSeconds = 20
                 },
-                Bar("Cartouche · fond", 5.5, 7, 17, 6.5, HabillageVisibility.Always, 10),
-                Caps("Cartouche · nom de la chaîne", "MA CHAÎNE", 6.3, 7.9, 46, 900, HabillageVisibility.Always, 10),
+                // les cartouches prennent la taille du texte (alignés sur des huitièmes d'écran) : plus de bandeau vide
+                Caps("Cartouche · nom de la chaîne", "MA CHAÎNE", 5.5, 7, 40, 900, HabillageVisibility.Always, 10),
                 Bar("Bloc de couleur", 88.5, 7, 6, 10.7, HabillageVisibility.ProgramStart, 12, "#FF3200FF"),
-                Bar("Bandeau titre · fond", 5.5, 80.6, 52, 4.6, HabillageVisibility.ProgramStart, 20),
-                Caps("Bandeau titre · texte", "{{ MediaItem_Title | string.upcase }}", 6.3, 81.2, 34, 800, HabillageVisibility.ProgramStart, 20),
+                Caps("Titre", "{{ (MediaItem_ShowTitle ?? MediaItem_Title) | string.upcase }}", 5.5, 77.5, 40, 900, HabillageVisibility.ProgramStart, 20),
+                Caps("Sous-titre (épisode)", "{{ if MediaItem_ShowTitle }}{{ MediaItem_Title | string.upcase }}{{ end }}", 5.5, 84.6, 26, 900, HabillageVisibility.ProgramStart, 20, "#FF3200FF"),
                 new HabillageItem
                 {
                     Kind = HabillageItemKind.UpNext, Label = "Tout de suite", X = 5.5, Y = 70, Width = 46, VisibleSeconds = 25, ZIndex = 80
@@ -1117,6 +1136,11 @@
         if (item.HaloWidth > 0)
         {
             css += $" -webkit-text-stroke: {px(item.HaloWidth * 2)} {item.HaloColor}; paint-order: stroke fill;";
+        }
+
+        if (item.Kind == HabillageItemKind.Text && !string.IsNullOrEmpty(item.BoxColor))
+        {
+            css += $" background: {item.BoxColor}; padding: {px(item.FontSize * 0.2)} {px(item.FontSize * 0.36)};";
         }
 
         return css;

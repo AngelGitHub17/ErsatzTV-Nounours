@@ -20,6 +20,18 @@ public sealed class NounoursSettings
     public WeatherSettings Weather { get; set; } = new();
     public List<Appointment> Appointments { get; set; } = [];
 
+    /// <summary>Diffusion automatique de l'interlude à heures fixes (en plus du remplissage de secours).</summary>
+    public BroadcastSettings InterludeBroadcast { get; set; } = new();
+
+    /// <summary>Derniers passages des diffusions automatiques (clé = service:heure:chaîne).</summary>
+    public Dictionary<string, DateTimeOffset> BroadcastRuns { get; set; } = [];
+
+    /// <summary>Source OBS pour les directs (Régie et Info).</summary>
+    public ObsSettings Obs { get; set; } = new();
+
+    /// <summary>Bandeaux de la chaîne d'info, modifiables en direct.</summary>
+    public InfoSettings Info { get; set; } = new();
+
     /// <summary>Chaînes éphémères : identifiant de chaîne → date de suppression automatique.</summary>
     public Dictionary<int, DateTimeOffset> EphemeralChannels { get; set; } = [];
 
@@ -87,8 +99,25 @@ public sealed class PublishSettings
 }
 
 /// <summary>Carton « Ce soir » fabriqué chaque jour à partir du guide.</summary>
+/// <summary>
+///     Diffusion automatique d'une vidéo fabriquée par les services : aux heures choisies, sur les chaînes choisies,
+///     juste avant le programme suivant (elle remplace la fin du programme en cours, souvent le générique) ou à l'heure exacte.
+/// </summary>
+public sealed class BroadcastSettings
+{
+    public bool Enabled { get; set; }
+
+    /// <summary>Heures séparées par des virgules, ex. « 07:00, 12:55, 19:55 ».</summary>
+    public string Times { get; set; } = "12:55, 19:55";
+
+    public List<int> ChannelIds { get; set; } = [];
+    public bool BeforeNext { get; set; } = true;
+}
+
 public sealed class TonightSettings
 {
+    public BroadcastSettings Broadcast { get; set; } = new() { Times = "19:55" };
+
     public bool Enabled { get; set; }
 
     /// <summary>Heure de fabrication, « HH:mm ».</summary>
@@ -109,6 +138,8 @@ public sealed class TonightSettings
 /// <summary>Bande-annonce « Cette semaine » : les films de la semaine, refaite chaque semaine au jour et à l'heure choisis.</summary>
 public sealed class WeeklySettings
 {
+    public BroadcastSettings Broadcast { get; set; } = new() { Times = "13:55, 20:35" };
+
     public bool Enabled { get; set; }
 
     /// <summary>Jour de fabrication (lundi par défaut).</summary>
@@ -127,6 +158,8 @@ public sealed class WeeklySettings
 /// <summary>Carte météo en quadrillage, refaite chaque jour (Open-Meteo, sans clé).</summary>
 public sealed class WeatherSettings
 {
+    public BroadcastSettings Broadcast { get; set; } = new() { Times = "07:00, 12:55, 19:55" };
+
     public bool Enabled { get; set; }
     public string At { get; set; } = "06:00";
 
@@ -155,6 +188,53 @@ public sealed class Appointment
     public int PlayoutId { get; set; }
     public int MediaItemId { get; set; }
     public string MediaTitle { get; set; } = string.Empty;
+
+    /// <summary>Un seul jour (insertion dans le conducteur) ; vide = récurrent.</summary>
+    public DateOnly? Date { get; set; }
+
+    /// <summary>Juste avant le programme suivant (finit pile au début du programme qui suit l'heure dite).</summary>
+    public bool BeforeNext { get; set; }
+
+    /// <summary>Durée de la vidéo (sert à « juste avant »).</summary>
+    public double DurationSeconds { get; set; }
+
+    /// <summary>« À la place » : la vidéo tourne en boucle pendant N minutes (0 = une fois).</summary>
+    public int Minutes { get; set; }
     public DateTimeOffset? LastRun { get; set; }
     public string LastResult { get; set; }
+}
+
+/// <summary>
+///     OBS en direct : OBS envoie son image en SRT (Réglages › Stream › Personnalisé, ou Sortie « Enregistrement personnalisé »)
+///     et ErsatzTV la reprend comme un flux en direct.
+/// </summary>
+public sealed class ObsSettings
+{
+    /// <summary>Adresse du PC qui fait tourner OBS (127.0.0.1 si c'est le même PC).</summary>
+    public string Host { get; set; } = "127.0.0.1";
+
+    public int Port { get; set; } = 9710;
+
+    /// <summary>« srt » (recommandé) ou « udp ».</summary>
+    public string Protocol { get; set; } = "srt";
+
+    /// <summary>Latence SRT en millisecondes.</summary>
+    public int LatencyMs { get; set; } = 300;
+}
+
+/// <summary>Chaîne d'info : titres qui défilent, flash, sujet en cours ; lus par l'habillage toutes les quelques secondes.</summary>
+public sealed class InfoSettings
+{
+    public string Headlines { get; set; } = "Bienvenue sur la chaîne d'information\nToute l'actualité en continu";
+    public string Flash { get; set; } = string.Empty;
+    public string Topic { get; set; } = string.Empty;
+    public string RssUrl { get; set; } = string.Empty;
+    public string ChannelName { get; set; } = "NOUNOURS INFO";
+    public List<InfoSource> Sources { get; set; } = [];
+}
+
+public sealed class InfoSource
+{
+    public string Name { get; set; } = string.Empty;
+    public string Url { get; set; } = string.Empty;
 }

@@ -1,0 +1,239 @@
+@page "/info"
+@using System.Globalization
+@using ErsatzTV.Application.Channels
+@using ErsatzTV.Application.Nounours
+@inject IInfoService Info
+@inject IRegieService Regie
+@inject IHabillageService Habillage
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+
+<PageTitle>Info en continu · ErsatzTV</PageTitle>
+
+<div class="n-page" style="height: 100%; overflow-y: auto">
+    <div class="n-page-header">
+        <div>
+            <h1>Info en continu</h1>
+            <p>Une chaîne d'information : les bandeaux (sujet « EN DIRECT », flash, titres qui défilent) se changent ici <b>en direct</b> et restent à l'écran sur tout ce qui passe — vos vidéos, un flux d'une chaîne d'info, ou votre direct OBS.</p>
+        </div>
+    </div>
+
+    <MudGrid Spacing="3">
+        @* ------------------------------------------------ bandeaux *@
+        <MudItem xs="12" lg="6">
+            <div class="n-card" style="height: 100%">
+                <div class="n-card-title">Les bandeaux, en direct</div>
+                <MudTextField @bind-Value="_s.Info.Topic" Label="Sujet en cours (bandeau « EN DIRECT », vide = caché)" Placeholder="Conseil municipal de Saintes" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                <MudTextField @bind-Value="_s.Info.Flash" Label="Flash info (bandeau rouge, vide = caché)" Placeholder="Coupure de courant dans le centre-ville" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"/>
+                <MudTextField @bind-Value="_s.Info.Headlines" Label="Titres qui défilent (un par ligne)" Lines="5" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"/>
+                <MudTextField @bind-Value="_s.Info.RssUrl" Label="Flux RSS ajouté aux titres (facultatif)" Placeholder="https://…/rss.xml" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"
+                              HelperText="Pris en compte au prochain « Appliquer l'habillage », relu toutes les 15 minutes"/>
+                <div class="d-flex gap-2 mt-3 flex-wrap">
+                    <MudButton Variant="Variant.Filled" Color="Color.Error" StartIcon="@Icons.Material.Filled.Campaign" OnClick="@Publish">Mettre à l'antenne</MudButton>
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.ClearAll" OnClick="@ClearFlash">Retirer le flash</MudButton>
+                </div>
+                <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">Les changements apparaissent à l'écran en 5 secondes environ, sans couper l'image.</MudText>
+            </div>
+        </MudItem>
+
+        @* ------------------------------------------------ prendre l'antenne *@
+        <MudItem xs="12" lg="6">
+            <div class="n-card" style="height: 100%">
+                <div class="n-card-title">Prendre l'antenne</div>
+                <MudText Typo="Typo.body2" Class="n-muted mb-2">Passez un flux en direct (OBS, chaîne d'info) ou une vidéo sur la chaîne : les bandeaux restent par-dessus. « Rendre l'antenne » revient à la grille, à l'heure.</MudText>
+                <div class="d-flex gap-2 flex-wrap align-start">
+                    <MudSelect T="int" @bind-Value="_playoutId" Label="Chaîne" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 180px">
+                        @foreach (RegieChannel channel in _regieChannels)
+                        {
+                            <MudSelectItem Value="@channel.PlayoutId">@channel.Number · @channel.Name@(channel.OnAir ? " · à l'antenne" : "")</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudAutocomplete T="RegieSource" Value="@_source" ValueChanged="@(v => _source = v)" SearchFunc="@Search" ToStringFunc="@(x => x?.Title)" Label="Source"
+                                     Variant="Variant.Outlined" Margin="Margin.Dense" DebounceInterval="300" MinCharacters="0" Style="flex: 1; min-width: 200px">
+                        <ItemTemplate Context="item"><div><b>@item.Title</b> <span class="n-muted">· @item.Detail</span></div></ItemTemplate>
+                    </MudAutocomplete>
+                </div>
+                <div class="d-flex gap-2 mt-3">
+                    <MudButton Variant="Variant.Filled" Color="Color.Error" StartIcon="@Icons.Material.Filled.Sensors" OnClick="@TakeAir" Disabled="@(_busy || _source is null || _playoutId == 0)">Prendre l'antenne</MudButton>
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Undo" OnClick="@Release" Disabled="@(_busy || _playoutId == 0)">Rendre l'antenne</MudButton>
+                </div>
+                @if (_regieChannels.Find(c => c.PlayoutId == _playoutId) is { OnAir: true } on)
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-3">À l'antenne : <b>@on.Title</b></MudAlert>
+                }
+            </div>
+        </MudItem>
+
+        @* ------------------------------------------------ habillage *@
+        <MudItem xs="12" lg="6">
+            <div class="n-card" style="height: 100%">
+                <div class="n-card-title">L'habillage info</div>
+                <MudText Typo="Typo.body2" Class="n-muted mb-2">Nom de la chaîne en haut à gauche, heure en haut à droite, puis en bas : sujet « EN DIRECT », flash, titres qui défilent. Ajustable ensuite dans le <MudLink Href="@($"habillage/{InfoService.SceneSlug}")" Typo="Typo.body2">studio d'habillage</MudLink>.</MudText>
+                <MudTextField @bind-Value="_s.Info.ChannelName" Label="Nom affiché" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                <div class="d-flex gap-1 flex-wrap mt-2 align-center">
+                    <span class="n-muted" style="font-size: .85rem">Sur les chaînes :</span>
+                    @foreach (ChannelViewModel channel in _channels)
+                    {
+                        bool active = _sceneChannels.Contains(channel.Id);
+                        <MudChip T="int" Size="Size.Small" Color="@(active ? Color.Primary : Color.Default)" Variant="@(active ? Variant.Filled : Variant.Outlined)"
+                                 OnClick="@(() => { if (!_sceneChannels.Remove(channel.Id)) { _sceneChannels.Add(channel.Id); } })">@channel.Number · @channel.Name</MudChip>
+                    }
+                </div>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Layers" OnClick="@ApplyScene" Disabled="@_busy" Class="mt-3">Créer / mettre à jour et appliquer</MudButton>
+            </div>
+        </MudItem>
+
+        @* ------------------------------------------------ sources *@
+        <MudItem xs="12" lg="6">
+            <div class="n-card" style="height: 100%">
+                <div class="n-card-title">Sources en direct : OBS et flux d'info</div>
+                <MudText Typo="Typo.body2" Class="mb-2"><b>OBS</b> (caméra, écran, invités…) :</MudText>
+                <div class="d-flex gap-2 flex-wrap">
+                    <MudSelect T="string" @bind-Value="_s.Obs.Protocol" Label="Liaison" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 150px">
+                        <MudSelectItem Value="@("srt")">SRT (conseillé)</MudSelectItem>
+                        <MudSelectItem Value="@("udp")">UDP (même réseau)</MudSelectItem>
+                    </MudSelect>
+                    @if (_s.Obs.Protocol != "udp")
+                    {
+                        <MudTextField @bind-Value="_s.Obs.Host" Label="Adresse du PC OBS" Variant="Variant.Outlined" Margin="Margin.Dense"/>
+                    }
+                    <MudNumericField @bind-Value="_s.Obs.Port" Label="Port" Min="1024" Max="65535" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 120px"/>
+                    @if (_s.Obs.Protocol != "udp")
+                    {
+                        <MudNumericField @bind-Value="_s.Obs.LatencyMs" Label="Latence (ms)" Min="20" Max="8000" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 130px"/>
+                    }
+                </div>
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2" NoIcon="true">
+                    Dans OBS : <b>Paramètres › Stream</b>, service <b>Personnalisé</b>, serveur
+                    <code>@ObsServer()</code>, clé vide, puis <b>Démarrer le streaming</b>.
+                    Ici : source « OBS (direct) » dans « Prendre l'antenne ».
+                </MudAlert>
+
+                <MudText Typo="Typo.body2" Class="mt-3 mb-1"><b>Flux de chaînes d'info</b> (lien direct .m3u8 / .ts publié par la chaîne) :</MudText>
+                @foreach (InfoSource source in _s.Info.Sources)
+                {
+                    <div class="d-flex gap-2 align-center mb-1" @key="source">
+                        <span style="min-width: 140px"><b>@source.Name</b></span>
+                        <span class="n-muted" style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .85rem">@source.Url</span>
+                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="@(() => _s.Info.Sources.Remove(source))"/>
+                    </div>
+                }
+                <div class="d-flex gap-2 flex-wrap">
+                    <MudTextField @bind-Value="_newSource.Name" Label="Nom" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 180px"/>
+                    <MudTextField @bind-Value="_newSource.Url" Label="Adresse du flux" Placeholder="https://…/index.m3u8" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex: 1"/>
+                    <MudIconButton Icon="@Icons.Material.Filled.Add" OnClick="@AddSource" Disabled="@(string.IsNullOrWhiteSpace(_newSource.Url))" Style="margin-top: 4px"/>
+                </div>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Save" OnClick="@SyncSources" Disabled="@_busy" Class="mt-3">Enregistrer les sources</MudButton>
+                <MudText Typo="Typo.caption" Class="n-muted d-block mt-2">N'ajoutez que des flux que la chaîne autorise à reprendre (beaucoup publient un lien officiel). Les sources apparaissent aussi dans la Régie et le Conducteur.</MudText>
+            </div>
+        </MudItem>
+    </MudGrid>
+</div>
+
+@code {
+    private NounoursSettings _s = new();
+    private List<ChannelViewModel> _channels = [];
+    private List<RegieChannel> _regieChannels = [];
+    private readonly List<int> _sceneChannels = [];
+    private InfoSource _newSource = new();
+    private RegieSource _source;
+    private int _playoutId;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _s = NounoursSettings.Load();
+        _channels = (await Mediator.Send(new GetAllChannels()))
+            .OrderBy(c => double.TryParse(c.Number, NumberStyles.Number, CultureInfo.InvariantCulture, out double n) ? n : 0)
+            .ToList();
+        _regieChannels = await Regie.GetChannels(CancellationToken.None);
+        _playoutId = _regieChannels.FirstOrDefault()?.PlayoutId ?? 0;
+        foreach (HabillageChannelTarget target in await Habillage.GetTargets(CancellationToken.None))
+        {
+            if (target.Scenes.Contains(InfoService.SceneSlug))
+            {
+                _sceneChannels.Add(target.ChannelId);
+            }
+        }
+    }
+
+    private void SaveSettings()
+    {
+        InfoSettings info = _s.Info;
+        ObsSettings obs = _s.Obs;
+        NounoursSettings.Update(s =>
+        {
+            s.Info = info;
+            s.Obs = obs;
+        });
+    }
+
+    private string ObsServer() =>
+        _s.Obs.Protocol == "udp"
+            ? $"udp://ADRESSE-DE-CE-PC:{_s.Obs.Port}"
+            : $"srt://0.0.0.0:{_s.Obs.Port}?mode=listener&latency={Math.Clamp(_s.Obs.LatencyMs, 20, 8000) * 1000}";
+
+    private void Publish()
+    {
+        SaveSettings();
+        Info.PublishBanners(_s.Info);
+        Snackbar.Add("Bandeaux à l'antenne (environ 5 s).", Severity.Success);
+    }
+
+    private void ClearFlash()
+    {
+        _s.Info.Flash = string.Empty;
+        Publish();
+    }
+
+    private async Task Busy(Func<Task> work)
+    {
+        _busy = true;
+        try
+        {
+            await work();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private Task ApplyScene() => Busy(async () =>
+    {
+        SaveSettings();
+        Snackbar.Add(await Info.ApplyScene(_s.Info, _sceneChannels, CancellationToken.None), Severity.Success);
+    });
+
+    private void AddSource()
+    {
+        _s.Info.Sources.Add(new InfoSource { Name = string.IsNullOrWhiteSpace(_newSource.Name) ? "Flux info" : _newSource.Name.Trim(), Url = _newSource.Url.Trim() });
+        _newSource = new InfoSource();
+    }
+
+    private Task SyncSources() => Busy(async () =>
+    {
+        SaveSettings();
+        Snackbar.Add(await Info.SyncSources(_s, CancellationToken.None), Severity.Success);
+    });
+
+    private async Task<IEnumerable<RegieSource>> Search(string text, CancellationToken token) =>
+        string.IsNullOrWhiteSpace(text) ? await Regie.Suggestions(token) : await Regie.Search(text, token);
+
+    private Task TakeAir() => Busy(async () =>
+    {
+        Either<BaseError, Unit> result = await Regie.TakeAir(_playoutId, _source.MediaItemId, _source.IsLive ? RegieMode.UntilRelease : RegieMode.Once, 0, _source.Title, CancellationToken.None);
+        result.Match(_ => Snackbar.Add($"« {_source.Title} » à l'antenne.", Severity.Success), e => Snackbar.Add(e.ToString(), Severity.Error));
+        _regieChannels = await Regie.GetChannels(CancellationToken.None);
+    });
+
+    private Task Release() => Busy(async () =>
+    {
+        await Regie.Release(_playoutId, CancellationToken.None);
+        _regieChannels = await Regie.GetChannels(CancellationToken.None);
+    });
+}

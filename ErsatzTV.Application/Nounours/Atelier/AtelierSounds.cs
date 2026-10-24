@@ -1,34 +1,81 @@
 using System.Text.Json;
+using static ErsatzTV.Application.Nounours.Atelier.AtelierSynth;
 
 namespace ErsatzTV.Application.Nounours.Atelier;
 
 /// <summary>
-///     Les sons de l'atelier rangés par ambiance (énergique, calme, suspense…), plus quelques boucles
-///     « maison » fabriquées par le programme lui-même (aucun droit d'auteur : elles sont synthétisées ici).
+///     Les sons de l'atelier rangés par ambiance, plus des sons « maison » fabriqués par le programme
+///     (synthétisés ici, mélodies originales : aucun droit d'auteur) dans l'esprit des habillages télé des années 90 :
+///     indicatifs courts qui finissent sur un coup (pour les jingles) et boucles (interlude, météo, cartons).
 /// </summary>
 public static class AtelierSounds
 {
-    public static readonly string[] Ambiances = ["Énergique", "Calme", "Suspense", "Jeunesse", "Cinéma", "Pub"];
+    public static readonly string[] Ambiances = ["Indicatif", "Énergique", "Calme", "Suspense", "Jeunesse", "Cinéma", "Pub"];
 
     public const string BuiltinPrefix = "integre-";
 
+    /// <summary>Version des sons intégrés : en la changeant, les anciens fichiers sont remplacés.</summary>
+    private const string Version = "v2-";
+
     private static readonly object Lock = new();
     private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
+    private static readonly Queue<string> Recent = new();
 
     private static string TagsFile => Path.Combine(AtelierService.SourcesFolder, "ambiances.json");
 
-    /// <summary>Boucles intégrées : nom de fichier, nom affiché, ambiance, générateur.</summary>
-    private static readonly (string File, string Name, string Ambiance, Func<float[]> Make)[] Builtins =
+    // basses (16 doubles croches) : -99 = silence
+    private const int X = -99;
+    private static readonly int[] BassHouse = [0, X, 0, X, X, X, 0, X, 0, X, X, 7, X, 0, X, X];
+    private static readonly int[] BassFunk = [0, X, X, 7, X, X, 0, X, X, 0, 4, X, 7, X, 5, X];
+    private static readonly int[] BassRoot = [0, X, X, X, X, X, X, X, 0, X, X, X, X, X, X, X];
+    private static readonly int[] BassPulse = [0, X, 0, X, 0, X, 0, X, 0, X, 0, X, 0, X, 0, X];
+    private static readonly int[] BassNone = [X];
+
+    /// <summary>Sons intégrés : fichier, nom affiché, ambiance, recette.</summary>
+    private static readonly (string File, string Name, string Ambiance, Recipe Recipe)[] Builtins =
     [
-        (BuiltinPrefix + "pulsation-95.wav", "Pulsation 95", "Énergique", Synth.Pulsation),
-        (BuiltinPrefix + "vitamine.wav", "Vitamine", "Jeunesse", Synth.Vitamine),
-        (BuiltinPrefix + "nuit-calme.wav", "Nuit calme", "Calme", Synth.NuitCalme),
-        (BuiltinPrefix + "suspense.wav", "Suspense", "Suspense", Synth.Suspense),
-        (BuiltinPrefix + "grand-ecran.wav", "Grand écran", "Cinéma", Synth.GrandEcran),
-        (BuiltinPrefix + "coupure-pub.wav", "Coupure pub", "Pub", Synth.CoupurePub)
+        // ---------------- indicatifs (3 à 4 mesures + coup final), pour les jingles
+        (BuiltinPrefix + Version + "carre-rouge.wav", "Carré rouge", "Indicatif",
+            new Recipe(120, 57, false, Drums.House, Lead.Brass, [0, 3, 4], BassHouse,
+                [(0, 4, 2), (3, 4, 1), (6, 5, 2), (10, 4, 2), (16, 7, 3), (22, 6, 2), (26, 4, 4)], Hit.Orchestra, 3, Riser: true, Seed: 11)),
+        (BuiltinPrefix + Version + "grand-soir.wav", "Grand soir", "Indicatif",
+            new Recipe(104, 53, false, Drums.NewJack, Lead.EPiano, [0, 5, 3, 4], BassFunk,
+                [(0, 2, 3), (4, 4, 2), (8, 6, 4), (16, 7, 2), (20, 6, 2), (24, 4, 6)], Hit.Brass, 4, Swing: 0.32, Seed: 12)),
+        (BuiltinPrefix + Version + "eclair.wav", "Éclair", "Indicatif",
+            new Recipe(128, 52, true, Drums.Break, Lead.Bell, [0, 5, 6], BassFunk,
+                [(0, 0, 1), (2, 2, 1), (4, 4, 1), (6, 7, 2), (12, 6, 2), (16, 4, 1), (18, 2, 1), (20, 4, 2), (24, 9, 4)], Hit.Orchestra, 3, Riser: true, Seed: 13)),
+        (BuiltinPrefix + Version + "rideau.wav", "Rideau", "Indicatif",
+            new Recipe(96, 50, true, Drums.Break, Lead.Brass, [0, 6, 5, 4], BassRoot,
+                [(0, 4, 4), (6, 5, 2), (8, 4, 4), (16, 2, 4), (22, 3, 2), (24, 4, 6)], Hit.Timpani, 3, Riser: true, Seed: 14)),
+        (BuiltinPrefix + Version + "neon.wav", "Néon", "Indicatif",
+            new Recipe(112, 55, true, Drums.NewJack, Lead.Square, [0, 3, 5, 4], BassFunk,
+                [(0, 7, 2), (3, 6, 1), (4, 4, 2), (8, 2, 2), (11, 4, 3), (16, 7, 2), (19, 9, 1), (20, 7, 4)], Hit.Brass, 3, Swing: 0.3, Seed: 15)),
+        (BuiltinPrefix + Version + "petit-ecran.wav", "Petit écran", "Jeunesse",
+            new Recipe(132, 60, false, Drums.House, Lead.Bell, [0, 4, 5, 3], BassPulse,
+                [(0, 0, 1), (2, 4, 1), (4, 7, 1), (6, 4, 1), (8, 9, 2), (12, 7, 2), (16, 5, 1), (18, 7, 1), (20, 9, 1), (22, 11, 3)], Hit.Bell, 3, Seed: 16)),
+        (BuiltinPrefix + Version + "flash-pub.wav", "Flash pub", "Pub",
+            new Recipe(140, 62, false, Drums.House, Lead.Square, [0, 4, 5, 4], BassPulse,
+                [(0, 4, 1), (1, 4, 1), (2, 5, 2), (4, 7, 2), (8, 9, 1), (10, 7, 2), (16, 11, 2), (20, 9, 2), (24, 14, 4)], Hit.Brass, 2, Seed: 17)),
+        (BuiltinPrefix + Version + "tension.wav", "Tension", "Suspense",
+            new Recipe(92, 45, true, Drums.Heart, Lead.Pad, [0, 0, 5, 4], BassRoot,
+                [(0, 7, 4), (8, 8, 4), (16, 7, 4), (24, 6, 6)], Hit.Timpani, 3, Riser: true, Seed: 18)),
+
+        // ---------------- boucles (mesures entières, se raccordent), pour l'interlude, la météo, les cartons
+        (BuiltinPrefix + Version + "boucle-95.wav", "Boucle 95", "Énergique",
+            new Recipe(122, 57, false, Drums.House, Lead.Brass, [0, 3, 4, 3], BassHouse,
+                [(0, 4, 2), (6, 5, 2), (10, 4, 2), (16, 2, 2), (22, 4, 4)], Hit.None, 8, Loop: true, Seed: 21)),
+        (BuiltinPrefix + Version + "salon-jazz.wav", "Salon jazz-funk", "Calme",
+            new Recipe(94, 53, false, Drums.Break, Lead.EPiano, [0, 5, 1, 4], BassFunk,
+                [(0, 4, 3), (6, 6, 2), (10, 4, 3), (16, 2, 3), (22, 3, 2), (26, 1, 4)], Hit.None, 8, Swing: 0.25, Loop: true, Seed: 22)),
+        (BuiltinPrefix + Version + "meteo-douce.wav", "Météo douce", "Calme",
+            new Recipe(86, 58, false, Drums.None, Lead.Pad, [0, 4, 5, 3], BassRoot,
+                [(0, 7, 4), (8, 9, 4), (16, 11, 4), (24, 9, 8)], Hit.None, 8, Loop: true, Seed: 23)),
+        (BuiltinPrefix + Version + "ecran-large.wav", "Écran large", "Cinéma",
+            new Recipe(84, 50, true, Drums.Break, Lead.Brass, [0, 5, 6, 4], BassRoot,
+                [(0, 4, 6), (8, 5, 4), (16, 7, 6), (24, 6, 8)], Hit.None, 8, Loop: true, Seed: 24))
     ];
 
-    /// <summary>Nom lisible d'un son (« Pulsation 95 (intégré) » pour les boucles maison).</summary>
+    /// <summary>Nom lisible d'un son (« Carré rouge · intégré » pour les sons maison).</summary>
     public static string DisplayName(string file)
     {
         foreach ((string f, string name, _, _) in Builtins)
@@ -42,7 +89,9 @@ public static class AtelierSounds
         return file;
     }
 
-    /// <summary>Fabrique les boucles intégrées manquantes (quelques dixièmes de seconde, une seule fois).</summary>
+    public static bool IsBuiltin(string file) => Builtins.Any(b => string.Equals(b.File, file, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Fabrique les sons intégrés manquants (une seule fois) et retire ceux d'une ancienne version.</summary>
     public static void EnsureBuiltins()
     {
         lock (Lock)
@@ -50,12 +99,25 @@ public static class AtelierSounds
             Directory.CreateDirectory(AtelierService.SourcesFolder);
             Dictionary<string, string> tags = LoadTags();
             var changed = false;
-            foreach ((string file, _, string ambiance, Func<float[]> make) in Builtins)
+
+            // anciens sons intégrés (version précédente) : remplacés
+            foreach (string old in Directory.GetFiles(AtelierService.SourcesFolder, BuiltinPrefix + "*.wav"))
+            {
+                string name = Path.GetFileName(old);
+                if (!IsBuiltin(name))
+                {
+                    File.Delete(old);
+                    changed |= tags.Remove(name);
+                }
+            }
+
+            foreach ((string file, _, string ambiance, Recipe recipe) in Builtins)
             {
                 string path = Path.Combine(AtelierService.SourcesFolder, file);
                 if (!File.Exists(path))
                 {
-                    Synth.WriteWav(path, make());
+                    (float[] left, float[] right) = Render(recipe);
+                    WriteWav(path, left, right);
                 }
 
                 if (!tags.ContainsKey(file))
@@ -111,16 +173,59 @@ public static class AtelierSounds
         }
     }
 
-    /// <summary>Un son de l'ambiance demandée (le premier trouvé), pour l'habillage complet en un clic.</summary>
-    public static string FirstOf(string ambiance)
+    /// <summary>Un son de l'ambiance, tiré au hasard en évitant les derniers utilisés (vos sons passent avant les sons intégrés).</summary>
+    public static string FirstOf(string ambiance) => Pick(ambiance, 1).FirstOrDefault() ?? string.Empty;
+
+    /// <summary>
+    ///     <paramref name="count" /> sons de l'ambiance, tous différents tant qu'il y en a assez,
+    ///     en évitant ceux qui viennent de servir.
+    /// </summary>
+    public static List<string> Pick(string ambiance, int count, params string[] fallbacks)
     {
         EnsureBuiltins();
         Dictionary<string, string> tags = AllTags();
-        return AtelierService.Sources()
-            .Select(s => s.Name)
-            .Where(n => tags.TryGetValue(n, out string a) && a == ambiance)
-            .OrderBy(n => n.StartsWith(BuiltinPrefix, StringComparison.Ordinal)) // les sons de l'utilisateur d'abord
-            .FirstOrDefault() ?? string.Empty;
+        List<string> names = AtelierService.Sources().Select(s => s.Name).ToList();
+        List<string> candidates = names.Where(n => tags.GetValueOrDefault(n) == ambiance).ToList();
+        foreach (string fallback in fallbacks)
+        {
+            if (candidates.Count >= count)
+            {
+                break;
+            }
+
+            candidates.AddRange(names.Where(n => tags.GetValueOrDefault(n) == fallback && !candidates.Contains(n)));
+        }
+
+        if (candidates.Count == 0)
+        {
+            return [];
+        }
+
+        lock (Lock)
+        {
+            // les sons de l'utilisateur d'abord, puis le hasard, les plus récemment utilisés en dernier
+            List<string> ordered = candidates
+                .OrderBy(n => Recent.Contains(n))
+                .ThenBy(n => IsBuiltin(n))
+                .ThenBy(_ => Random.Shared.Next())
+                .ToList();
+            var result = new List<string>();
+            for (var i = 0; i < count; i++)
+            {
+                result.Add(ordered[i % ordered.Count]);
+            }
+
+            foreach (string used in result.Distinct())
+            {
+                Recent.Enqueue(used);
+                while (Recent.Count > Math.Max(2, candidates.Count - 1))
+                {
+                    Recent.Dequeue();
+                }
+            }
+
+            return result;
+        }
     }
 
     private static Dictionary<string, string> LoadTags()
@@ -144,286 +249,6 @@ public static class AtelierSounds
     {
         Directory.CreateDirectory(AtelierService.SourcesFolder);
         File.WriteAllText(TagsFile, JsonSerializer.Serialize(tags, Indented));
-    }
-
-    // ================================================================== synthèse
-
-    /// <summary>Un petit synthétiseur : batterie, basse, accords. Rendu en stéréo 44,1 kHz (gauche = droite).</summary>
-    private static class Synth
-    {
-        private const int Rate = 44100;
-
-        public static float[] Pulsation()
-        {
-            const double bpm = 124;
-            double beat = 60 / bpm;
-            var buffer = new float[(int)(beat * 32 * Rate)]; // 8 mesures
-            int[] bass = [45, 45, 48, 43]; // la, la, do, sol (une note par mesure)
-            for (var b = 0; b < 32; b++)
-            {
-                double t = b * beat;
-                Kick(buffer, t, 0.9);
-                Hat(buffer, t + beat / 2, 0.22);
-                if (b % 2 == 1)
-                {
-                    Clap(buffer, t, 0.5);
-                }
-
-                int root = bass[b / 4 % 4];
-                Tone(buffer, t + beat / 2, beat * 0.45, Midi(root - 12), 0.32, Wave.Square, 0.02, 6);
-                if (b % 4 == 0)
-                {
-                    Chord(buffer, t, beat * 0.5, [root + 12, root + 15, root + 19], 0.12, Wave.Saw);
-                }
-            }
-
-            return buffer;
-        }
-
-        public static float[] Vitamine()
-        {
-            const double bpm = 132;
-            double beat = 60 / bpm;
-            var buffer = new float[(int)(beat * 32 * Rate)];
-            int[][] chords = [[60, 64, 67], [65, 69, 72], [67, 71, 74], [64, 67, 72]];
-            for (var b = 0; b < 32; b++)
-            {
-                double t = b * beat;
-                Kick(buffer, t, b % 2 == 0 ? 0.8 : 0.5);
-                Hat(buffer, t + beat / 2, 0.18);
-                int[] chord = chords[b / 4 % 4];
-                for (var s = 0; s < 4; s++)
-                {
-                    // arpège en doubles croches, une octave au-dessus
-                    Tone(buffer, t + s * beat / 4, beat / 4 * 0.8, Midi(chord[s % 3] + 12), 0.14, Wave.Square, 0.003, 18);
-                }
-
-                if (b % 4 == 0)
-                {
-                    Tone(buffer, t, beat * 1.8, Midi(chord[0] - 24), 0.35, Wave.Triangle, 0.01, 2);
-                }
-            }
-
-            return buffer;
-        }
-
-        public static float[] NuitCalme()
-        {
-            const double bpm = 80;
-            double beat = 60 / bpm;
-            var buffer = new float[(int)(beat * 24 * Rate)];
-            int[][] chords = [[57, 60, 64, 67], [53, 57, 60, 64], [55, 59, 62, 67], [52, 55, 60, 64]];
-            for (var bar = 0; bar < 6; bar++)
-            {
-                double t = bar * beat * 4;
-                Chord(buffer, t, beat * 4.2, chords[bar % 4], 0.11, Wave.Sine, 0.6, 0.6);
-                for (var b = 0; b < 4; b++)
-                {
-                    Rim(buffer, t + b * beat, b == 0 ? 0.25 : 0.12);
-                    Tone(buffer, t + b * beat + beat / 2, beat * 0.4, Midi(chords[bar % 4][(b + bar) % 4] + 12), 0.07, Wave.Sine, 0.01, 4);
-                }
-
-                Kick(buffer, t, 0.45);
-            }
-
-            return buffer;
-        }
-
-        public static float[] Suspense()
-        {
-            const double bpm = 100;
-            double beat = 60 / bpm;
-            var buffer = new float[(int)(beat * 24 * Rate)];
-            Tone(buffer, 0, beat * 24, Midi(33), 0.22, Wave.Saw, 1.5, 0, 0.08); // bourdon grave
-            for (var b = 0; b < 24; b++)
-            {
-                double t = b * beat;
-                // battement de cœur : deux coups
-                Kick(buffer, t, 0.75);
-                Kick(buffer, t + beat * 0.28, 0.45);
-                if (b % 2 == 1)
-                {
-                    Tone(buffer, t + beat / 2, beat * 0.3, Midi(b % 4 == 1 ? 81 : 82), 0.06, Wave.Sine, 0.005, 10);
-                }
-            }
-
-            return buffer;
-        }
-
-        public static float[] GrandEcran()
-        {
-            const double bpm = 90;
-            double beat = 60 / bpm;
-            var buffer = new float[(int)(beat * 16 * Rate)];
-            int[][] chords = [[50, 57, 62, 65], [46, 53, 58, 62], [48, 55, 60, 64], [45, 52, 57, 61]];
-            for (var bar = 0; bar < 4; bar++)
-            {
-                double t = bar * beat * 4;
-                double gain = 0.6 + bar * 0.15; // crescendo
-                Chord(buffer, t, beat * 3.8, chords[bar], 0.1 * gain, Wave.Saw, 0.15, 0.5, 0.25);
-                Timpani(buffer, t, 0.8 * gain);
-                Timpani(buffer, t + beat * 2.5, 0.5 * gain);
-                Timpani(buffer, t + beat * 3, 0.6 * gain);
-            }
-
-            Timpani(buffer, beat * 15.5, 1);
-            return buffer;
-        }
-
-        public static float[] CoupurePub()
-        {
-            const double bpm = 140;
-            double beat = 60 / bpm;
-            var buffer = new float[(int)(beat * 16 * Rate)];
-            int[] melody = [72, 76, 79, 84, 83, 79, 76, 79, 77, 81, 84, 89, 88, 84, 79, 84];
-            for (var b = 0; b < 16; b++)
-            {
-                double t = b * beat;
-                Kick(buffer, t, 0.7);
-                Hat(buffer, t + beat / 2, 0.2);
-                if (b % 2 == 1)
-                {
-                    Clap(buffer, t, 0.45);
-                }
-
-                Tone(buffer, t, beat * 0.85, Midi(melody[b]), 0.16, Wave.Square, 0.005, 5);
-                Tone(buffer, t, beat * 0.9, Midi(melody[b / 4 * 4] - 24), 0.3, Wave.Triangle, 0.005, 3);
-            }
-
-            Chord(buffer, beat * 15, beat, [72, 76, 79, 84], 0.15, Wave.Square, 0.005, 3);
-            return buffer;
-        }
-
-        // ------------------------------------------------------------------ instruments
-
-        private enum Wave
-        {
-            Sine,
-            Square,
-            Saw,
-            Triangle
-        }
-
-        private static double Midi(int note) => 440 * Math.Pow(2, (note - 69) / 12.0);
-
-        private static double Osc(Wave wave, double phase)
-        {
-            double x = phase - Math.Floor(phase);
-            return wave switch
-            {
-                Wave.Square => x < 0.5 ? 0.8 : -0.8,
-                Wave.Saw => 2 * x - 1,
-                Wave.Triangle => 1 - 4 * Math.Abs(x - 0.5),
-                _ => Math.Sin(2 * Math.PI * x)
-            };
-        }
-
-        /// <summary>Une note : attaque, puis décroissance exponentielle (<paramref name="decay" /> 0 = tenue) ; filtre passe-bas doux.</summary>
-        private static void Tone(float[] buffer, double at, double length, double frequency, double gain, Wave wave, double attack, double decay, double lowpass = 0.35)
-        {
-            int start = (int)(at * Rate);
-            int count = (int)(length * Rate);
-            double filtered = 0;
-            for (var i = 0; i < count && start + i < buffer.Length; i++)
-            {
-                double t = i / (double)Rate;
-                double env = Math.Min(1, t / Math.Max(0.001, attack)) * (decay > 0 ? Math.Exp(-t * decay) : 1);
-                double release = Math.Min(1, (length - t) / 0.03); // pas de clic à la fin
-                double sample = Osc(wave, frequency * t) * env * release * gain;
-                filtered += (sample - filtered) * lowpass;
-                buffer[start + i] += (float)filtered;
-            }
-        }
-
-        private static void Chord(float[] buffer, double at, double length, int[] notes, double gain, Wave wave, double attack = 0.01, double decay = 1.5, double lowpass = 0.2)
-        {
-            foreach (int note in notes)
-            {
-                Tone(buffer, at, length, Midi(note), gain, wave, attack, decay, lowpass);
-            }
-        }
-
-        private static void Kick(float[] buffer, double at, double gain)
-        {
-            int start = (int)(at * Rate);
-            double phase = 0;
-            for (var i = 0; i < Rate * 0.35 && start + i < buffer.Length; i++)
-            {
-                double t = i / (double)Rate;
-                double frequency = 48 + 110 * Math.Exp(-t * 30);
-                phase += frequency / Rate;
-                buffer[start + i] += (float)(Math.Sin(2 * Math.PI * phase) * Math.Exp(-t * 9) * gain);
-            }
-        }
-
-        private static void Timpani(float[] buffer, double at, double gain)
-        {
-            int start = (int)(at * Rate);
-            var random = new Random(start);
-            double phase = 0;
-            double noise = 0;
-            for (var i = 0; i < Rate * 1.4 && start + i < buffer.Length; i++)
-            {
-                double t = i / (double)Rate;
-                phase += (70 + 30 * Math.Exp(-t * 12)) / Rate;
-                noise += (random.NextDouble() * 2 - 1 - noise) * 0.05;
-                buffer[start + i] += (float)((Math.Sin(2 * Math.PI * phase) * 0.8 + noise * 1.5) * Math.Exp(-t * 2.8) * gain);
-            }
-        }
-
-        private static void Noise(float[] buffer, double at, double length, double gain, double decay, bool bright)
-        {
-            int start = (int)(at * Rate);
-            var random = new Random(start + 17);
-            double previous = 0;
-            for (var i = 0; i < length * Rate && start + i < buffer.Length; i++)
-            {
-                double t = i / (double)Rate;
-                double white = random.NextDouble() * 2 - 1;
-                double sample = bright ? white - previous : white; // passe-haut grossier pour les cymbales
-                previous = white;
-                buffer[start + i] += (float)(sample * Math.Exp(-t * decay) * gain);
-            }
-        }
-
-        private static void Hat(float[] buffer, double at, double gain) => Noise(buffer, at, 0.06, gain, 60, true);
-
-        private static void Clap(float[] buffer, double at, double gain)
-        {
-            Noise(buffer, at, 0.18, gain, 22, false);
-            Noise(buffer, at + 0.012, 0.12, gain * 0.6, 30, false);
-        }
-
-        private static void Rim(float[] buffer, double at, double gain) =>
-            Tone(buffer, at, 0.05, 1700, gain, Wave.Triangle, 0.0005, 70, 0.9);
-
-        /// <summary>Normalise (−1 dB) et écrit un WAV 16 bits stéréo.</summary>
-        public static void WriteWav(string path, float[] mono)
-        {
-            float peak = mono.Length == 0 ? 1 : Math.Max(0.0001f, mono.Max(Math.Abs));
-            float scale = 0.89f / peak;
-            using var stream = File.Create(path);
-            using var writer = new BinaryWriter(stream);
-            int dataBytes = mono.Length * 4;
-            writer.Write("RIFF"u8.ToArray());
-            writer.Write(36 + dataBytes);
-            writer.Write("WAVEfmt "u8.ToArray());
-            writer.Write(16);
-            writer.Write((short)1);
-            writer.Write((short)2);
-            writer.Write(Rate);
-            writer.Write(Rate * 4);
-            writer.Write((short)4);
-            writer.Write((short)16);
-            writer.Write("data"u8.ToArray());
-            writer.Write(dataBytes);
-            foreach (float sample in mono)
-            {
-                var value = (short)Math.Clamp(Math.Round(Math.Tanh(sample * scale * 1.1) / Math.Tanh(1.1) * 32767), short.MinValue, short.MaxValue);
-                writer.Write(value);
-                writer.Write(value);
-            }
-        }
     }
 }
 

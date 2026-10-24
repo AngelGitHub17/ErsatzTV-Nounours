@@ -282,3 +282,10 @@ div.ersatztv-light.nounours {
     body, .mud-layout { background: #fff !important; }
     .n-print-day h2 { border-color: #000; }
 }
+
+/* ---------- conducteur en direct ---------- */
+.n-cond-row { align-items: center; border-top: 1px solid var(--mud-palette-lines-default); display: flex; gap: 12px; padding: 6px 8px; }
+.n-cond-row > b { flex: none; font-variant-numeric: tabular-nums; width: 70px; }
+.n-cond-row.is-now { background: rgba(255, 50, 0, .12); }
+.n-cond-row.is-filler { font-size: .88rem; opacity: .7; }
+.n-cond-insert { background: rgba(255, 168, 0, .14); }

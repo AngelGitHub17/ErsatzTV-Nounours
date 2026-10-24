@@ -385,8 +385,25 @@ public sealed class RetroRenderer : IDisposable
             return;
         }
 
-        float h = _window.Height * 0.065f;
-        DrawBar(canvas, name, _window.Left, _window.Bottom - h, h, _window.Width * 0.45f, 1);
+        if (!_grid)
+        {
+            float h = _window.Height * 0.065f;
+            DrawBar(canvas, name, _window.Left, _window.Bottom - h, h, _window.Width * 0.45f, 1);
+            return;
+        }
+
+        // en grille : une bande en bas à droite, de la largeur d'une case (deux si le nom est long)
+        float ch = _window.Height / Rows;
+        float strip = ch * 0.24f;
+        int span = ColumnsFor(name, strip, 0.62f, 1, Math.Min(2, _cols));
+        float cw = _window.Width / _cols;
+        var box = new SKRect(_window.Right - cw * span, _window.Bottom - strip, _window.Right, _window.Bottom);
+        using (var ink = new SKPaint { Color = _ink })
+        {
+            canvas.DrawRect(box, ink);
+        }
+
+        DrawFitted(canvas, name, box, _text, 0.62f, 1);
     }
 
     /// <summary>Carton final : texte en capitales italiques sur fond noir (ex. signalétique).</summary>
@@ -488,6 +505,13 @@ public sealed class RetroRenderer : IDisposable
         if (textWidth + padding * 2.2f > maxWidth)
         {
             font.Size = size * (maxWidth - padding * 2.2f) / textWidth;
+        }
+
+        if (_grid)
+        {
+            // en grille, les bandeaux s'arrêtent sur une demi-case : tout reste aligné sur le quadrillage
+            float half = _window.Width / _cols / 2;
+            width = Math.Min(Math.Max(maxWidth, half), (float)Math.Ceiling(width / half) * half);
         }
 
         float shown = width * EaseOut(Math.Clamp(reveal, 0, 1));
@@ -661,32 +685,188 @@ public sealed class RetroRenderer : IDisposable
         }
         else
         {
-            // le titre sur une bande noire, en bas ; une case vive en haut à droite
-            using (var paper = new SKPaint { Color = SKColors.White })
-            {
-                canvas.DrawRect(_window, paper);
-            }
-
-            using (var accent = new SKPaint { Color = Color(Cell.Accent) })
-            {
-                canvas.DrawRect(CellRect(_cols - 1, 0), accent);
-            }
-
-            if (!string.IsNullOrWhiteSpace(spec.Label))
-            {
-                using var ink = new SKPaint { Color = _ink };
-                canvas.DrawRect(CellRect(0, 0, 2, 1), ink);
-                DrawBlockText(canvas, spec.Label, CellRect(0, 0, 2, 1));
-            }
-
-            float reveal = (p - titleFrom) * main / 6f;
-            SKRect band = CellRect(0, 1, _cols, 1);
-            DrawBar(canvas, spec.Title, band.Left, band.MidY - band.Height * 0.3f, band.Height * 0.6f, _window.Width, reveal);
-            DrawBar(canvas, spec.Subtitle, band.Left, band.MidY + band.Height * 0.36f, band.Height * 0.34f, _window.Width * 0.8f, reveal - 0.6f, false);
-            DrawChannelTag(canvas, spec.ChannelName);
+            DrawTitleGrid(canvas, frame, spec, (p - titleFrom) / Math.Max(0.01f, 1 - titleFrom));
         }
 
         DrawFrameBorder(canvas);
+    }
+
+    /// <summary>
+    ///     Phase titre, calée sur la grille : l'étiquette en haut à gauche, le titre dans un bloc noir de la largeur
+    ///     qu'il lui faut (en cases entières, sur deux lignes au besoin), le sous-titre dans un bloc de couleur dessous,
+    ///     les autres cases continuent de changer au rythme. Les blocs apparaissent case par case.
+    /// </summary>
+    private void DrawTitleGrid(SKCanvas canvas, int frame, JingleSpec spec, float t)
+    {
+        int beat = _beat[Math.Clamp(frame, 0, _frames - 1)];
+        _currentBeat = beat;
+        Cell[,] cells = Composition(beat, false, out _);
+        float cw = _window.Width / _cols;
+        float ch = _window.Height / Rows;
+
+        // blocs réservés : étiquette (rangée 0), titre (rangée 1), sous-titre (rangée 2)
+        bool hasLabel = !string.IsNullOrWhiteSpace(spec.Label);
+        bool hasSubtitle = !string.IsNullOrWhiteSpace(spec.Subtitle);
+        int labelSpan = hasLabel ? ColumnsFor(spec.Label, ch, 0.42f, 1, Math.Min(2, _cols)) : 0;
+        int titleSpan = ColumnsFor(spec.Title, ch, 0.36f, 2, _cols);
+        int subtitleSpan = hasSubtitle ? ColumnsFor(spec.Subtitle, ch, 0.26f, 2, _cols - 1) : 0;
+
+        using var paint = new SKPaint();
+        for (var c = 0; c < _cols; c++)
+        {
+            for (var r = 0; r < Rows; r++)
+            {
+                Cell cell = cells[c, r] == Cell.Ink ? Cell.Paper : cells[c, r]; // le noir est réservé aux textes
+                paint.Color = Color(cell);
+                SKRect rect = CellRect(c, r);
+                rect.Right += 1;
+                rect.Bottom += 1;
+                canvas.DrawRect(rect, paint);
+            }
+        }
+
+        // apparition case par case, comme les blocs du générique
+        float Shown(int column, float from) => Math.Clamp((t - from - column * 0.05f) * 12, 0, 1);
+
+        if (hasLabel)
+        {
+            DrawRevealBlock(canvas, CellRect(0, 0, labelSpan, 1), labelSpan, c => Shown(c, 0), _ink);
+            if (Shown(labelSpan - 1, 0) >= 1)
+            {
+                DrawFitted(canvas, spec.Label, CellRect(0, 0, labelSpan, 1), _text, 0.42f, 1);
+            }
+        }
+
+        DrawRevealBlock(canvas, CellRect(0, 1, titleSpan, 1), titleSpan, c => Shown(c, 0.08f), _ink);
+        if (Shown(titleSpan - 1, 0.08f) >= 1)
+        {
+            DrawFitted(canvas, spec.Title, CellRect(0, 1, titleSpan, 1), _text, 0.36f, 2);
+        }
+
+        if (hasSubtitle)
+        {
+            DrawRevealBlock(canvas, CellRect(0, 2, subtitleSpan, 1), subtitleSpan, c => Shown(c, 0.22f), Color(Cell.Accent));
+            if (Shown(subtitleSpan - 1, 0.22f) >= 1)
+            {
+                DrawFitted(canvas, spec.Subtitle, CellRect(0, 2, subtitleSpan, 1), _text, 0.26f, 2);
+            }
+        }
+
+        DrawChannelTag(canvas, spec.ChannelName);
+    }
+
+    /// <summary>Le nombre de cases (entre 1 et <paramref name="max" />) qu'il faut pour que le texte soit lisible.</summary>
+    private int ColumnsFor(string text, float cellHeight, float sizeRatio, int maxLines, int max)
+    {
+        float cw = _window.Width / _cols;
+        for (var k = 1; k < max; k++)
+        {
+            if (FittedSize(text, new SKRect(0, 0, cw * k, cellHeight), sizeRatio, maxLines, out _) >= cellHeight * sizeRatio * 0.8f)
+            {
+                return k;
+            }
+        }
+
+        return Math.Max(1, max);
+    }
+
+    private static void DrawRevealBlock(SKCanvas canvas, SKRect block, int span, Func<int, float> shown, SKColor color)
+    {
+        float cw = block.Width / Math.Max(1, span);
+        using var paint = new SKPaint { Color = color };
+        for (var c = 0; c < span; c++)
+        {
+            float s = shown(c);
+            if (s <= 0)
+            {
+                continue;
+            }
+
+            // la case « tombe » de haut en bas en deux images : coupe franche, pas de glissé
+            float bottom = block.Top + block.Height * (s < 0.5f ? 0.5f : 1);
+            canvas.DrawRect(new SKRect(block.Left + c * cw, block.Top, block.Left + (c + 1) * cw + 1, bottom + 1), paint);
+        }
+    }
+
+    /// <summary>Taille de police la plus grande qui tient dans la boîte, sur 1 à <paramref name="maxLines" /> lignes.</summary>
+    private float FittedSize(string text, SKRect box, float sizeRatio, int maxLines, out List<string> lines)
+    {
+        lines = [];
+        string[] words = (text ?? string.Empty).ToUpperInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length == 0)
+        {
+            return 0;
+        }
+
+        float best = 0;
+        using var font = new SKFont(_upright, 100);
+        for (var n = 1; n <= Math.Min(maxLines, words.Length); n++)
+        {
+            List<string> candidate = Balance(words, n, font);
+            float widest = candidate.Max(l => font.MeasureText(l)) / 100;
+            float byWidth = box.Width * 0.86f / Math.Max(0.01f, widest);
+            float byHeight = Math.Min(box.Height * sizeRatio * (n == 1 ? 1 : 0.82f), box.Height * 0.8f / (n * 1.12f));
+            float size = Math.Min(byWidth, byHeight);
+            if (size > best * 1.08f)
+            {
+                best = size;
+                lines = candidate;
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>Répartit les mots sur n lignes de longueurs proches.</summary>
+    private static List<string> Balance(string[] words, int n, SKFont font)
+    {
+        if (n == 1)
+        {
+            return [string.Join(' ', words)];
+        }
+
+        float total = font.MeasureText(string.Join(' ', words));
+        var lines = new List<string>();
+        var current = new List<string>();
+        foreach (string word in words)
+        {
+            current.Add(word);
+            if (lines.Count < n - 1 && font.MeasureText(string.Join(' ', current)) >= total / n * 0.92f)
+            {
+                lines.Add(string.Join(' ', current));
+                current.Clear();
+            }
+        }
+
+        if (current.Count > 0)
+        {
+            lines.Add(string.Join(' ', current));
+        }
+
+        return lines;
+    }
+
+    /// <summary>Texte en capitales droites, ajusté dans la boîte (une ou deux lignes), aligné à gauche, centré en hauteur.</summary>
+    private void DrawFitted(SKCanvas canvas, string text, SKRect box, SKColor color, float sizeRatio, int maxLines)
+    {
+        float size = FittedSize(text, box, sizeRatio, maxLines, out List<string> lines);
+        if (size <= 0)
+        {
+            return;
+        }
+
+        using var font = new SKFont(_upright, size);
+        using var paint = new SKPaint { Color = color, IsAntialias = true };
+        SKFontMetrics metrics = font.Metrics;
+        float lineHeight = size * 1.08f;
+        float height = lineHeight * (lines.Count - 1) - metrics.Ascent;
+        float y = box.MidY - height / 2 - metrics.Ascent;
+        float x = box.Left + Math.Min(box.Width * 0.07f, box.Height * 0.2f);
+        foreach (string line in lines)
+        {
+            canvas.DrawText(line, x, y, font, paint);
+            y += lineHeight;
+        }
     }
 
     /// <summary>
@@ -813,13 +993,38 @@ public sealed class RetroRenderer : IDisposable
     {
         canvas.Clear(SKColors.Transparent);
         DrawFrameBorder(canvas);
-        float wh = _window.Height;
-        float barH = wh * 0.08f;
-        float y = _window.Bottom - barH * 2.4f;
-        DrawBar(canvas, "    " + title, _window.Left, y, barH, _window.Width * 0.9f, 1);
-        DrawBar(canvas, dateLine, _window.Left, y + barH * 1.06f, barH * 0.78f, _window.Width * 0.9f, 1, false);
-        // le carré par-dessus le bandeau
-        DrawSquare(canvas, _window.Left + barH * 0.3f, y + barH * 0.2f, barH * 0.6f, 4);
+        float ch = _window.Height / Rows;
+        float cw = _window.Width / _cols;
+
+        // en bas à gauche de l'image : le titre dans un bloc noir, la diffusion dans un bloc de couleur dessous,
+        // chacun de la largeur qu'il lui faut, en demi-cases
+        float titleH = ch * 0.34f;
+        float lineH = ch * 0.22f;
+        float bottom = _window.Bottom - ch * 0.12f;
+        bool hasLine = !string.IsNullOrWhiteSpace(dateLine);
+        var titleBox = new SKRect(_window.Left, bottom - titleH - (hasLine ? lineH : 0), _window.Left + HalfCells(title, titleH, 0.62f, cw), bottom - (hasLine ? lineH : 0));
+        using (var ink = new SKPaint { Color = _ink })
+        {
+            canvas.DrawRect(titleBox, ink);
+        }
+
+        DrawFitted(canvas, title, titleBox, _text, 0.62f, 1);
+        if (hasLine)
+        {
+            var lineBox = new SKRect(_window.Left, bottom - lineH, _window.Left + HalfCells(dateLine, lineH, 0.6f, cw), bottom);
+            using var accent = new SKPaint { Color = Color(Cell.Accent) };
+            canvas.DrawRect(lineBox, accent);
+            DrawFitted(canvas, dateLine, lineBox, _text, 0.6f, 1);
+        }
+    }
+
+    /// <summary>Largeur (en demi-cases) qu'il faut pour écrire le texte à la taille voulue.</summary>
+    private float HalfCells(string text, float height, float sizeRatio, float cellWidth)
+    {
+        using var font = new SKFont(_upright, height * sizeRatio);
+        float needed = font.MeasureText((text ?? string.Empty).ToUpperInvariant()) + height * 0.5f;
+        float half = cellWidth / 2;
+        return Math.Clamp((float)Math.Ceiling(needed / half) * half, half, _window.Width);
     }
 
     // ------------------------------------------------------------------ outils

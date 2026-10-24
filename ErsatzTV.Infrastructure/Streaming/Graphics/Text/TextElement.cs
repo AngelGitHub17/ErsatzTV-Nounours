@@ -83,11 +83,46 @@ public partial class TextElement(
                 }
             }
 
-            _image = new SKBitmap(
-                (int)Math.Ceiling(textBlock.MeasuredWidth),
-                (int)Math.Ceiling(textBlock.MeasuredHeight));
-            using (var canvas = new SKCanvas(_image))
+            var boxColor = SKColors.Transparent;
+            bool boxed = !string.IsNullOrWhiteSpace(textElement.BoxColor) && SKColor.TryParse(textElement.BoxColor, out boxColor);
+            if (boxed && string.IsNullOrWhiteSpace(textElement.Text?.Trim()))
             {
+                // pas de texte (ex. pas de sous-titre pour un film) : pas de cartouche vide
+                IsFinished = true;
+                return Task.CompletedTask;
+            }
+
+            if (textBlock.MeasuredWidth < 1 || textBlock.MeasuredHeight < 1)
+            {
+                // rien à écrire (ex. titre vide d'un flux en direct)
+                IsFinished = true;
+                return Task.CompletedTask;
+            }
+
+            if (boxed)
+            {
+                // cartouche à la taille du texte (arrondi au pas de la grille)
+                float lineHeight = textBlock.MeasuredHeight / Math.Max(1, textBlock.Lines.Count);
+                float padding = (float)(lineHeight * Math.Clamp(textElement.BoxPadding, 0, 2));
+                float width = textBlock.MeasuredWidth + padding * 2.2f;
+                if (textElement.BoxSnapPercent > 0)
+                {
+                    float snap = (float)(textElement.BoxSnapPercent / 100 * context.FrameSize.Width);
+                    width = (float)Math.Ceiling(width / snap) * snap;
+                }
+
+                float height = textBlock.MeasuredHeight + padding * 1.2f;
+                _image = new SKBitmap((int)Math.Ceiling(width), (int)Math.Ceiling(height));
+                using var canvas = new SKCanvas(_image);
+                canvas.Clear(boxColor);
+                textBlock.Paint(canvas, new SKPoint(padding * 1.1f, padding * 0.6f));
+            }
+            else
+            {
+                _image = new SKBitmap(
+                    (int)Math.Ceiling(textBlock.MeasuredWidth),
+                    (int)Math.Ceiling(textBlock.MeasuredHeight));
+                using var canvas = new SKCanvas(_image);
                 canvas.Clear(SKColors.Transparent);
                 textBlock.Paint(canvas, new SKPoint(0, 0));
             }

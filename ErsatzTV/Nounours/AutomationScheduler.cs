@@ -63,10 +63,7 @@ public sealed class AutomationScheduler(
             await automation.MakeTonight(cancellationToken);
         }
 
-        if (settings.Appointments.Count > 0)
-        {
-            await automation.RunAppointments(cancellationToken);
-        }
+        await automation.RunAppointments(cancellationToken);
 
         DateOnly today = DateOnly.FromDateTime(DateTime.Now);
         WeeklySettings weekly = settings.Weekly;

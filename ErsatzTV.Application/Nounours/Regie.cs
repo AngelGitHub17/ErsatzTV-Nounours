@@ -163,9 +163,19 @@ public sealed class RegieService(
             .Take(30)
             .ToListAsync(cancellationToken);
 
-        return items
-            .Select(i => new RegieSource(i.Id, i.Title ?? $"Vidéo {i.Id}", $"Habillage vidéo · {ContentCatalog.Format(i.Duration)}", i.Duration, false))
+        // les flux en direct (OBS, chaînes d'info) d'abord
+        string directLibrary = FolderImportService.Label(ImportRole.Direct);
+        var streams = await dbContext.RemoteStreams.AsNoTracking()
+            .Where(s => s.LibraryPath.Library.Name == directLibrary)
+            .Select(s => new { s.Id, Title = s.RemoteStreamMetadata.Select(m => m.Title).FirstOrDefault() })
+            .ToListAsync(cancellationToken);
+
+        return streams
+            .Select(s => new RegieSource(s.Id, s.Title ?? $"Flux {s.Id}", "Flux en direct", TimeSpan.Zero, true))
             .OrderBy(i => i.Title, StringComparer.CurrentCultureIgnoreCase)
+            .Concat(items
+            .Select(i => new RegieSource(i.Id, i.Title ?? $"Vidéo {i.Id}", $"Habillage vidéo · {ContentCatalog.Format(i.Duration)}", i.Duration, false))
+            .OrderBy(i => i.Title, StringComparer.CurrentCultureIgnoreCase))
             .ToList();
     }
 

@@ -39,6 +39,8 @@ public interface IAutomationService
 
     /// <summary>Rendez-vous d'antenne arrivés à l'heure : la régie passe la vidéo une fois.</summary>
     Task RunAppointments(CancellationToken cancellationToken);
+
+    Task<(int Id, double Seconds)?> FindByPath(string path, CancellationToken cancellationToken);
 }
 
 public sealed class AutomationService(
@@ -47,6 +49,7 @@ public sealed class AutomationService(
     IGuideService guideService,
     AtelierService atelier,
     IRegieService regie,
+    Microsoft.Extensions.DependencyInjection.IServiceScopeFactory scopeFactory,
     ILogger<AutomationService> logger) : IAutomationService
 {
     private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
@@ -404,38 +407,200 @@ public sealed class AutomationService(
 
     // ------------------------------------------------------------------ rendez-vous d'antenne
 
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> InFlight = new();
+
+    /// <summary>
+    ///     Rendez-vous d'antenne (récurrents ou insertions du jour) et diffusions automatiques des services.
+    ///     Appelé chaque minute : ce qui doit partir dans la minute qui vient est lancé à la seconde près.
+    /// </summary>
     public async Task RunAppointments(CancellationToken cancellationToken)
     {
-        List<Appointment> appointments = NounoursSettings.Load().Appointments;
+        NounoursSettings settings = NounoursSettings.Load();
         DateTimeOffset now = DateTimeOffset.Now;
-        foreach (Appointment appointment in appointments.Where(a => a.Enabled && a.PlayoutId > 0 && a.MediaItemId > 0))
+
+        // 1. rendez-vous et insertions
+        foreach (Appointment appointment in settings.Appointments.Where(a => a.Enabled && a.PlayoutId > 0 && a.MediaItemId > 0))
         {
             if (!TimeSpan.TryParse(appointment.At, CultureInfo.InvariantCulture, out TimeSpan at) ||
-                appointment.Days.Count > 0 && !appointment.Days.Contains(now.DayOfWeek))
+                appointment.Date is null && appointment.Days.Count > 0 && !appointment.Days.Contains(now.DayOfWeek))
             {
                 continue;
             }
 
-            // à l'heure dite (avec 10 minutes de rattrapage si ErsatzTV était arrêté), une fois par jour
-            DateTimeOffset due = new DateTimeOffset(now.Date + at, now.Offset);
-            if (now < due || now - due > TimeSpan.FromMinutes(10) || appointment.LastRun is { } last && last >= due)
+            DateTime day = appointment.Date?.ToDateTime(TimeOnly.MinValue) ?? now.Date;
+            var due = new DateTimeOffset(day + at, now.Offset);
+            if (appointment.LastRun is { } last && last >= due)
             {
                 continue;
             }
 
-            Either<BaseError, Unit> result = await regie.TakeAir(appointment.PlayoutId, appointment.MediaItemId, RegieMode.Once, 0, appointment.Name, cancellationToken);
-            string text = result.Match(_ => $"Passé à {now:HH:mm}", error => $"Échec : {error}");
-            logger.LogInformation("Rendez-vous d'antenne « {Name} » : {Result}", appointment.Name, text);
-            NounoursSettings.Update(s =>
+            var plan = new PlannedAir($"rdv:{appointment.Id}:{due:yyyyMMddHHmm}", appointment.Name, appointment.PlayoutId, appointment.MediaItemId,
+                appointment.DurationSeconds, appointment.BeforeNext, appointment.Minutes, due);
+            await Launch(plan, now, result => NounoursSettings.Update(s =>
             {
                 Appointment saved = s.Appointments.FirstOrDefault(a => a.Id == appointment.Id);
                 if (saved is not null)
                 {
-                    saved.LastRun = now;
-                    saved.LastResult = text;
+                    saved.LastRun = due;
+                    saved.LastResult = result;
+                    if (saved.Date is not null)
+                    {
+                        saved.Enabled = false; // insertion faite : on la garde pour l'historique du jour
+                    }
                 }
-            });
+            }), cancellationToken);
         }
+
+        // 2. diffusions automatiques des vidéos des services
+        string folder(ImportRole role) => Path.Combine(FileSystemLayout.ImportsFolder, FolderImportService.Label(role));
+        var services = new (string Key, string Name, BroadcastSettings Broadcast, string File)[]
+        {
+            ("meteo", "Météo", settings.Weather.Broadcast, Path.Combine(folder(ImportRole.BandesAnnonces), AtelierService.WeatherFile)),
+            ("semaine", "Cette semaine", settings.Weekly.Broadcast, Path.Combine(folder(ImportRole.BandesAnnonces), "atelier-cette-semaine.mp4")),
+            ("cesoir", "Ce soir", settings.Tonight.Broadcast, Path.Combine(folder(ImportRole.BandesAnnonces), AtelierService.TonightFile)),
+            ("interlude", "Interlude", settings.InterludeBroadcast, Path.Combine(folder(ImportRole.Habillage), AtelierService.InterludeFile))
+        };
+
+        List<RegieChannel> channels = null;
+        foreach ((string key, string name, BroadcastSettings broadcast, string file) in services)
+        {
+            if (broadcast is not { Enabled: true } || broadcast.ChannelIds.Count == 0 || !File.Exists(file))
+            {
+                continue;
+            }
+
+            (int Id, double Seconds)? media = await FindByPath(file, cancellationToken);
+            if (media is null)
+            {
+                continue; // pas encore analysée
+            }
+
+            channels ??= await regie.GetChannels(cancellationToken);
+            foreach (TimeSpan at in ParseTimes(broadcast.Times))
+            {
+                var due = new DateTimeOffset(now.Date + at, now.Offset);
+                foreach (RegieChannel channel in channels.Where(c => broadcast.ChannelIds.Contains(c.ChannelId)))
+                {
+                    string runKey = $"{key}:{at:hhmm}:{channel.ChannelId}";
+                    if (settings.BroadcastRuns.TryGetValue(runKey, out DateTimeOffset last) && last >= due)
+                    {
+                        continue;
+                    }
+
+                    var plan = new PlannedAir($"diff:{runKey}:{due:yyyyMMdd}", name, channel.PlayoutId, media.Value.Id, media.Value.Seconds, broadcast.BeforeNext, 0, due);
+                    await Launch(plan, now, _ => NounoursSettings.Update(s => s.BroadcastRuns[runKey] = due), cancellationToken);
+                }
+            }
+        }
+    }
+
+    public static List<TimeSpan> ParseTimes(string times) =>
+        (times ?? string.Empty)
+        .Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Select(t => TimeSpan.TryParse(t, CultureInfo.InvariantCulture, out TimeSpan v) ? v : (TimeSpan?)null)
+        .Where(t => t is not null)
+        .Select(t => t!.Value)
+        .Distinct()
+        .Order()
+        .ToList();
+
+    private sealed record PlannedAir(string Key, string Name, int PlayoutId, int MediaItemId, double Seconds, bool BeforeNext, int Minutes, DateTimeOffset Due);
+
+    /// <summary>Calcule l'instant de départ ; s'il tombe dans la minute, attend puis prend l'antenne. Trop tard (10 min) : abandonné.</summary>
+    private async Task Launch(PlannedAir plan, DateTimeOffset now, Action<string> done, CancellationToken cancellationToken)
+    {
+        if (now < plan.Due.AddMinutes(-2))
+        {
+            return; // pas encore l'heure (et « juste avant » ne regarde que 2 minutes en avance)
+        }
+
+        DateTimeOffset start = plan.Due;
+        if (plan.BeforeNext)
+        {
+            DateTimeOffset? next = await NextBoundary(plan.PlayoutId, plan.Due, cancellationToken);
+            if (next is not null)
+            {
+                start = next.Value - TimeSpan.FromSeconds(Math.Max(1, plan.Seconds));
+                if (start < plan.Due.AddMinutes(-2))
+                {
+                    start = plan.Due.AddMinutes(-2);
+                }
+            }
+        }
+
+        if (now - start > TimeSpan.FromMinutes(10))
+        {
+            done($"Manqué ({start:HH:mm})");
+            return;
+        }
+
+        if (start - now > TimeSpan.FromSeconds(65) || !InFlight.TryAdd(plan.Key, true))
+        {
+            return; // une prochaine minute s'en chargera (ou c'est déjà en route)
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                TimeSpan wait = start - DateTimeOffset.Now;
+                if (wait > TimeSpan.Zero)
+                {
+                    await Task.Delay(wait, CancellationToken.None);
+                }
+
+                RegieMode mode = plan.Minutes > 0 ? RegieMode.Minutes : RegieMode.Once;
+                // la minute du planificateur est finie : on prend notre propre portée de services
+                using Microsoft.Extensions.DependencyInjection.IServiceScope scope = scopeFactory.CreateScope();
+                IRegieService air = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<IRegieService>(scope.ServiceProvider);
+                Either<BaseError, Unit> result = await air.TakeAir(plan.PlayoutId, plan.MediaItemId, mode, plan.Minutes, plan.Name, CancellationToken.None);
+                string text = result.Match(_ => $"Passé à {DateTimeOffset.Now:HH:mm:ss}", error => $"Échec : {error}");
+                logger.LogInformation("Antenne automatique « {Name} » : {Result}", plan.Name, text);
+                done(text);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Antenne automatique « {Name} » : erreur", plan.Name);
+                done($"Erreur : {ex.Message}");
+            }
+            finally
+            {
+                InFlight.TryRemove(plan.Key, out _);
+            }
+        }, CancellationToken.None);
+    }
+
+    /// <summary>Début du premier programme qui commence après <paramref name="after" /> (les intercalaires comptent).</summary>
+    private async Task<DateTimeOffset?> NextBoundary(int playoutId, DateTimeOffset after, CancellationToken cancellationToken)
+    {
+        await using TvContext db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        DateTime utc = after.UtcDateTime;
+        DateTime? start = await db.PlayoutItems.AsNoTracking()
+            .Where(i => i.PlayoutId == playoutId && i.Start > utc)
+            .OrderBy(i => i.Start)
+            .Select(i => (DateTime?)i.Start)
+            .FirstOrDefaultAsync(cancellationToken);
+        return start is null ? null : new DateTimeOffset(DateTime.SpecifyKind(start.Value, DateTimeKind.Utc)).ToLocalTime();
+    }
+
+    /// <summary>Le programme (film ou vidéo) correspondant à un fichier, et sa durée.</summary>
+    public async Task<(int Id, double Seconds)?> FindByPath(string path, CancellationToken cancellationToken)
+    {
+        await using TvContext db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var other = await db.OtherVideos.AsNoTracking()
+            .Where(o => o.MediaVersions.Any(v => v.MediaFiles.Any(f => f.Path == path)))
+            .Select(o => new { o.Id, Duration = o.MediaVersions.Select(v => v.Duration).FirstOrDefault() })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (other is not null)
+        {
+            return (other.Id, other.Duration.TotalSeconds);
+        }
+
+        var movie = await db.Movies.AsNoTracking()
+            .Where(o => o.MediaVersions.Any(v => v.MediaFiles.Any(f => f.Path == path)))
+            .Select(o => new { o.Id, Duration = o.MediaVersions.Select(v => v.Duration).FirstOrDefault() })
+            .FirstOrDefaultAsync(cancellationToken);
+        return movie is null ? null : (movie.Id, movie.Duration.TotalSeconds);
     }
 
     // ------------------------------------------------------------------ sous-titres automatiques
