@@ -1,0 +1,298 @@
+@page "/videos-web"
+@using System.Globalization
+@using ErsatzTV.Application.Nounours
+@implements IDisposable
+@inject IWebVideoService Web
+@inject IJSRuntime Js
+@inject ISnackbar Snackbar
+
+<PageTitle>Vidéos YouTube · ErsatzTV</PageTitle>
+
+<div class="n-page" style="height: 100%; overflow-y: auto">
+    <div class="n-page-header">
+        <div>
+            <h1>Vidéos YouTube</h1>
+            <p>Cherchez des vidéos (mots, adresse d'une vidéo, d'une playlist ou d'une chaîne), cochez celles qui vous intéressent : leurs adresses sont gardées dans votre sélection, à copier ou à exporter, et vous pouvez les télécharger directement dans la médiathèque (pubs, jingles, clips…).</p>
+        </div>
+    </div>
+
+    <div class="n-card mb-3">
+        <div class="d-flex gap-2 align-center flex-wrap">
+            <MudTextField @bind-Value="_input" Label="Mots à chercher, ou adresse YouTube" Placeholder="pub années 90 · https://www.youtube.com/@@chaine/videos · https://youtube.com/playlist?list=…"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex: 1; min-width: 280px" Immediate="true"
+                          OnKeyUp="@(e => e.Key == "Enter" ? Search() : Task.CompletedTask)"/>
+            <MudNumericField @bind-Value="_max" Label="Combien" Min="1" Max="200" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 110px"/>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Search" OnClick="@Search" Disabled="@(_busy || _tool is null || string.IsNullOrWhiteSpace(_input))">Chercher</MudButton>
+        </div>
+        <div class="d-flex gap-2 align-center mt-2" style="font-size: .85rem">
+            @if (_tool is { } tool)
+            {
+                <span class="n-muted">yt-dlp @tool.Version</span>
+                <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@Install" Disabled="@_busy">Mettre à jour</MudButton>
+            }
+            else if (_checked)
+            {
+                <span>yt-dlp (l'outil qui lit YouTube) n'est pas installé.</span>
+                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="@Install" Disabled="@_busy">Installer yt-dlp</MudButton>
+            }
+            @if (_busy)
+            {
+                <MudProgressCircular Indeterminate="true" Size="Size.Small"/>
+            }
+        </div>
+        <div class="d-flex gap-2 align-center mt-2 flex-wrap">
+            <MudSelect T="string" Value="@_cookies" ValueChanged="@SetCookies" Label="Connexion YouTube (si YouTube demande « vous n'êtes pas un robot »)" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 420px">
+                <MudSelectItem Value="@string.Empty">Aucune</MudSelectItem>
+                <MudSelectItem Value="@("firefox")">Firefox (conseillé)</MudSelectItem>
+                <MudSelectItem Value="@("edge")">Microsoft Edge</MudSelectItem>
+                <MudSelectItem Value="@("chrome")">Google Chrome</MudSelectItem>
+                <MudSelectItem Value="@("brave")">Brave</MudSelectItem>
+            </MudSelect>
+            <span class="n-muted" style="font-size: .8rem">Le navigateur choisi doit être connecté à YouTube sur ce PC (Chrome et Edge doivent être fermés pendant la lecture).</span>
+        </div>
+        <MudText Typo="Typo.caption" Class="n-muted d-block mt-1">Ne téléchargez que des vidéos que vous avez le droit de garder et de diffuser : les vôtres, sous licence libre (Creative Commons), ou avec l'accord de leur auteur.</MudText>
+    </div>
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" lg="8">
+            <div class="n-card" style="height: 100%">
+                <div class="d-flex align-center gap-2">
+                    <div class="n-card-title" style="margin: 0; flex: 1">Résultats @(_results.Count > 0 ? $"({_results.Count})" : "")</div>
+                    @if (_results.Count > 0)
+                    {
+                        <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@AddAll">Tout ajouter à la sélection</MudButton>
+                    }
+                </div>
+                @if (_results.Count == 0)
+                {
+                    <div class="n-empty" style="padding: 24px">Cherchez des vidéos ci-dessus.</div>
+                }
+                <div class="n-web-grid">
+                    @foreach (WebVideo video in _results)
+                    {
+                        bool chosen = _selection.Any(v => v.Url == video.Url);
+                        <div class="n-web-card @(chosen ? "is-chosen" : "")" @onclick="@(() => Toggle(video))">
+                            <div class="n-web-thumb" style="background-image: url('@video.Thumbnail')">
+                                @if (video.Seconds is { } s)
+                                {
+                                    <span>@Length(s)</span>
+                                }
+                                @if (chosen)
+                                {
+                                    <b>✓</b>
+                                }
+                            </div>
+                            <div class="n-web-title">@video.Title</div>
+                            <div class="n-muted" style="font-size: .75rem">@video.Channel</div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </MudItem>
+
+        <MudItem xs="12" lg="4">
+            <div class="n-card mb-3">
+                <div class="n-card-title">Ma sélection (@_selection.Count)</div>
+                @foreach (WebVideo video in _selection)
+                {
+                    <div class="n-stat-row">
+                        <span class="n-stat-name" title="@video.Url">@video.Title</span>
+                        <span class="n-muted">@(video.Seconds is { } s ? Length(s) : "")</span>
+                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="@(() => Toggle(video))"/>
+                    </div>
+                }
+                @if (_selection.Count > 0)
+                {
+                    <div class="d-flex gap-2 flex-wrap mt-2">
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.ContentCopy" OnClick="@Copy">Copier les adresses</MudButton>
+                        <a class="mud-button-root mud-button mud-button-outlined mud-button-outlined-default mud-button-outlined-size-small" style="padding: 3px 9px"
+                           href="@ListLink()" download="videos-youtube.txt">Exporter (.txt)</a>
+                        <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@Clear">Vider</MudButton>
+                    </div>
+
+                    <div class="n-card-title mt-4">Télécharger dans la médiathèque</div>
+                    <MudSelect T="ImportRole" @bind-Value="_role" Label="Ranger dans" Variant="Variant.Outlined" Margin="Margin.Dense">
+                        @foreach (ImportRole role in WebVideoService.Destinations)
+                        {
+                            <MudSelectItem Value="@role">@FolderImportService.Label(role)</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudSelect T="int" @bind-Value="_height" Label="Qualité" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2">
+                        <MudSelectItem Value="720">720p (léger)</MudSelectItem>
+                        <MudSelectItem Value="1080">1080p (conseillé)</MudSelectItem>
+                        <MudSelectItem Value="0">La meilleure disponible</MudSelectItem>
+                    </MudSelect>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Download" Class="mt-2" FullWidth="true"
+                               OnClick="@Download" Disabled="@(_tool is null || _job is { State: WebJobState.Running })">
+                        Télécharger @_selection.Count vidéo(s)
+                    </MudButton>
+                }
+                @if (_job is not null)
+                {
+                    <div class="mt-2" style="font-size: .85rem">
+                        @if (_job.State == WebJobState.Running)
+                        {
+                            <div>@_job.Done / @_job.Total · @_job.Current</div>
+                            <MudProgressLinear Value="@((_job.Done + _job.Progress) * 100 / Math.Max(1, _job.Total))" Color="Color.Primary"/>
+                        }
+                        else
+                        {
+                            <div>@(_job.State == WebJobState.Done ? "✓" : "⚠") @_job.Files.Count vidéo(s) téléchargée(s), rangées dans « @FolderImportService.Label(_jobRole) » (elles apparaissent d'ici une minute).</div>
+                            @foreach (string failed in _job.Failed)
+                            {
+                                <div style="color: #FF3200">✗ @failed</div>
+                            }
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="n-card">
+                <div class="n-card-title">Déjà récupérées</div>
+                @if (_history.Count == 0)
+                {
+                    <div class="n-muted" style="font-size: .85rem">Rien pour l'instant.</div>
+                }
+                @foreach (WebVideoRecord record in _history.Take(40))
+                {
+                    <div class="n-stat-row" style="font-size: .82rem">
+                        <span class="n-stat-name"><a href="@record.Url" target="_blank" rel="noopener">@record.Title</a><br/><span class="n-muted">@record.When.ToLocalTime().ToString("dd/MM HH:mm", Fr) · @record.Destination</span></span>
+                    </div>
+                }
+                @if (_history.Count > 0)
+                {
+                    <MudText Typo="Typo.caption" Class="n-muted d-block mt-1">Le registre (date, titre, adresse, fichier) est aussi dans chaque dossier : « adresses-videos-web.tsv ».</MudText>
+                }
+            </div>
+        </MudItem>
+    </MudGrid>
+</div>
+
+@code {
+    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
+    private string _input = string.Empty;
+    private string _cookies = string.Empty;
+
+    private void SetCookies(string value)
+    {
+        _cookies = value ?? string.Empty;
+        NounoursSettings.Update(s => s.WebCookiesBrowser = _cookies);
+    }
+    private int _max = 24;
+    private bool _busy;
+    private bool _checked;
+    private (string Path, string Version)? _tool;
+    private List<WebVideo> _results = [];
+    private List<WebVideo> _selection = [];
+    private List<WebVideoRecord> _history = [];
+    private ImportRole _role = ImportRole.Pubs;
+    private ImportRole _jobRole;
+    private int _height = 1080;
+    private WebDownloadJob _job;
+    private Timer _timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _selection = NounoursSettings.Load().WebSelection;
+        _cookies = NounoursSettings.Load().WebCookiesBrowser ?? string.Empty;
+        _history = Web.History();
+        _tool = await Web.Tool(CancellationToken.None);
+        _checked = true;
+    }
+
+    private static string Length(double seconds) =>
+        seconds >= 3600 ? TimeSpan.FromSeconds(seconds).ToString(@"h\:mm\:ss") : TimeSpan.FromSeconds(seconds).ToString(@"m\:ss");
+
+    private async Task Busy(Func<Task> work)
+    {
+        _busy = true;
+        try
+        {
+            await work();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private Task Install() => Busy(async () =>
+    {
+        Snackbar.Add(await Web.InstallTool(CancellationToken.None), Severity.Info);
+        _tool = await Web.Tool(CancellationToken.None);
+    });
+
+    private Task Search() => Busy(async () =>
+    {
+        _results = await Web.Search(_input, _max, CancellationToken.None);
+        if (_results.Count == 0)
+        {
+            Snackbar.Add("Aucune vidéo trouvée.", Severity.Info);
+        }
+    });
+
+    private void SaveSelection()
+    {
+        List<WebVideo> selection = _selection;
+        NounoursSettings.Update(s => s.WebSelection = selection);
+    }
+
+    private void Toggle(WebVideo video)
+    {
+        if (_selection.RemoveAll(v => v.Url == video.Url) == 0)
+        {
+            _selection.Add(video);
+        }
+
+        SaveSelection();
+    }
+
+    private void AddAll()
+    {
+        _selection.AddRange(_results.Where(r => _selection.All(v => v.Url != r.Url)));
+        SaveSelection();
+    }
+
+    private void Clear()
+    {
+        _selection = [];
+        SaveSelection();
+    }
+
+    private async Task Copy()
+    {
+        await Js.InvokeVoidAsync("navigator.clipboard.writeText", string.Join("\n", _selection.Select(v => v.Url)));
+        Snackbar.Add($"{_selection.Count} adresse(s) copiée(s).", Severity.Success);
+    }
+
+    private string ListLink() =>
+        "data:text/plain;charset=utf-8;base64," + Convert.ToBase64String(System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(Web.AddressList(_selection))).ToArray());
+
+    private void Download()
+    {
+        _jobRole = _role;
+        _job = Web.Download(_selection.ToList(), _role, _height);
+        _timer?.Dispose();
+        _timer = new Timer(_ => InvokeAsync(() =>
+        {
+            if (_job is { State: not WebJobState.Running })
+            {
+                _timer?.Dispose();
+                _timer = null;
+                _history = Web.History();
+                // ce qui est téléchargé sort de la sélection ; ce qui a échoué y reste
+                var done = _job.Files.Count > 0 ? _history.Select(h => h.Url).ToHashSet() : [];
+                _selection.RemoveAll(v => done.Contains(v.Url));
+                SaveSelection();
+            }
+
+            StateHasChanged();
+        }), null, 1000, 1000);
+    }
+
+    public void Dispose() => _timer?.Dispose();
+}

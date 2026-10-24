@@ -420,6 +420,14 @@ public class CollectionKey : Record<CollectionKey>
                 CollectionType = filler.CollectionType,
                 PlaylistId = filler.PlaylistId
             },
+
+            // Nounours : une seule vidéo (interlude, cartons de saga…) comme remplissage
+            CollectionType.Movie or CollectionType.Episode or CollectionType.MusicVideo or CollectionType.OtherVideo
+                or CollectionType.Song or CollectionType.Image => new CollectionKey
+                {
+                    CollectionType = filler.CollectionType,
+                    MediaItemId = filler.MediaItemId
+                },
             _ => throw new ArgumentOutOfRangeException(nameof(filler))
         };
 }

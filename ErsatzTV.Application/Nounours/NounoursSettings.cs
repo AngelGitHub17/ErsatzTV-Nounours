@@ -20,6 +20,12 @@ public sealed class NounoursSettings
     public WeatherSettings Weather { get; set; } = new();
     public EssentialSettings Essential { get; set; } = new();
     public SagaSettings Sagas { get; set; } = new();
+
+    /// <summary>Vidéos du web choisies (adresses gardées, à télécharger plus tard).</summary>
+    public List<WebVideo> WebSelection { get; set; } = [];
+
+    /// <summary>Navigateur dont yt-dlp reprend la connexion YouTube (« firefox », « edge », « chrome »…) ; vide = aucun.</summary>
+    public string WebCookiesBrowser { get; set; } = string.Empty;
     public List<Appointment> Appointments { get; set; } = [];
 
     /// <summary>Diffusion automatique de l'interlude à heures fixes (en plus du remplissage de secours).</summary>

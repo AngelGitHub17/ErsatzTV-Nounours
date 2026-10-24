@@ -326,3 +326,13 @@ div.ersatztv-light.nounours {
 .n-saga-films li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .n-remote-scenes { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }
 .n-saga-status { border-left: 3px solid var(--mud-palette-primary); font-size: .8rem; margin: 4px 0; padding-left: 8px; }
+
+/* ---------- vidéos YouTube ---------- */
+.n-web-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); margin-top: 8px; }
+.n-web-card { border: 2px solid transparent; border-radius: 8px; cursor: pointer; padding: 4px; }
+.n-web-card:hover { background: var(--mud-palette-action-default-hover); }
+.n-web-card.is-chosen { border-color: var(--mud-palette-primary); }
+.n-web-thumb { aspect-ratio: 16 / 9; background: #000 center / cover no-repeat; border-radius: 6px; position: relative; }
+.n-web-thumb span { background: #000c; border-radius: 3px; bottom: 4px; color: #fff; font-size: .72rem; padding: 1px 5px; position: absolute; right: 4px; }
+.n-web-thumb b { background: var(--mud-palette-primary); border-radius: 50%; color: #fff; height: 26px; left: 6px; line-height: 26px; position: absolute; text-align: center; top: 6px; width: 26px; }
+.n-web-title { display: -webkit-box; font-size: .85rem; font-weight: 600; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin-top: 4px; overflow: hidden; }

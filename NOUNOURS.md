@@ -200,6 +200,17 @@ Les insertions s'affichent dans la liste et s'annulent d'un clic. La grille n'es
   l'heure locale (avant, lundi 0h30 en France comptait encore pour dimanche, et **tout le lundi** passait la grille du week-end) ;
   et le jour du changement d'heure, « minuit » n'est plus calculé à 23h (la journée suivante démarrait la veille).
 
+### Vidéos YouTube (`/videos-web`)
+- Chercher des vidéos (mots, ou adresse d'une vidéo, d'une playlist, d'une chaîne), avec miniature, durée et chaîne ; un clic les
+  ajoute à **ma sélection** (gardée d'une fois sur l'autre).
+- **Garder les adresses** : « Copier les adresses » ou « Exporter (.txt) » (adresse + titre).
+- **Télécharger** la sélection dans la médiathèque (Pubs, Jingles, Bandes-annonces, Habillage vidéo, Clips, Vidéos, Films), en
+  720p, 1080p ou la meilleure qualité, avec progression. Chaque dossier garde un registre `adresses-videos-web.tsv` (date, titre,
+  adresse, fichier) et la page liste ce qui a déjà été récupéré.
+- Utilise **yt-dlp**, que la page installe (et met à jour) en un clic depuis sa page officielle GitHub. Si YouTube répond « confirmez
+  que vous n'êtes pas un robot », choisir « Connexion YouTube » : Firefox (conseillé), Edge, Chrome ou Brave connecté à YouTube.
+- Seulement des vidéos que vous avez le droit de garder et de diffuser (les vôtres, licence libre, accord de l'auteur).
+
 ### Rotation et trous (programmation automatique)
 - **Rotation** : pour chaque famille de la grille, tous les combien un même programme revient (d'après la grille et la durée
   moyenne des programmes) — orange s'il revient dans la semaine, rouge s'il revient presque tous les jours.
@@ -369,6 +380,13 @@ Voir [MODULES.md](MODULES.md). Un module ajoute des pages, des entrées de menu,
 sans toucher au cœur. Exemples fournis : « Audience » et « Statistiques de diffusion » (intégrés) et « Bloc-notes de la régie » (externe, `plugins-exemple/`).
 
 ### Corrections
+- **Chaîne qui ne diffuse plus rien pendant des jours** : une collection vide utilisée comme remplissage (ex. « Pubs » sans pub,
+  « Jingles » sans jingle) faisait échouer TOUTE la construction de la grille (« has no valid items ») ; la grille n'était plus
+  prolongée. La programmation automatique n'utilise plus une collection vide (et le dit), et un garde-fou débranche, toutes les
+  15 minutes, les remplissages dont la collection est vide, puis reconstruit la grille. Sans pubs, la chaîne reçoit l'interlude
+  (ou les rediffusions) comme remplissage de secours, pour éviter l'écran noir entre deux programmes.
+- **Interlude et cartons de saga** : une vidéo seule utilisée comme remplissage faisait planter la construction de la grille
+  (« Parameter 'filler' ») ; ErsatzTV l'accepte maintenant (`CollectionKey.cs`).
 - Les rendez-vous ajoutés depuis le planning (et les créneaux de l'assistant) sont remis dans l'ordre chronologique :
   ErsatzTV lit les créneaux dans l'ordre de la liste, un créneau à heure fixe placé après un plus tardif passait au lendemain.
 - ErsatzTV plantait après l'ajout d'un élément de planning sans filigrane ni élément graphique (liste non initialisée) : corrigé

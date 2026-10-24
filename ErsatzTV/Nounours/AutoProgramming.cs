@@ -447,11 +447,24 @@ public sealed class AutoProgrammingService(
 
         // 2. jingles et pubs
         (int? pre, int? post, int? tail) = await EnsureFillers(plan, cancellationToken);
-        if (pre.HasValue || post.HasValue)
+        if (post.HasValue)
         {
-            Report(plan.QuarterHour
-                ? "Jingles avant les programmes, pubs pour caler les débuts sur le quart d'heure"
-                : "Jingles avant les programmes, pubs entre les programmes");
+            Report(plan.QuarterHour ? "Pubs pour caler les débuts sur le quart d'heure" : "Pubs entre les programmes");
+        }
+
+        if (pre.HasValue)
+        {
+            Report("Un jingle avant chaque programme");
+        }
+
+        if (plan.Pubs && !_hasPubs)
+        {
+            Report("⚠ Aucune pub dans « Pubs » : les programmes s'enchaînent sans coupure (ajoutez des pubs dans « Ajouter des médias », puis réappliquez)");
+        }
+
+        if (plan.Jingles && !_hasJingles)
+        {
+            Report("⚠ Aucun jingle dans « Jingles » : pas de jingle avant les programmes (fabriquez-en dans l'Atelier, puis réappliquez)");
         }
 
         List<WizardSlot> Slots(List<AutoBlock> blocks) =>
@@ -540,6 +553,28 @@ public sealed class AutoProgrammingService(
             await worker.WriteAsync(new BuildPlayout(playoutId, PlayoutBuildMode.Reset), cancellationToken);
         }
 
+        // sans pubs pour combler, un film plus court que son créneau laisse un écran noir jusqu'au rendez-vous suivant :
+        // la chaîne reçoit un remplissage de secours (l'interlude s'il existe, sinon les rediffusions)
+        if (!_hasPubs)
+        {
+            await using TvContext db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+            ErsatzTV.Core.Domain.Channel channel = await db.Channels.FirstOrDefaultAsync(c => c.Playouts.Any(p => p.Id == playoutId), cancellationToken);
+            if (channel is { FallbackFillerId: null })
+            {
+                int? interlude = await db.FillerPresets.Where(p => p.Name == AutomationService.InterludePresetName).Select(p => (int?)p.Id).FirstOrDefaultAsync(cancellationToken);
+                if (interlude is not null)
+                {
+                    channel.FallbackFillerId = interlude;
+                    await db.SaveChangesAsync(cancellationToken);
+                    Report("Entre deux programmes sans pub : l'interlude passe (remplissage de secours)");
+                }
+                else if (collections.TryGetValue(AutoCategory.Nuit, out int night) || collections.TryGetValue(AutoCategory.Series, out night))
+                {
+                    Report(await FillGaps(channel.Id, night, cancellationToken) + " (en attendant des pubs, pour éviter l'écran noir)");
+                }
+            }
+        }
+
         Report("Grille en construction : elle apparaît dans le Planning d'ici quelques secondes");
         return steps;
     }
@@ -567,11 +602,112 @@ public sealed class AutoProgrammingService(
     }
 
     /// <summary>Jingle avant chaque programme ; pubs après (comptées, ou pour caler sur le quart d'heure) ; pubs pour combler avant un rendez-vous.</summary>
+    private bool _hasJingles;
+    private bool _hasPubs;
+
+    /// <summary>La collection intelligente trouve-t-elle au moins une vidéo ?</summary>
+    public async Task<bool> HasItems(int? smartCollectionId, CancellationToken cancellationToken)
+    {
+        if (smartCollectionId is null)
+        {
+            return false;
+        }
+
+        await using TvContext db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        string query = await db.SmartCollections.Where(c => c.Id == smartCollectionId).Select(c => c.Query).FirstOrDefaultAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return false;
+        }
+
+        try
+        {
+            SearchResultAllItemsViewModel items = await mediator.Send(new QuerySearchIndexAllItems(query), cancellationToken);
+            return items.MovieIds.Count + items.EpisodeIds.Count + items.MusicVideoIds.Count + items.OtherVideoIds.Count +
+                (items.RemoteStreamIds?.Count ?? 0) > 0;
+        }
+        catch (Exception ex)
+        {
+            // recherche indisponible (index en cours de reconstruction…) : dans le doute, on ne touche à rien
+            logger.LogDebug(ex, "Programmation auto : collection {Id} non vérifiée", smartCollectionId);
+            return true;
+        }
+    }
+
+    /// <summary>
+    ///     Réparation : un remplissage (jingles, pubs, comblement…) branché sur une collection vide empêche la grille de se
+    ///     construire, et la chaîne finit par ne plus rien diffuser. On le débranche des plannings (et des chaînes) puis
+    ///     on reconstruit. Renvoie ce qui a été débranché.
+    /// </summary>
+    public async Task<List<string>> RepairEmptyFillers(CancellationToken cancellationToken)
+    {
+        await using TvContext db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        List<FillerPreset> presets = await db.FillerPresets.Where(p => p.CollectionType == CollectionType.SmartCollection && p.SmartCollectionId != null).ToListAsync(cancellationToken);
+        var empty = new List<FillerPreset>();
+        foreach (FillerPreset preset in presets)
+        {
+            if (!await HasItems(preset.SmartCollectionId, cancellationToken))
+            {
+                empty.Add(preset);
+            }
+        }
+
+        if (empty.Count == 0)
+        {
+            return [];
+        }
+
+        var ids = empty.Select(p => p.Id).ToList();
+        List<ProgramScheduleItem> items = await db.ProgramScheduleItems
+            .Where(i => ids.Contains(i.PreRollFillerId ?? 0) || ids.Contains(i.PostRollFillerId ?? 0) || ids.Contains(i.MidRollFillerId ?? 0) ||
+                        ids.Contains(i.TailFillerId ?? 0) || ids.Contains(i.FallbackFillerId ?? 0))
+            .ToListAsync(cancellationToken);
+        var schedules = items.Select(i => i.ProgramScheduleId).ToHashSet();
+        foreach (ProgramScheduleItem item in items)
+        {
+            if (ids.Contains(item.PreRollFillerId ?? 0)) item.PreRollFillerId = null;
+            if (ids.Contains(item.PostRollFillerId ?? 0)) item.PostRollFillerId = null;
+            if (ids.Contains(item.MidRollFillerId ?? 0)) item.MidRollFillerId = null;
+            if (ids.Contains(item.TailFillerId ?? 0)) item.TailFillerId = null;
+            if (ids.Contains(item.FallbackFillerId ?? 0)) item.FallbackFillerId = null;
+        }
+
+        List<ErsatzTV.Core.Domain.Channel> channels = await db.Channels.Where(c => ids.Contains(c.FallbackFillerId ?? 0)).ToListAsync(cancellationToken);
+        foreach (ErsatzTV.Core.Domain.Channel channel in channels)
+        {
+            channel.FallbackFillerId = null;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        if (items.Count == 0 && channels.Count == 0)
+        {
+            return [];
+        }
+
+        List<int> playouts = await db.Playouts
+            .Where(p => schedules.Contains(p.ProgramScheduleId ?? 0) || p.ProgramScheduleAlternates.Any(a => schedules.Contains(a.ProgramScheduleId)))
+            .Select(p => p.Id)
+            .ToListAsync(cancellationToken);
+        foreach (int playoutId in playouts)
+        {
+            await worker.WriteAsync(new BuildPlayout(playoutId, PlayoutBuildMode.Refresh), cancellationToken);
+        }
+
+        var result = empty.Select(p => p.Name).ToList();
+        logger.LogWarning("Remplissages débranchés (collection vide, la grille ne pouvait plus se construire) : {Presets}", string.Join(", ", result));
+        return result;
+    }
+
     private async Task<(int? Pre, int? Post, int? Tail)> EnsureFillers(AutoPlan plan, CancellationToken cancellationToken)
     {
         await using TvContext db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         int? jingles = await db.SmartCollections.Where(c => c.Name == FolderImportService.Label(ImportRole.Jingles)).Select(c => (int?)c.Id).FirstOrDefaultAsync(cancellationToken);
         int? pubs = await db.SmartCollections.Where(c => c.Name == FolderImportService.Label(ImportRole.Pubs)).Select(c => (int?)c.Id).FirstOrDefaultAsync(cancellationToken);
+
+        // une collection vide fait échouer TOUTE la construction de la grille (ErsatzTV : « has no valid items ») : on ne s'en sert pas
+        jingles = await HasItems(jingles, cancellationToken) ? jingles : null;
+        pubs = await HasItems(pubs, cancellationToken) ? pubs : null;
+        (_hasJingles, _hasPubs) = (jingles is not null, pubs is not null);
 
         async Task<int?> Preset(string name, FillerKind kind, FillerMode mode, int? count, int? pad, int? collection)
         {

@@ -44,6 +44,7 @@ public sealed class AutomationScheduler(
     }
 
     private DateTimeOffset _journalUntil = DateTimeOffset.Now.AddMinutes(-1);
+    private DateTimeOffset _repairAt = DateTimeOffset.MinValue;
 
     private async Task Tick(CancellationToken cancellationToken)
     {
@@ -129,6 +130,20 @@ public sealed class AutomationScheduler(
             if (due > DateTimeOffset.MinValue && (essential.LastMadeAt is null || essential.LastMadeAt < due))
             {
                 await automation.MakeEssential(cancellationToken);
+            }
+        }
+
+        // garde-fou : un remplissage sur une collection vide (ex. « Pubs » sans pub) bloque toute la grille d'une chaîne
+        if (now >= _repairAt)
+        {
+            _repairAt = now.AddMinutes(15);
+            try
+            {
+                await scope.ServiceProvider.GetRequiredService<AutoProgrammingService>().RepairEmptyFillers(cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogDebug(ex, "Réparation des remplissages : erreur");
             }
         }
 
