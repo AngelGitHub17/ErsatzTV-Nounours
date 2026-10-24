@@ -220,6 +220,11 @@ public sealed class ObsSettings
 
     /// <summary>Latence SRT en millisecondes.</summary>
     public int LatencyMs { get; set; } = 300;
+
+    /// <summary>Télécommande d'OBS (Outils › Paramètres du serveur WebSocket) : port et mot de passe.</summary>
+    public int WebSocketPort { get; set; } = 4455;
+
+    public string WebSocketPassword { get; set; } = string.Empty;
 }
 
 /// <summary>Chaîne d'info : titres qui défilent, flash, sujet en cours ; lus par l'habillage toutes les quelques secondes.</summary>
@@ -229,12 +234,37 @@ public sealed class InfoSettings
     public string Flash { get; set; } = string.Empty;
     public string Topic { get; set; } = string.Empty;
     public string RssUrl { get; set; } = string.Empty;
-    public string ChannelName { get; set; } = "NOUNOURS INFO";
+    public string ChannelName { get; set; } = "NOUNOURS.INFOS";
     public List<InfoSource> Sources { get; set; } = [];
+
+    /// <summary>Crédit affiché à l'écran (obligatoire pour certaines sources, ex. « © Union européenne, 2026 — CC BY 4.0 »).</summary>
+    public string Credit { get; set; } = string.Empty;
+
+    /// <summary>Adresses lues automatiquement pour les titres : flux RSS / Atom, ou page texte (un titre par ligne). Une par ligne.</summary>
+    public string Feeds { get; set; } = string.Empty;
+
+    public int FeedItems { get; set; } = 6;
+    public int FeedMinutes { get; set; } = 10;
+    public DateTimeOffset? FeedsAt { get; set; }
+    public string FeedsResult { get; set; }
+
+    /// <summary>Un nouveau flash déclenche le jingle « Flash spécial » sur ces chaînes.</summary>
+    public bool FlashJingle { get; set; }
+
+    public List<int> FlashChannelIds { get; set; } = [];
+
+    /// <summary>Dernier flash mis à l'antenne (pour ne jouer le jingle qu'une fois par flash).</summary>
+    public string LastFlash { get; set; } = string.Empty;
 }
 
 public sealed class InfoSource
 {
     public string Name { get; set; } = string.Empty;
     public string Url { get; set; } = string.Empty;
+
+    /// <summary>Piste audio séparée (ex. la version française d'un flux multilingue) ; vide = celle du flux.</summary>
+    public string AudioUrl { get; set; } = string.Empty;
+
+    /// <summary>Crédit à afficher quand cette source passe (licence).</summary>
+    public string Credit { get; set; } = string.Empty;
 }

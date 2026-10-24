@@ -1,0 +1,92 @@
+@page "/journal"
+@using System.Globalization
+@using ErsatzTV.Application.Nounours
+@inject IJournalService Journal
+
+<PageTitle>Journal de diffusion · ErsatzTV</PageTitle>
+
+<div class="n-page" style="height: 100%; overflow-y: auto">
+    <div class="n-page-header">
+        <div>
+            <h1>Journal de diffusion</h1>
+            <p>Tout ce qui est passé à l'antenne, à la seconde : programmes, jingles, pubs, prises d'antenne de la régie et directs. Noté automatiquement chaque minute.</p>
+        </div>
+        @if (_lines.Count > 0)
+        {
+            <a class="mud-button-root mud-button mud-button-filled mud-button-filled-primary mud-button-filled-size-medium" style="padding: 6px 16px"
+               href="@CsvLink()" download="@($"journal-{_day:yyyy-MM-dd}.csv")">Télécharger (CSV)</a>
+        }
+    </div>
+
+    <div class="n-card mb-3">
+        <div class="d-flex gap-3 flex-wrap align-center">
+            <MudSelect T="DateOnly" Value="@_day" ValueChanged="@SelectDay" Label="Jour" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 220px">
+                @foreach (DateOnly day in _days)
+                {
+                    <MudSelectItem Value="@day">@day.ToString("dddd d MMMM yyyy", Fr)</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="string" @bind-Value="_channel" Label="Chaîne" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 240px">
+                <MudSelectItem Value="@string.Empty">Toutes</MudSelectItem>
+                @foreach (string channel in _all.Select(l => l.Channel).Distinct().Order())
+                {
+                    <MudSelectItem Value="@channel">@channel</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSwitch T="bool" @bind-Value="_hideFiller" Color="Color.Primary" Label="Masquer les intercalaires"/>
+            <span class="n-muted">@_lines.Count élément(s)</span>
+        </div>
+    </div>
+
+    <div class="n-card">
+        @if (_lines.Count == 0)
+        {
+            <div class="n-empty" style="padding: 24px">Rien de noté pour ce jour. Le journal commence quand ErsatzTV tourne.</div>
+        }
+        @foreach (JournalLine line in _lines)
+        {
+            <div class="n-cond-row @(line.Kind == "Intercalaire" ? "is-filler" : "")">
+                <b>@line.Start.ToString("HH:mm:ss", Fr)</b>
+                <span class="n-muted" style="width: 150px; flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">@line.Channel</span>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@(line.Kind == "Direct" ? Color.Error : Color.Default)">@line.Kind</MudChip>
+                <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">@line.Title</span>
+                <span class="n-muted">@Length(line.Finish - line.Start)</span>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
+    private List<DateOnly> _days = [];
+    private DateOnly _day = DateOnly.FromDateTime(DateTime.Today);
+    private List<JournalLine> _all = [];
+    private string _channel = string.Empty;
+    private bool _hideFiller;
+
+    private List<JournalLine> _lines =>
+        _all.Where(l => (_channel.Length == 0 || l.Channel == _channel) && (!_hideFiller || l.Kind != "Intercalaire")).ToList();
+
+    protected override void OnInitialized()
+    {
+        _days = Journal.Days();
+        if (!_days.Contains(_day))
+        {
+            _days.Insert(0, _day);
+        }
+
+        _all = Journal.Read(_day);
+    }
+
+    private void SelectDay(DateOnly day)
+    {
+        _day = day;
+        _all = Journal.Read(day);
+    }
+
+    private string CsvLink() =>
+        "data:text/csv;charset=utf-8;base64," + Convert.ToBase64String(System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(Journal.Csv(_lines))).ToArray());
+
+    private static string Length(TimeSpan t) =>
+        t.TotalHours >= 1 ? $"{(int)t.TotalHours} h {t.Minutes:00}" : t.TotalMinutes >= 1 ? $"{(int)t.TotalMinutes} min {t.Seconds:00}" : $"{Math.Max(0, t.Seconds)} s";
+}

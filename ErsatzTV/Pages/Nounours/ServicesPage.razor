@@ -232,6 +232,15 @@
             </div>
         </MudItem>
 
+        @* ------------------------------------------------ son *@
+        <MudItem xs="12" lg="6">
+            <div class="n-card" style="height: 100%">
+                <div class="n-card-title">Même volume partout</div>
+                <MudSwitch T="bool" Value="@_sameVolume" ValueChanged="@SetSameVolume" Color="Color.Primary" Label="Volume identique entre les programmes, les pubs et les chaînes"/>
+                <MudText Typo="Typo.body2" Class="n-muted mt-1">Le son de chaque programme est ramené au même niveau perçu pendant la diffusion (norme EBU R128, comme à la télé : −16 LUFS ici). Fini la pub qui crie après un film calme. Demande un peu plus de calcul au PC.</MudText>
+            </div>
+        </MudItem>
+
         @* ------------------------------------------------ chaînes éphémères *@
         <MudItem xs="12" lg="6">
             <div class="n-card" style="height: 100%">
@@ -299,6 +308,7 @@
             .OrderBy(c => double.TryParse(c.Number, NumberStyles.Number, CultureInfo.InvariantCulture, out double n) ? n : 0)
             .ToList();
         _regieChannels = await Regie.GetChannels(CancellationToken.None);
+        _sameVolume = await Automation.IsSameVolume(CancellationToken.None);
     }
 
     private void Save()
@@ -388,6 +398,15 @@
 
     private static readonly DayOfWeek[] Week =
         [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday];
+
+    private bool _sameVolume;
+
+    private async Task SetSameVolume(bool on)
+    {
+        int count = await Automation.SetSameVolume(on, CancellationToken.None);
+        _sameVolume = on;
+        Snackbar.Add(on ? $"Volume identique activé ({count} profil(s) FFmpeg) : effectif au prochain programme." : "Volume identique désactivé.", Severity.Success);
+    }
 
     private RenderFragment ChannelChips(List<int> ids) => __builder =>
     {

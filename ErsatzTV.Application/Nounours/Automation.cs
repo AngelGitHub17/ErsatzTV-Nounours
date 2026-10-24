@@ -41,6 +41,11 @@ public interface IAutomationService
     Task RunAppointments(CancellationToken cancellationToken);
 
     Task<(int Id, double Seconds)?> FindByPath(string path, CancellationToken cancellationToken);
+
+    /// <summary>Même volume sur toutes les chaînes : normalisation EBU R128 dans tous les profils FFmpeg.</summary>
+    Task<int> SetSameVolume(bool enabled, CancellationToken cancellationToken);
+
+    Task<bool> IsSameVolume(CancellationToken cancellationToken);
 }
 
 public sealed class AutomationService(
@@ -581,6 +586,31 @@ public sealed class AutomationService(
             .Select(i => (DateTime?)i.Start)
             .FirstOrDefaultAsync(cancellationToken);
         return start is null ? null : new DateTimeOffset(DateTime.SpecifyKind(start.Value, DateTimeKind.Utc)).ToLocalTime();
+    }
+
+    public async Task<int> SetSameVolume(bool enabled, CancellationToken cancellationToken)
+    {
+        await using TvContext db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        List<FFmpegProfile> profiles = await db.FFmpegProfiles.ToListAsync(cancellationToken);
+        foreach (FFmpegProfile profile in profiles)
+        {
+            profile.NormalizeLoudnessMode = enabled ? NormalizeLoudnessMode.LoudNorm : NormalizeLoudnessMode.Off;
+            if (enabled)
+            {
+                profile.NormalizeAudio = true; // la normalisation du son passe par le réencodage audio
+                profile.TargetLoudness ??= -16;
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return profiles.Count;
+    }
+
+    public async Task<bool> IsSameVolume(CancellationToken cancellationToken)
+    {
+        await using TvContext db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        List<NormalizeLoudnessMode> modes = await db.FFmpegProfiles.Select(p => p.NormalizeLoudnessMode).ToListAsync(cancellationToken);
+        return modes.Count > 0 && modes.All(m => m == NormalizeLoudnessMode.LoudNorm);
     }
 
     /// <summary>Le programme (film ou vidéo) correspondant à un fichier, et sa durée.</summary>

@@ -183,6 +183,14 @@ Les 6 prochaines heures d'une chaîne. Choisissez une vidéo ou un flux, puis : 
 (elle finit pile quand il commence, à la place de la fin du précédent) ou **À la place** d'un programme (pendant toute sa durée).
 Les insertions s'affichent dans la liste et s'annulent d'un clic. La grille n'est pas reconstruite : tout reprend à l'heure.
 
+### Journal de diffusion (`/journal`)
+Chaque minute, tout ce qui a commencé à l'antenne (programmes, intercalaires, régie, directs) est noté dans `journal/AAAA-MM-JJ.jsonl`.
+Page par jour, filtre par chaîne, intercalaires masquables, export **CSV** (ouvre dans Excel).
+
+### Même volume partout (Services automatiques)
+Un interrupteur active la normalisation du son (EBU R128, −16 LUFS) dans tous les profils FFmpeg : même niveau perçu entre films,
+séries, pubs et chaînes.
+
 ### Info en continu (`/info`)
 - **Bandeaux en direct** : sujet « EN DIRECT » (texte fixe, le fond s'arrête au texte), **flash** (bandeau bordeaux, caché s'il est
   vide), **titres** qui défilent (+ RSS). « Mettre à l'antenne » : visible en 5 à 30 s environ (tampon du lecteur), sans couper l'image.
@@ -192,6 +200,17 @@ Les insertions s'affichent dans la liste et s'annulent d'un clic. La grille n'es
   `srt://0.0.0.0:9710?mode=listener&latency=300000` (adresse et port réglables, UDP possible sur le même réseau) — et des **flux de
   chaînes d'info** (lien direct .m3u8 / .ts que la chaîne autorise à reprendre). Ils deviennent des « flux en direct » (bibliothèque
   « Flux en direct ») utilisables aussi dans la Régie et le Conducteur.
+- **Créer la chaîne d'info en un clic** (« Nounours.Infos ») : bouton « Ajouter EBS » — la chaîne d'information des institutions
+  européennes, diffusée en clair et réutilisable sous licence **CC BY 4.0** en citant la source (le crédit « © Union européenne »
+  s'affiche à l'écran) ; son en français assemblé automatiquement (image 720p + piste française) — puis « Créer la chaîne » : chaîne
+  en continu sur les flux d'info, habillage info appliqué, flash relié. France 24, DW… : il faut leur accord pour rediffuser.
+- **Titres automatiques** : adresses lues toutes les N minutes (RSS, Atom, ou une page de vos sites qui renvoie un titre par ligne
+  ou un tableau JSON), ajoutées aux titres du bandeau. Exemple PHP : `<?php header('Content-Type: text/plain; charset=utf-8');
+  echo "Titre 1\nTitre 2";`.
+- **Jingle « Flash spécial »** : fabriqué en un clic, il passe tout seul sur les chaînes choisies dès qu'un nouveau flash est mis
+  à l'antenne (une fois par flash).
+- **Caméras / scènes OBS** : télécommande d'OBS (obs-websocket v5, Outils › Paramètres du serveur WebSocket, mot de passe) ; les
+  scènes s'affichent en boutons dans « Prendre l'antenne » : multi-caméras sans couper l'antenne.
 - Un direct tourne désormais en un seul processus continu (au lieu de se reconnecter à la source toutes les 44 s).
 - Corrigé : un texte vide (ex. titre d'un flux en direct) faisait disparaître tout l'habillage ; le moteur graphique journalise
   maintenant ses erreurs au lieu de s'arrêter en silence.

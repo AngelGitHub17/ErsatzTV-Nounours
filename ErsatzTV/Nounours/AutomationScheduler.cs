@@ -43,11 +43,32 @@ public sealed class AutomationScheduler(
         }
     }
 
+    private DateTimeOffset _journalUntil = DateTimeOffset.Now.AddMinutes(-1);
+
     private async Task Tick(CancellationToken cancellationToken)
     {
         NounoursSettings settings = NounoursSettings.Load();
         using IServiceScope scope = scopeFactory.CreateScope();
         IAutomationService automation = scope.ServiceProvider.GetRequiredService<IAutomationService>();
+
+        // journal de diffusion : ce qui a commencé depuis la dernière minute
+        DateTimeOffset now = DateTimeOffset.Now;
+        try
+        {
+            await scope.ServiceProvider.GetRequiredService<IJournalService>().Record(_journalUntil, now, cancellationToken);
+            _journalUntil = now;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogDebug(ex, "Journal de diffusion : erreur");
+        }
+
+        // titres de l'info lus sur vos sites / flux RSS
+        if (!string.IsNullOrWhiteSpace(settings.Info.Feeds) &&
+            (settings.Info.FeedsAt is null || now - settings.Info.FeedsAt >= TimeSpan.FromMinutes(Math.Max(2, settings.Info.FeedMinutes))))
+        {
+            await scope.ServiceProvider.GetRequiredService<IInfoService>().RefreshFeeds(cancellationToken);
+        }
 
         if (settings.EphemeralChannels.Count > 0)
         {
