@@ -294,12 +294,13 @@ public sealed class InfoService(
 
         foreach ((string file, (string title, string url)) in wanted)
         {
-            // les flux d'info durent « 1 h » pour la grille (répétés à la suite) ; OBS n'a pas de durée
+            // les flux d'info durent « 30 min » pour la grille (répétés à la suite) : ils rentrent dans un journal de 19h30
+            // comme dans une tranche de midi à 13h ; OBS n'a pas de durée
             string yaml = scripts.TryGetValue(file, out string script)
-                ? $"title: {Quote(title)}\nscript: {Quote(script)}\nis_live: true\nduration: \"01:00:00\"\n"
+                ? $"title: {Quote(title)}\nscript: {Quote(script)}\nis_live: true\nduration: \"00:30:00\"\n"
                 : file == ObsFile
                     ? $"title: {Quote(title)}\nurl: {Quote(url)}\nis_live: true\n"
-                    : $"title: {Quote(title)}\nurl: {Quote(url)}\nis_live: true\nduration: \"01:00:00\"\n";
+                    : $"title: {Quote(title)}\nurl: {Quote(url)}\nis_live: true\nduration: \"00:30:00\"\n";
             string path = Path.Combine(StreamsFolder, file);
             if (!File.Exists(path) || await File.ReadAllTextAsync(path, cancellationToken) != yaml)
             {

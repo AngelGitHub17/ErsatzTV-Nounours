@@ -289,3 +289,13 @@ div.ersatztv-light.nounours {
 .n-cond-row.is-now { background: rgba(255, 50, 0, .12); }
 .n-cond-row.is-filler { font-size: .88rem; opacity: .7; }
 .n-cond-insert { background: rgba(255, 168, 0, .14); }
+
+/* ---------- programmation automatique ---------- */
+.n-auto { display: grid; gap: 16px; grid-template-columns: minmax(300px, 420px) 1fr; }
+@media (max-width: 1100px) { .n-auto { grid-template-columns: 1fr; } }
+.n-auto-dot { border-radius: 3px; display: inline-block; flex: none; height: 14px; width: 14px; }
+.n-auto-row { align-items: center; display: flex; gap: 8px; margin-bottom: 4px; }
+.n-auto-day { background: var(--mud-palette-background-gray); border-radius: 6px; height: 46px; overflow: hidden; position: relative; }
+.n-auto-day > div { border-right: 2px solid var(--mud-palette-surface); bottom: 0; color: #fff; font-size: .72rem; font-weight: 700; overflow: hidden; padding: 4px 6px; position: absolute; top: 0; }
+.n-auto-day > div span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.n-style.is-active { outline: 2px solid var(--mud-palette-primary); }

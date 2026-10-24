@@ -429,6 +429,17 @@ public class PlayoutBuilder : IPlayoutBuilder
             collectionMediaItems);
     }
 
+    /// <summary>
+    ///     Nounours : le minuit local suivant, avec le bon décalage horaire. Avant, le décalage du départ était gardé :
+    ///     le jour du passage à l'heure d'hiver, « minuit » tombait à 23h et la journée suivante démarrait la veille
+    ///     (donc avec la grille de la veille).
+    /// </summary>
+    private static DateTimeOffset LocalMidnightAfter(DateTimeOffset value)
+    {
+        DateTime next = DateTime.SpecifyKind(value.ToLocalTime().Date.AddDays(1), DateTimeKind.Unspecified);
+        return new DateTimeOffset(next, TimeZoneInfo.Local.GetUtcOffset(next));
+    }
+
     private async Task<Either<BaseError, PlayoutBuildResult>> BuildPlayoutItems(
         Playout playout,
         PlayoutReferenceData referenceData,
@@ -443,7 +454,7 @@ public class PlayoutBuilder : IPlayoutBuilder
         DateTimeOffset trimAfter = playoutFinish;
 
         DateTimeOffset start = playoutStart;
-        DateTimeOffset finish = playoutStart.Date.AddDays(1);
+        DateTimeOffset finish = LocalMidnightAfter(playoutStart);
 
         // _logger.LogDebug(
         //     "Trim before: {TrimBefore}, Start: {Start}, Finish: {Finish}, PlayoutFinish: {PlayoutFinish}",
@@ -492,7 +503,7 @@ public class PlayoutBuilder : IPlayoutBuilder
             randomStartPoint = false;
 
             start = playout.Anchor?.NextStartOffset ?? start;
-            finish = finish.AddDays(1);
+            finish = LocalMidnightAfter(finish);
         }
 
         if (cancellationToken.IsCancellationRequested)
@@ -569,8 +580,10 @@ public class PlayoutBuilder : IPlayoutBuilder
     {
         var random = new Random(playout.Seed);
 
+        // Nounours : le jour se lit à l'heure locale. Les ancres arrivent en UTC : à Paris, lundi 0h30 était
+        // encore « dimanche » et toute la journée du lundi se construisait avec la grille du week-end.
         ProgramSchedule activeSchedule = AlternateScheduleSelector
-            .GetScheduleForDate(referenceData.ProgramScheduleAlternates, playoutStart)
+            .GetScheduleForDate(referenceData.ProgramScheduleAlternates, playoutStart.ToLocalTime())
             .Match(s => s.ProgramSchedule, referenceData.ProgramSchedule);
 
         if (activeSchedule.Items.Count == 0)
@@ -954,7 +967,7 @@ public class PlayoutBuilder : IPlayoutBuilder
         }
 
         ProgramSchedule activeScheduleAtAnchor = AlternateScheduleSelector
-            .GetScheduleForDate(referenceData.ProgramScheduleAlternates, playoutBuilderState.CurrentTime)
+            .GetScheduleForDate(referenceData.ProgramScheduleAlternates, playoutBuilderState.CurrentTime.ToLocalTime())
             .Match(s => s.ProgramSchedule, referenceData.ProgramSchedule);
 
         // if we ended in a different alternate schedule, fix the anchor data
